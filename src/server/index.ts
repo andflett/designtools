@@ -47,8 +47,9 @@ export async function startServer({ targetPort, studioPort }: ServerOptions) {
   app.use("/scan", createScanRouter(projectRoot));
 
   // --- Serve the injected selection script ---
+  const selectionScriptPath = path.join(packageRoot, "src/inject/selection.js");
   app.get("/studio-inject.js", (_req, res) => {
-    res.sendFile(path.join(packageRoot, "src/inject/selection.js"));
+    res.type("application/javascript").send(fs.readFileSync(selectionScriptPath, "utf-8"));
   });
 
   // --- Proxy to the target dev server ---
