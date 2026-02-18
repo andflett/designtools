@@ -83,22 +83,49 @@ function ShadowRow({
   const handleSave = async (newValue: string) => {
     setSaving(true);
     try {
-      const variableName = shadow.cssVariable || `--${shadow.name}`;
-      const selector = stylingType === "tailwind-v4" ? "@theme" : ":root";
+      // Design token shadows write to their own endpoint
+      if (shadow.source === "design-token" && shadow.tokenFilePath && shadow.tokenPath) {
+        const res = await fetch("/api/shadows/design-token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            filePath: shadow.tokenFilePath,
+            tokenPath: shadow.tokenPath,
+            value: newValue,
+          }),
+        });
+        const data = await res.json();
+        if (!data.ok) console.error("Design token save failed:", data.error);
+      } else {
+        // CSS/SCSS shadow writes
+        const variableName = shadow.sassVariable || shadow.cssVariable || `--${shadow.name}`;
+        let selector: string;
+        let filePath = cssFilePath;
 
-      const endpoint = shadow.isOverridden ? "/api/shadows" : "/api/shadows/create";
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          filePath: cssFilePath,
-          variableName,
-          value: newValue,
-          selector,
-        }),
-      });
-      const data = await res.json();
-      if (!data.ok) console.error("Shadow save failed:", data.error);
+        if (stylingType === "tailwind-v4") {
+          selector = "@theme";
+        } else if (stylingType === "bootstrap" && shadow.sassVariable) {
+          selector = "scss";
+          // Use the SCSS file if available, fall back to CSS file
+          filePath = shadow.filePath || cssFilePath;
+        } else {
+          selector = ":root";
+        }
+
+        const endpoint = shadow.isOverridden ? "/api/shadows" : "/api/shadows/create";
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            filePath,
+            variableName,
+            value: newValue,
+            selector,
+          }),
+        });
+        const data = await res.json();
+        if (!data.ok) console.error("Shadow save failed:", data.error);
+      }
     } catch (err) {
       console.error("Shadow save error:", err);
     }
@@ -134,6 +161,17 @@ function ShadowRow({
             }}
           >
             preset
+          </span>
+        )}
+        {shadow.source === "design-token" && (
+          <span
+            className="text-[9px] px-1.5 py-0.5 rounded"
+            style={{
+              background: "var(--studio-input-bg)",
+              color: "var(--studio-text-dimmed)",
+            }}
+          >
+            token
           </span>
         )}
         {saving && (

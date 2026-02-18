@@ -1,6 +1,11 @@
 import { Router } from "express";
 import fs from "fs/promises";
 import path from "path";
+import {
+  updateDesignTokenShadow,
+  buildDesignTokensJson,
+  writeDesignTokensFile,
+} from "../scanner/presets/w3c-design-tokens.js";
 
 export function createShadowsRouter(projectRoot: string) {
   const router = Router();
@@ -10,21 +15,27 @@ export function createShadowsRouter(projectRoot: string) {
     try {
       const { filePath, variableName, value, selector } = req.body as {
         filePath: string;
-        variableName: string;   // e.g. "--shadow-md"
+        variableName: string;   // e.g. "--shadow-md" or "--bs-box-shadow-sm"
         value: string;          // e.g. "0 4px 6px -1px rgb(0 0 0 / 0.1)"
-        selector: string;       // ":root" or "@theme"
+        selector: string;       // ":root", "@theme", or "scss"
       };
 
       const fullPath = path.join(projectRoot, filePath);
-      let css = await fs.readFile(fullPath, "utf-8");
 
-      if (selector === "@theme") {
+      if (selector === "scss") {
+        // Write to a Sass file
+        let scss = await fs.readFile(fullPath, "utf-8");
+        scss = writeShadowToScss(scss, variableName, value);
+        await fs.writeFile(fullPath, scss, "utf-8");
+      } else if (selector === "@theme") {
+        let css = await fs.readFile(fullPath, "utf-8");
         css = writeShadowToTheme(css, variableName, value);
+        await fs.writeFile(fullPath, css, "utf-8");
       } else {
+        let css = await fs.readFile(fullPath, "utf-8");
         css = writeShadowToSelector(css, selector, variableName, value);
+        await fs.writeFile(fullPath, css, "utf-8");
       }
-
-      await fs.writeFile(fullPath, css, "utf-8");
 
       res.json({ ok: true, filePath, variableName, value });
     } catch (err: any) {
@@ -40,19 +51,29 @@ export function createShadowsRouter(projectRoot: string) {
         filePath: string;
         variableName: string;
         value: string;
-        selector: string;       // ":root" or "@theme"
+        selector: string;       // ":root", "@theme", or "scss"
       };
 
       const fullPath = path.join(projectRoot, filePath);
-      let css = await fs.readFile(fullPath, "utf-8");
 
-      if (selector === "@theme") {
+      if (selector === "scss") {
+        let scss: string;
+        try {
+          scss = await fs.readFile(fullPath, "utf-8");
+        } catch {
+          scss = "";
+        }
+        scss = addShadowToScss(scss, variableName, value);
+        await fs.writeFile(fullPath, scss, "utf-8");
+      } else if (selector === "@theme") {
+        let css = await fs.readFile(fullPath, "utf-8");
         css = addShadowToTheme(css, variableName, value);
+        await fs.writeFile(fullPath, css, "utf-8");
       } else {
+        let css = await fs.readFile(fullPath, "utf-8");
         css = addShadowToSelector(css, selector, variableName, value);
+        await fs.writeFile(fullPath, css, "utf-8");
       }
-
-      await fs.writeFile(fullPath, css, "utf-8");
 
       res.json({ ok: true, filePath, variableName, value });
     } catch (err: any) {
@@ -61,8 +82,51 @@ export function createShadowsRouter(projectRoot: string) {
     }
   });
 
+  // Write a shadow to a W3C Design Token file
+  router.post("/design-token", async (req, res) => {
+    try {
+      const { filePath, tokenPath, value } = req.body as {
+        filePath: string;   // e.g. "tokens/shadows.tokens.json"
+        tokenPath: string;  // e.g. "shadow-md" or "elevation.shadow-md"
+        value: string;      // CSS box-shadow string
+      };
+
+      const fullPath = path.join(projectRoot, filePath);
+      await updateDesignTokenShadow(fullPath, tokenPath, value);
+
+      res.json({ ok: true, filePath, tokenPath, value });
+    } catch (err: any) {
+      console.error("Design token write error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Export all shadows as a W3C Design Tokens file
+  router.post("/export-tokens", async (req, res) => {
+    try {
+      const { filePath, shadows } = req.body as {
+        filePath: string;
+        shadows: Array<{ name: string; value: string; description?: string }>;
+      };
+
+      const fullPath = path.join(projectRoot, filePath);
+      const tokens = buildDesignTokensJson(shadows);
+
+      // Ensure directory exists
+      await fs.mkdir(path.dirname(fullPath), { recursive: true });
+      await writeDesignTokensFile(fullPath, tokens);
+
+      res.json({ ok: true, filePath, tokenCount: shadows.length });
+    } catch (err: any) {
+      console.error("Token export error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   return router;
 }
+
+// --- CSS selector-based writes ---
 
 function writeShadowToSelector(
   css: string,
@@ -177,4 +241,35 @@ function addShadowToTheme(
   }
 
   return writeShadowToTheme(css, variableName, value);
+}
+
+// --- Sass/SCSS writes ---
+
+function writeShadowToScss(
+  scss: string,
+  variableName: string,
+  newValue: string
+): string {
+  // variableName comes as "$box-shadow-sm"
+  const varEscaped = variableName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(
+    `(${varEscaped}\\s*:\\s*)(.+?)(\\s*(?:!default)?\\s*;)`,
+    "g"
+  );
+
+  if (!regex.test(scss)) {
+    throw new Error(`Sass variable "${variableName}" not found in SCSS file`);
+  }
+
+  return scss.replace(regex, `$1${newValue}$3`);
+}
+
+function addShadowToScss(
+  scss: string,
+  variableName: string,
+  value: string
+): string {
+  // Append the new variable at the end of the file
+  const line = `${variableName}: ${value};\n`;
+  return scss.endsWith("\n") ? scss + line : scss + "\n" + line;
 }
