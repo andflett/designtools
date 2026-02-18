@@ -1,6 +1,6 @@
 import { Router } from "express";
 import fs from "fs/promises";
-import path from "path";
+import { safePath } from "@designtools/core/server";
 
 export function createTokensRouter(projectRoot: string) {
   const router = Router();
@@ -14,7 +14,7 @@ export function createTokensRouter(projectRoot: string) {
         selector: string; // ":root" or ".dark"
       };
 
-      const fullPath = path.join(projectRoot, filePath);
+      const fullPath = safePath(projectRoot, filePath);
       let css = await fs.readFile(fullPath, "utf-8");
 
       // Find the correct selector block and replace the token value

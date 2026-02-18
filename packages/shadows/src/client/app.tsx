@@ -39,6 +39,9 @@ export function App() {
       if (msg.type === "tool:elementSelected") {
         setSelectedElement(msg.data);
       }
+      if (msg.type === "tool:pathChanged") {
+        setIframePath(msg.path);
+      }
       if (msg.type === "tool:injectedReady" && iframeRef.current) {
         if (selectionMode) {
           sendToIframe(iframeRef.current, {
@@ -70,8 +73,20 @@ export function App() {
   }, [theme]);
 
   const previewShadow = useCallback(
-    (variableName: string, value: string) => {
-      if (iframeRef.current) {
+    (variableName: string, value: string, shadowName?: string) => {
+      if (!iframeRef.current) return;
+
+      // Tailwind v4 compiles shadow utilities (.shadow-sm) to use --tw-shadow
+      // internally, so setting --shadow-sm on :root has no effect.
+      // Instead, inject a <style> that overrides the utility class.
+      const isTailwind = scanData?.styling.type === "tailwind-v4";
+      if (isTailwind && shadowName) {
+        sendToIframe(iframeRef.current, {
+          type: "tool:previewShadow",
+          className: shadowName,
+          value,
+        });
+      } else {
         sendToIframe(iframeRef.current, {
           type: "tool:setProperty",
           token: variableName,
@@ -79,13 +94,14 @@ export function App() {
         });
       }
     },
-    []
+    [scanData]
   );
 
   return (
     <ToolChrome
       toolName="Shadows"
       toolIcon={<ShadowIcon style={{ width: 15, height: 15 }} />}
+      showSelectionMode={false}
       selectionMode={selectionMode}
       onToggleSelectionMode={() => setSelectionMode((s) => !s)}
       theme={theme}

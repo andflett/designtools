@@ -1,7 +1,7 @@
 import "../scss/main.scss";
 
 export const metadata = {
-  title: "Dashboard — Bootstrap Demo",
+  title: "Elevation — Bootstrap Demo",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -10,12 +10,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <nav className="navbar navbar-expand-sm navbar-dark bg-dark px-3">
           <a className="navbar-brand fw-semibold" href="/">
-            Acme Dashboard
+            Elevation Studio
           </a>
           <ul className="navbar-nav ms-auto gap-2">
             <li className="nav-item">
               <a className="nav-link active" href="/">
-                Overview
+                Shadows
               </a>
             </li>
           </ul>

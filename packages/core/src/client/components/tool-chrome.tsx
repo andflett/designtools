@@ -1,4 +1,4 @@
-import { type RefObject, type ReactNode, useState } from "react";
+import { type RefObject, type ReactNode, useState, useEffect } from "react";
 import {
   CursorArrowIcon,
   SunIcon,
@@ -14,6 +14,8 @@ export interface ToolChromeProps {
   toolIcon: ReactNode;
   /** The tool's editor panel (right side) */
   editorPanel?: ReactNode;
+  /** Whether to show the selection mode button (default true) */
+  showSelectionMode?: boolean;
   /** Selection mode state */
   selectionMode: boolean;
   onToggleSelectionMode: () => void;
@@ -34,6 +36,7 @@ export function ToolChrome({
   toolName,
   toolIcon,
   editorPanel,
+  showSelectionMode = true,
   selectionMode,
   onToggleSelectionMode,
   theme,
@@ -46,6 +49,11 @@ export function ToolChrome({
 }: ToolChromeProps) {
   const breakpoints = [375, 768, 1024, 1280];
   const [urlInput, setUrlInput] = useState(iframePath);
+
+  // Sync URL bar when iframePath changes (e.g. from iframe navigation)
+  useEffect(() => {
+    setUrlInput(iframePath);
+  }, [iframePath]);
 
   const handleUrlSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -145,13 +153,15 @@ export function ToolChrome({
 
         {/* Right: tools */}
         <div className="flex items-center gap-1 shrink-0">
-          <button
-            onClick={onToggleSelectionMode}
-            className={`studio-icon-btn ${selectionMode ? "active" : ""}`}
-            title={selectionMode ? "Selection mode on" : "Selection mode off"}
-          >
-            <CursorArrowIcon />
-          </button>
+          {showSelectionMode && (
+            <button
+              onClick={onToggleSelectionMode}
+              className={`studio-icon-btn ${selectionMode ? "active" : ""}`}
+              title={selectionMode ? "Selection mode on" : "Selection mode off"}
+            >
+              <CursorArrowIcon />
+            </button>
+          )}
           <button
             onClick={onToggleTheme}
             className="studio-icon-btn"

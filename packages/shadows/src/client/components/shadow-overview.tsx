@@ -7,61 +7,96 @@ interface ShadowOverviewProps {
   previewSettings: PreviewSettings;
 }
 
-export function ShadowOverview({ shadows, previewSettings }: ShadowOverviewProps) {
-  const [previewSize, setPreviewSize] = useState(80);
+type OverviewSize = "small" | "large";
 
-  const containerSize = previewSize + 64;
+export function ShadowOverview({ shadows, previewSettings }: ShadowOverviewProps) {
+  const [size, setSize] = useState<OverviewSize>("small");
 
   return (
     <div>
-      {/* Size selector */}
-      <div className="px-4 py-2 flex items-center justify-end">
-        <select
-          value={previewSize}
-          onChange={(e) => setPreviewSize(parseInt(e.target.value))}
-          className="studio-select"
-          style={{ fontSize: 10, width: 50 }}
-        >
-          <option value={64}>S</option>
-          <option value={80}>M</option>
-          <option value={112}>L</option>
-        </select>
+      {/* Size toggle tabs */}
+      <div
+        className="px-4 py-2 shrink-0"
+      >
+        <div className="studio-segmented" style={{ width: "100%" }}>
+          <button
+            onClick={() => setSize("small")}
+            className={size === "small" ? "active" : ""}
+            style={{ flex: 1 }}
+          >
+            Small
+          </button>
+          <button
+            onClick={() => setSize("large")}
+            className={size === "large" ? "active" : ""}
+            style={{ flex: 1 }}
+          >
+            Large
+          </button>
+        </div>
       </div>
 
       {/* Shadow grid */}
-      <div
-        className="grid gap-5 px-4 py-3"
-        style={{
-          gridTemplateColumns: `repeat(auto-fill, minmax(${containerSize}px, 1fr))`,
-        }}
-      >
-        {shadows.map((shadow: any) => (
-          <div key={shadow.name} className="flex flex-col items-center gap-2">
-            <div
-              className="flex items-center justify-center rounded-xl"
-              style={{
-                background: previewSettings.previewBg,
-                width: containerSize,
-                height: containerSize,
-              }}
-            >
-              <ShadowPreview
-                value={shadow.value}
-                size={previewSize}
-                background="white"
-                showBorder={previewSettings.showBorder}
-                borderColor={previewSettings.borderColor}
-              />
+      {size === "small" ? (
+        <div
+          className="grid gap-3 px-4 py-3"
+          style={{ gridTemplateColumns: "repeat(2, 1fr)" }}
+        >
+          {shadows.map((shadow: any) => (
+            <div key={shadow.name} className="flex flex-col items-center gap-2">
+              <div
+                className="flex items-center justify-center rounded-xl w-full"
+                style={{
+                  background: previewSettings.previewBg,
+                  height: 100,
+                }}
+              >
+                <ShadowPreview
+                  value={shadow.value}
+                  size={56}
+                  background="white"
+                  showBorder={previewSettings.showBorder}
+                  borderColor={previewSettings.borderColor}
+                />
+              </div>
+              <span
+                className="text-[9px] font-mono text-center truncate w-full"
+                style={{ color: "var(--studio-text-muted)" }}
+              >
+                {shadow.name}
+              </span>
             </div>
-            <span
-              className="text-[9px] font-mono text-center truncate w-full"
-              style={{ color: "var(--studio-text-muted)" }}
-            >
-              {shadow.name}
-            </span>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3 px-4 py-3">
+          {shadows.map((shadow: any) => (
+            <div key={shadow.name} className="flex flex-col items-center gap-2">
+              <div
+                className="flex items-center justify-center rounded-xl w-full"
+                style={{
+                  background: previewSettings.previewBg,
+                  height: 200,
+                }}
+              >
+                <ShadowPreview
+                  value={shadow.value}
+                  size={96}
+                  background="white"
+                  showBorder={previewSettings.showBorder}
+                  borderColor={previewSettings.borderColor}
+                />
+              </div>
+              <span
+                className="text-[9px] font-mono text-center truncate w-full"
+                style={{ color: "var(--studio-text-muted)" }}
+              >
+                {shadow.name}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {shadows.length === 0 && (
         <div

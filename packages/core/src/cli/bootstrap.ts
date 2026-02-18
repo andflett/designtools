@@ -61,13 +61,15 @@ export async function bootstrap(config: ToolConfig): Promise<PreflightResult> {
 
   console.log("");
   console.log(`  ${bold(config.name)}`);
+  console.log(`  ${dim(projectRoot)}`);
   console.log("");
 
   // 1. Check package.json exists
   const pkgPath = path.join(projectRoot, "package.json");
   if (!fs.existsSync(pkgPath)) {
-    console.log(`  ${red("✗")} No package.json found`);
-    console.log(`    ${dim("Run this command from your project root.")}`);
+    console.log(`  ${red("✗")} No package.json found in ${projectRoot}`);
+    console.log(`    ${dim("Run this command from the root of the app you want to edit.")}`);
+    console.log(`    ${dim("All file reads and writes are scoped to this directory.")}`);
     console.log("");
     process.exit(1);
   }
@@ -157,6 +159,8 @@ export async function bootstrap(config: ToolConfig): Promise<PreflightResult> {
   }
 
   console.log(`  ${green("✓")} Tool           http://localhost:${toolPort}`);
+  console.log("");
+  console.log(`  ${dim("All file writes are scoped to:")} ${bold(projectRoot)}`);
   console.log("");
 
   return { framework, styling, targetPort, toolPort, projectRoot };

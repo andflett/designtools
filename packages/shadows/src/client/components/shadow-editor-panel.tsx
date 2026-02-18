@@ -9,7 +9,7 @@ import type { ElementData } from "@designtools/core/client/lib/iframe-bridge";
 import { ShadowList } from "./shadow-list.js";
 import { ShadowOverview } from "./shadow-overview.js";
 import {
-  ShadowPreviewSettings,
+  ShadowPreviewSettingsButton,
   DEFAULT_PREVIEW_SETTINGS,
   type PreviewSettings,
 } from "./shadow-preview-settings.js";
@@ -19,7 +19,7 @@ type ViewMode = "list" | "overview";
 interface ShadowEditorPanelProps {
   scanData: ShadowsScanData | null;
   selectedElement: ElementData | null;
-  onPreviewShadow: (variableName: string, value: string) => void;
+  onPreviewShadow: (variableName: string, value: string, shadowName?: string) => void;
 }
 
 export function ShadowEditorPanel({
@@ -55,7 +55,7 @@ export function ShadowEditorPanel({
 
   const modeConfig: Record<ViewMode, { icon: any; label: string }> = {
     list: { icon: MixerHorizontalIcon, label: "Edit" },
-    overview: { icon: GridIcon, label: "Overview" },
+    overview: { icon: GridIcon, label: "Preview" },
   };
 
   return (
@@ -96,6 +96,10 @@ export function ShadowEditorPanel({
             {scanData.shadows.shadows.length !== 1 ? "s" : ""} found
           </div>
         </div>
+        <ShadowPreviewSettingsButton
+          settings={previewSettings}
+          onChange={setPreviewSettings}
+        />
       </div>
 
       {/* View mode switcher */}
@@ -121,16 +125,20 @@ export function ShadowEditorPanel({
         </div>
       </div>
 
-      {/* Preview settings */}
-      <div
-        className="px-4 py-2.5 border-b shrink-0"
-        style={{ borderColor: "var(--studio-border)" }}
-      >
-        <ShadowPreviewSettings
-          settings={previewSettings}
-          onChange={setPreviewSettings}
-        />
-      </div>
+      {/* No CSS file warning */}
+      {!scanData.shadows.cssFilePath && (
+        <div
+          className="mx-4 mt-2.5 mb-0 px-3 py-2 rounded-md text-[10px] shrink-0"
+          style={{
+            background: "rgb(255 243 205)",
+            color: "rgb(133 100 4)",
+            border: "1px solid rgb(255 224 130)",
+            lineHeight: 1.4,
+          }}
+        >
+          No CSS file found. Run this tool from your app directory to enable editing.
+        </div>
+      )}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto studio-scrollbar">

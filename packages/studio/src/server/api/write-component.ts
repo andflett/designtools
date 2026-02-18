@@ -1,6 +1,6 @@
 import { Router } from "express";
 import fs from "fs/promises";
-import path from "path";
+import { safePath } from "@designtools/core/server";
 
 export function createComponentRouter(projectRoot: string) {
   const router = Router();
@@ -14,7 +14,7 @@ export function createComponentRouter(projectRoot: string) {
         variantContext?: string; // e.g. "default" or "destructive" — narrows the search
       };
 
-      const fullPath = path.join(projectRoot, filePath);
+      const fullPath = safePath(projectRoot, filePath);
       let source = await fs.readFile(fullPath, "utf-8");
 
       source = replaceClassInComponent(source, oldClass, newClass, variantContext);

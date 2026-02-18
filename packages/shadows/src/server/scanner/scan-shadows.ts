@@ -60,10 +60,12 @@ export async function scanShadows(
   styling: StylingSystem
 ): Promise<ShadowMap> {
   const shadows: ShadowDefinition[] = [];
-  const cssFilePath = framework.cssFiles[0] || "";
+  // Prefer framework.cssFiles, fall back to styling.cssFiles
+  const allCssFiles = framework.cssFiles.length > 0 ? framework.cssFiles : styling.cssFiles;
+  const cssFilePath = allCssFiles[0] || "";
 
   // 1. Scan CSS files for custom shadow variables/values
-  const customShadows = await scanCustomShadows(projectRoot, framework.cssFiles);
+  const customShadows = await scanCustomShadows(projectRoot, allCssFiles);
 
   // Track which preset names have been overridden
   const overriddenNames = new Set(customShadows.map(s => s.name));
@@ -103,13 +105,46 @@ export async function scanShadows(
     });
   }
 
-  // Sort: custom first, then design tokens, then presets — alphabetically within each group
+  // Sort: custom first, then design tokens, then presets
+  // Within framework-preset, use size-aware ordering (2xs < xs < sm < md < lg < xl < 2xl)
+  // Within other groups, use natural sort
+  const sizeOrder: Record<string, number> = {
+    "2xs": 0, "xs": 1, "sm": 2, "": 3, "md": 4, "lg": 5, "xl": 6, "2xl": 7,
+  };
+  const naturalCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+
   shadows.sort((a, b) => {
     const order = { custom: 0, "design-token": 1, "framework-preset": 2 };
     const aOrder = order[a.source] ?? 3;
     const bOrder = order[b.source] ?? 3;
     if (aOrder !== bOrder) return aOrder - bOrder;
-    return a.name.localeCompare(b.name);
+
+    // Extract size suffix (e.g. "shadow-2xl" → "2xl", "shadow" → "", "shadow-inner" → null)
+    const extractSize = (name: string): string | null => {
+      const match = name.match(/^[\w-]+-(\d*x[sl]|sm|md|lg)$/);
+      if (match) return match[1];
+      // Base name without suffix (e.g. "shadow" with no -sm/-lg)
+      if (/^[a-z]+(-[a-z]+)*$/.test(name) && !name.includes("-inner") && !name.includes("-none")) {
+        const parts = name.split("-");
+        const last = parts[parts.length - 1];
+        if (last in sizeOrder) return last;
+        // Bare name like "shadow" maps to ""
+        if (parts.length === 1 || !Object.keys(sizeOrder).includes(last)) return "";
+      }
+      return null;
+    };
+
+    const aSize = extractSize(a.name);
+    const bSize = extractSize(b.name);
+
+    // If both have size suffixes, sort by size
+    if (aSize !== null && bSize !== null) {
+      const aIdx = sizeOrder[aSize] ?? 99;
+      const bIdx = sizeOrder[bSize] ?? 99;
+      if (aIdx !== bIdx) return aIdx - bIdx;
+    }
+
+    return naturalCollator.compare(a.name, b.name);
   });
 
   return { shadows, cssFilePath, stylingType: styling.type, designTokenFiles };
@@ -128,6 +163,7 @@ function addPresets(
         source: "framework-preset",
         isOverridden: false,
         layers: parseShadowValue(preset.value),
+        cssVariable: `--${preset.name}`,
       });
     }
   }
@@ -206,7 +242,7 @@ async function scanCustomShadows(
       }
 
       // Also check @theme blocks (Tailwind v4)
-      const themeMatch = css.match(/@theme\s*\{([\s\S]*?)\}/);
+      const themeMatch = css.match(/@theme\s*(?:inline\s*)?\{([\s\S]*?)\}/);
       if (themeMatch) {
         const themeBlock = themeMatch[1];
         const propRegex = /(--shadow[\w-]*)\s*:\s*([^;]+);/g;

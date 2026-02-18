@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
 // ../core/src/cli/bootstrap.ts
-import fs2 from "fs";
-import path2 from "path";
+import fs3 from "fs";
+import path3 from "path";
+import process2 from "process";
 
 // ../core/src/scanner/detect-framework.ts
 import fs from "fs/promises";
@@ -91,14 +92,139 @@ async function findCssFiles(projectRoot) {
   return found;
 }
 
+// ../core/src/scanner/detect-styling.ts
+import fs2 from "fs/promises";
+import path2 from "path";
+async function detectStylingSystem(projectRoot, framework) {
+  const pkgPath = path2.join(projectRoot, "package.json");
+  let pkg = {};
+  try {
+    pkg = JSON.parse(await fs2.readFile(pkgPath, "utf-8"));
+  } catch {
+  }
+  const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+  if (deps.tailwindcss) {
+    const version = deps.tailwindcss;
+    const isV4 = version.startsWith("^4") || version.startsWith("~4") || version.startsWith("4");
+    if (isV4) {
+      const hasDarkMode3 = await checkDarkMode(projectRoot, framework.cssFiles);
+      return {
+        type: "tailwind-v4",
+        cssFiles: framework.cssFiles,
+        scssFiles: [],
+        hasDarkMode: hasDarkMode3
+      };
+    }
+    const configCandidates = [
+      "tailwind.config.ts",
+      "tailwind.config.js",
+      "tailwind.config.mjs",
+      "tailwind.config.cjs"
+    ];
+    let configPath;
+    for (const candidate of configCandidates) {
+      try {
+        await fs2.access(path2.join(projectRoot, candidate));
+        configPath = candidate;
+        break;
+      } catch {
+      }
+    }
+    const hasDarkMode2 = await checkDarkMode(projectRoot, framework.cssFiles);
+    return {
+      type: "tailwind-v3",
+      configPath,
+      cssFiles: framework.cssFiles,
+      scssFiles: [],
+      hasDarkMode: hasDarkMode2
+    };
+  }
+  if (deps.bootstrap) {
+    const hasDarkMode2 = await checkDarkMode(projectRoot, framework.cssFiles);
+    const scssFiles = await findBootstrapScssFiles(projectRoot);
+    return {
+      type: "bootstrap",
+      cssFiles: framework.cssFiles,
+      scssFiles,
+      hasDarkMode: hasDarkMode2
+    };
+  }
+  const hasDarkMode = await checkDarkMode(projectRoot, framework.cssFiles);
+  const hasCustomProps = await checkCustomProperties(projectRoot, framework.cssFiles);
+  if (hasCustomProps) {
+    return {
+      type: "css-variables",
+      cssFiles: framework.cssFiles,
+      scssFiles: [],
+      hasDarkMode
+    };
+  }
+  return {
+    type: framework.cssFiles.length > 0 ? "plain-css" : "unknown",
+    cssFiles: framework.cssFiles,
+    scssFiles: [],
+    hasDarkMode
+  };
+}
+async function checkDarkMode(projectRoot, cssFiles) {
+  for (const file of cssFiles) {
+    try {
+      const css = await fs2.readFile(path2.join(projectRoot, file), "utf-8");
+      if (css.includes(".dark") || css.includes('[data-theme="dark"]') || css.includes("prefers-color-scheme: dark")) {
+        return true;
+      }
+    } catch {
+    }
+  }
+  return false;
+}
+async function checkCustomProperties(projectRoot, cssFiles) {
+  for (const file of cssFiles) {
+    try {
+      const css = await fs2.readFile(path2.join(projectRoot, file), "utf-8");
+      if (/--[\w-]+\s*:/.test(css)) {
+        return true;
+      }
+    } catch {
+    }
+  }
+  return false;
+}
+async function findBootstrapScssFiles(projectRoot) {
+  const candidates = [
+    "src/scss/_variables.scss",
+    "src/scss/_custom.scss",
+    "src/scss/custom.scss",
+    "src/styles/_variables.scss",
+    "src/styles/variables.scss",
+    "assets/scss/_variables.scss",
+    "scss/_variables.scss",
+    "styles/_variables.scss"
+  ];
+  const found = [];
+  for (const candidate of candidates) {
+    try {
+      await fs2.access(path2.join(projectRoot, candidate));
+      found.push(candidate);
+    } catch {
+    }
+  }
+  return found;
+}
+
 // ../core/src/cli/bootstrap.ts
+var originalEmitWarning = process2.emitWarning;
+process2.emitWarning = ((warning, ...args) => {
+  if (typeof warning === "string" && warning.includes("util._extend")) return;
+  return originalEmitWarning.call(process2, warning, ...args);
+});
 var green = (s) => `\x1B[32m${s}\x1B[0m`;
 var yellow = (s) => `\x1B[33m${s}\x1B[0m`;
 var red = (s) => `\x1B[31m${s}\x1B[0m`;
 var dim = (s) => `\x1B[2m${s}\x1B[0m`;
 var bold = (s) => `\x1B[1m${s}\x1B[0m`;
 async function bootstrap(config) {
-  const args = process.argv.slice(2);
+  const args = process2.argv.slice(2);
   let targetPort = config.defaultTargetPort;
   let toolPort = config.defaultToolPort;
   for (let i = 0; i < args.length; i++) {
@@ -111,16 +237,18 @@ async function bootstrap(config) {
       i++;
     }
   }
-  const projectRoot = process.cwd();
+  const projectRoot = process2.cwd();
   console.log("");
   console.log(`  ${bold(config.name)}`);
+  console.log(`  ${dim(projectRoot)}`);
   console.log("");
-  const pkgPath = path2.join(projectRoot, "package.json");
-  if (!fs2.existsSync(pkgPath)) {
-    console.log(`  ${red("\u2717")} No package.json found`);
-    console.log(`    ${dim("Run this command from your project root.")}`);
+  const pkgPath = path3.join(projectRoot, "package.json");
+  if (!fs3.existsSync(pkgPath)) {
+    console.log(`  ${red("\u2717")} No package.json found in ${projectRoot}`);
+    console.log(`    ${dim("Run this command from the root of the app you want to edit.")}`);
+    console.log(`    ${dim("All file reads and writes are scoped to this directory.")}`);
     console.log("");
-    process.exit(1);
+    process2.exit(1);
   }
   const framework = await detectFramework(projectRoot);
   const frameworkLabel = framework.name === "nextjs" ? "Next.js" : framework.name === "remix" ? "Remix" : framework.name === "vite" ? "Vite" : "Unknown";
@@ -142,6 +270,21 @@ async function bootstrap(config) {
   } else {
     console.log(`  ${yellow("\u26A0")} CSS files      ${dim("no CSS files found")}`);
   }
+  const styling = await detectStylingSystem(projectRoot, framework);
+  const stylingLabels = {
+    "tailwind-v4": "Tailwind CSS v4",
+    "tailwind-v3": "Tailwind CSS v3",
+    "bootstrap": "Bootstrap",
+    "css-variables": "CSS Custom Properties",
+    "plain-css": "Plain CSS",
+    "unknown": "Unknown"
+  };
+  const stylingLabel = stylingLabels[styling.type];
+  if (styling.type !== "unknown") {
+    console.log(`  ${green("\u2713")} Styling        ${stylingLabel}`);
+  } else {
+    console.log(`  ${yellow("\u26A0")} Styling        ${dim("no styling system detected")}`);
+  }
   if (config.extraChecks) {
     const lines = await config.extraChecks(framework, projectRoot);
     for (const line of lines) {
@@ -152,7 +295,7 @@ async function bootstrap(config) {
       }
       if (line.status === "error") {
         console.log("");
-        process.exit(1);
+        process2.exit(1);
       }
     }
   }
@@ -166,24 +309,27 @@ async function bootstrap(config) {
     console.log(`    ${dim("Start your dev server first, then run this command.")}`);
     console.log(`    ${dim(`Use --port to specify a different port.`)}`);
     console.log("");
-    process.exit(1);
+    process2.exit(1);
   }
   console.log(`  ${green("\u2713")} Tool           http://localhost:${toolPort}`);
   console.log("");
-  return { framework, targetPort, toolPort, projectRoot };
+  console.log(`  ${dim("All file writes are scoped to:")} ${bold(projectRoot)}`);
+  console.log("");
+  return { framework, styling, targetPort, toolPort, projectRoot };
 }
 
 // src/server/index.ts
-import path9 from "path";
+import path7 from "path";
 import fs10 from "fs";
 import { fileURLToPath } from "url";
+import { createRequire } from "module";
 
 // ../core/src/server/create-server.ts
 import express from "express";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import httpProxy from "http-proxy";
 import { WebSocketServer } from "ws";
-import fs3 from "fs";
+import fs4 from "fs";
 import zlib from "zlib";
 import open from "open";
 import { createServer as createViteServer } from "vite";
@@ -200,7 +346,7 @@ async function createToolServer(config) {
   app.get(injectScriptUrl, async (_req, res) => {
     try {
       if (!compiledInjectCache) {
-        const raw = fs3.readFileSync(config.injectScriptPath, "utf-8");
+        const raw = fs4.readFileSync(config.injectScriptPath, "utf-8");
         if (config.injectScriptPath.endsWith(".ts")) {
           const result = await transform(raw, { loader: "ts" });
           compiledInjectCache = result.code;
@@ -241,7 +387,11 @@ async function createToolServer(config) {
             });
             stream.on("end", () => {
               const body = Buffer.concat(chunks).toString("utf-8");
-              const injected = body.replace(
+              let injected = body.replace(
+                "<head>",
+                `<head><base href="/proxy/">`
+              );
+              injected = injected.replace(
                 "</body>",
                 `<script src="${injectScriptUrl}"></script></body>`
               );
@@ -308,19 +458,39 @@ async function createToolServer(config) {
   return { app, wss, projectRoot };
 }
 
+// ../core/src/server/safe-path.ts
+import path4 from "path";
+function safePath(projectRoot, filePath) {
+  if (!filePath || typeof filePath !== "string") {
+    throw new Error("File path is required");
+  }
+  if (path4.isAbsolute(filePath)) {
+    throw new Error(
+      `Absolute paths are not allowed: "${filePath}". Paths must be relative to the project root.`
+    );
+  }
+  const resolvedRoot = path4.resolve(projectRoot);
+  const resolvedPath = path4.resolve(resolvedRoot, filePath);
+  if (resolvedPath !== resolvedRoot && !resolvedPath.startsWith(resolvedRoot + path4.sep)) {
+    throw new Error(
+      `Path "${filePath}" resolves outside the project directory. Refusing to write.`
+    );
+  }
+  return resolvedPath;
+}
+
 // src/server/api/write-tokens.ts
 import { Router } from "express";
-import fs4 from "fs/promises";
-import path3 from "path";
+import fs5 from "fs/promises";
 function createTokensRouter(projectRoot) {
   const router = Router();
   router.post("/", async (req, res) => {
     try {
       const { filePath, token, value, selector } = req.body;
-      const fullPath = path3.join(projectRoot, filePath);
-      let css = await fs4.readFile(fullPath, "utf-8");
+      const fullPath = safePath(projectRoot, filePath);
+      let css = await fs5.readFile(fullPath, "utf-8");
       css = replaceTokenInBlock(css, selector, token, value);
-      await fs4.writeFile(fullPath, css, "utf-8");
+      await fs5.writeFile(fullPath, css, "utf-8");
       res.json({ ok: true, filePath, token, value });
     } catch (err) {
       console.error("Token write error:", err);
@@ -359,17 +529,16 @@ function replaceTokenInBlock(css, selector, token, newValue) {
 
 // src/server/api/write-component.ts
 import { Router as Router2 } from "express";
-import fs5 from "fs/promises";
-import path4 from "path";
+import fs6 from "fs/promises";
 function createComponentRouter(projectRoot) {
   const router = Router2();
   router.post("/", async (req, res) => {
     try {
       const { filePath, oldClass, newClass, variantContext } = req.body;
-      const fullPath = path4.join(projectRoot, filePath);
-      let source = await fs5.readFile(fullPath, "utf-8");
+      const fullPath = safePath(projectRoot, filePath);
+      let source = await fs6.readFile(fullPath, "utf-8");
       source = replaceClassInComponent(source, oldClass, newClass, variantContext);
-      await fs5.writeFile(fullPath, source, "utf-8");
+      await fs6.writeFile(fullPath, source, "utf-8");
       res.json({ ok: true, filePath, oldClass, newClass });
     } catch (err) {
       console.error("Component write error:", err);
@@ -439,15 +608,14 @@ function replaceClassInComponent(source, oldClass, newClass, variantContext) {
 
 // src/server/api/write-element.ts
 import { Router as Router3 } from "express";
-import fs6 from "fs/promises";
-import path5 from "path";
+import fs7 from "fs/promises";
 function createElementRouter(projectRoot) {
   const router = Router3();
   router.post("/", async (req, res) => {
     try {
       const body = req.body;
-      const fullPath = path5.join(projectRoot, body.filePath);
-      let source = await fs6.readFile(fullPath, "utf-8");
+      const fullPath = safePath(projectRoot, body.filePath);
+      let source = await fs7.readFile(fullPath, "utf-8");
       if (body.type === "class") {
         source = replaceClassInElement(
           source,
@@ -473,7 +641,7 @@ function createElementRouter(projectRoot) {
           body.lineHint
         );
       }
-      await fs6.writeFile(fullPath, source, "utf-8");
+      await fs7.writeFile(fullPath, source, "utf-8");
       res.json({ ok: true });
     } catch (err) {
       console.error("Element write error:", err);
@@ -612,15 +780,15 @@ function addClassToElement(source, classIdentifier, newClass, lineHint) {
 import { Router as Router4 } from "express";
 
 // ../core/src/scanner/scan-tokens.ts
-import fs7 from "fs/promises";
-import path6 from "path";
+import fs8 from "fs/promises";
+import path5 from "path";
 async function scanTokens(projectRoot, framework) {
   if (framework.cssFiles.length === 0) {
     return { tokens: [], cssFilePath: "", groups: {} };
   }
   const cssFilePath = framework.cssFiles[0];
-  const fullPath = path6.join(projectRoot, cssFilePath);
-  const css = await fs7.readFile(fullPath, "utf-8");
+  const fullPath = path5.join(projectRoot, cssFilePath);
+  const css = await fs8.readFile(fullPath, "utf-8");
   const rootTokens = parseBlock(css, ":root");
   const darkTokens = parseBlock(css, ".dark");
   const tokenMap = /* @__PURE__ */ new Map();
@@ -727,13 +895,9 @@ function detectColorFormat(value) {
   return null;
 }
 
-// ../core/src/scanner/detect-styling.ts
-import fs8 from "fs/promises";
-import path7 from "path";
-
 // src/server/scanner/scan-components.ts
 import fs9 from "fs/promises";
-import path8 from "path";
+import path6 from "path";
 async function scanComponents(projectRoot) {
   const componentDirs = [
     "components/ui",
@@ -742,7 +906,7 @@ async function scanComponents(projectRoot) {
   let componentDir = "";
   for (const dir of componentDirs) {
     try {
-      await fs9.access(path8.join(projectRoot, dir));
+      await fs9.access(path6.join(projectRoot, dir));
       componentDir = dir;
       break;
     } catch {
@@ -751,13 +915,13 @@ async function scanComponents(projectRoot) {
   if (!componentDir) {
     return { components: [] };
   }
-  const fullDir = path8.join(projectRoot, componentDir);
+  const fullDir = path6.join(projectRoot, componentDir);
   const files = await fs9.readdir(fullDir);
   const tsxFiles = files.filter((f) => f.endsWith(".tsx"));
   const components = [];
   for (const file of tsxFiles) {
-    const filePath = path8.join(componentDir, file);
-    const source = await fs9.readFile(path8.join(projectRoot, filePath), "utf-8");
+    const filePath = path6.join(componentDir, file);
+    const source = await fs9.readFile(path6.join(projectRoot, filePath), "utf-8");
     const entry = parseComponent(source, filePath);
     if (entry) {
       components.push(entry);
@@ -909,13 +1073,28 @@ function createStudioScanRouter(projectRoot) {
 }
 
 // src/server/index.ts
-var __dirname = path9.dirname(fileURLToPath(import.meta.url));
-var packageRoot = fs10.existsSync(path9.join(__dirname, "../package.json")) ? path9.resolve(__dirname, "..") : path9.resolve(__dirname, "../..");
+var __dirname = path7.dirname(fileURLToPath(import.meta.url));
+var require2 = createRequire(import.meta.url);
+var packageRoot = fs10.existsSync(path7.join(__dirname, "../package.json")) ? path7.resolve(__dirname, "..") : path7.resolve(__dirname, "../..");
+function resolveInjectScript() {
+  const compiledInject = path7.join(packageRoot, "dist/inject/selection.js");
+  if (fs10.existsSync(compiledInject)) return compiledInject;
+  try {
+    const corePkg = require2.resolve("@designtools/core/package.json");
+    const coreRoot = path7.dirname(corePkg);
+    const coreInject = path7.join(coreRoot, "src/inject/selection.ts");
+    if (fs10.existsSync(coreInject)) return coreInject;
+  } catch {
+  }
+  const monorepoInject = path7.join(packageRoot, "../core/src/inject/selection.ts");
+  if (fs10.existsSync(monorepoInject)) return monorepoInject;
+  throw new Error(
+    "Could not find inject script (selection.ts). Ensure @designtools/core is installed."
+  );
+}
 async function startStudioServer(preflight) {
-  const clientRoot = path9.join(packageRoot, "src/client");
-  const injectScriptPath = path9.join(packageRoot, "../core/src/inject/selection.ts");
-  const compiledInject = path9.join(packageRoot, "dist/inject/selection.js");
-  const actualInjectPath = fs10.existsSync(compiledInject) ? compiledInject : injectScriptPath;
+  const clientRoot = path7.join(packageRoot, "src/client");
+  const actualInjectPath = resolveInjectScript();
   const { app, wss, projectRoot } = await createToolServer({
     targetPort: preflight.targetPort,
     toolPort: preflight.toolPort,

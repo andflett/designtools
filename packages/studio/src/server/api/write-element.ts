@@ -1,6 +1,6 @@
 import { Router } from "express";
 import fs from "fs/promises";
-import path from "path";
+import { safePath } from "@designtools/core/server";
 
 export function createElementRouter(projectRoot: string) {
   const router = Router();
@@ -8,7 +8,7 @@ export function createElementRouter(projectRoot: string) {
   router.post("/", async (req, res) => {
     try {
       const body = req.body as ElementWriteRequest;
-      const fullPath = path.join(projectRoot, body.filePath);
+      const fullPath = safePath(projectRoot, body.filePath);
       let source = await fs.readFile(fullPath, "utf-8");
 
       if (body.type === "class") {

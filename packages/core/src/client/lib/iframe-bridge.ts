@@ -8,6 +8,7 @@ export type BaseToolToIframe =
   | { type: "tool:enterSelectionMode" }
   | { type: "tool:exitSelectionMode" }
   | { type: "tool:setProperty"; token: string; value: string }
+  | { type: "tool:previewShadow"; className: string; value: string }
   | { type: "tool:previewClass"; elementPath: string; oldClass: string; newClass: string }
   | { type: "tool:revertPreview" }
   | { type: "tool:reselectElement" }
@@ -15,7 +16,8 @@ export type BaseToolToIframe =
 
 export type BaseIframeToTool =
   | { type: "tool:injectedReady" }
-  | { type: "tool:elementSelected"; data: ElementData };
+  | { type: "tool:elementSelected"; data: ElementData }
+  | { type: "tool:pathChanged"; path: string };
 
 export interface ElementData {
   tag: string;

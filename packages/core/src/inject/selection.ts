@@ -254,6 +254,26 @@ function onMessage(e: MessageEvent) {
     case "tool:setProperty":
       document.documentElement.style.setProperty(msg.token, msg.value);
       break;
+    case "tool:previewShadow": {
+      // Inject/update a <style> that overrides a Tailwind shadow utility.
+      // TW v4 compiles .shadow-sm to set --tw-shadow internally,
+      // so setting --shadow-sm on :root has no effect — we must
+      // override the class itself.
+      let previewStyle = document.getElementById("tool-shadow-preview") as HTMLStyleElement | null;
+      if (!previewStyle) {
+        previewStyle = document.createElement("style");
+        previewStyle.id = "tool-shadow-preview";
+        document.head.appendChild(previewStyle);
+      }
+      const cls = msg.className; // e.g. "shadow-sm"
+      const val = msg.value;
+      if (val === "none" || val === "0 0 #0000") {
+        previewStyle.textContent = `.${CSS.escape(cls)} { --tw-shadow: 0 0 #0000 !important; box-shadow: none !important; }`;
+      } else {
+        previewStyle.textContent = `.${CSS.escape(cls)} { --tw-shadow: ${val} !important; }`;
+      }
+      break;
+    }
     case "tool:previewClass": {
       const target = document.querySelector(msg.elementPath);
       if (target) {
@@ -287,6 +307,13 @@ function onMessage(e: MessageEvent) {
   }
 }
 
+function notifyPathChanged() {
+  // Strip /proxy prefix to get the app-relative path
+  const fullPath = window.location.pathname + window.location.search + window.location.hash;
+  const appPath = fullPath.startsWith("/proxy") ? fullPath.slice(6) || "/" : fullPath;
+  window.parent.postMessage({ type: "tool:pathChanged", path: appPath }, "*");
+}
+
 function interceptNavigation() {
   // Rewrite links that would navigate outside /proxy/ back through it.
   // The <base href="/proxy/"> tag handles most relative URLs, but
@@ -318,6 +345,12 @@ function interceptNavigation() {
       window.location.href = `/proxy${href}`;
     }
   }, false);
+
+  // Notify parent of path changes on popstate (back/forward)
+  window.addEventListener("popstate", () => notifyPathChanged());
+
+  // Notify on initial load
+  notifyPathChanged();
 }
 
 function init() {

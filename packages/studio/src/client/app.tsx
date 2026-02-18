@@ -35,6 +35,9 @@ export function App() {
       if (msg.type === "tool:elementSelected") {
         setSelectedElement(msg.data);
       }
+      if (msg.type === "tool:pathChanged") {
+        setIframePath(msg.path);
+      }
       if (msg.type === "tool:injectedReady" && iframeRef.current) {
         if (selectionMode) {
           sendToIframe(iframeRef.current, {

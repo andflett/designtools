@@ -1,22 +1,22 @@
 const kpis = [
-  { label: "Page Views", value: "128,430", delta: "+14.2%", up: true },
-  { label: "Unique Visitors", value: "34,210", delta: "+6.8%", up: true },
-  { label: "Conversion Rate", value: "3.24%", delta: "+0.4%", up: true },
-  { label: "Avg. Load Time", value: "1.2s", delta: "-0.3s", up: false },
+  { label: "Shadow Tokens", value: "5", delta: "W3C format", up: true },
+  { label: "Elevation Levels", value: "4", delta: "none to highest", up: true },
+  { label: "Avg. Layers", value: "2.3", delta: "Per token", up: true },
+  { label: "Token File", value: "1", delta: "shadows.tokens.json", up: true },
 ];
 
-const topPages = [
-  { path: "/", views: "42,180", bounce: "32%" },
-  { path: "/pricing", views: "18,320", bounce: "41%" },
-  { path: "/docs/getting-started", views: "12,540", bounce: "28%" },
-  { path: "/blog/release-v4", views: "9,870", bounce: "35%" },
-  { path: "/changelog", views: "6,210", bounce: "44%" },
+const tokenScale = [
+  { name: "shadow.none", cssVar: "--shadow-none", elevation: "Flat", layers: "0" },
+  { name: "shadow.low", cssVar: "--shadow-low", elevation: "Resting", layers: "1" },
+  { name: "shadow.medium", cssVar: "--shadow-medium", elevation: "Raised", layers: "2" },
+  { name: "shadow.high", cssVar: "--shadow-high", elevation: "Floating", layers: "2" },
+  { name: "shadow.highest", cssVar: "--shadow-highest", elevation: "Overlay", layers: "2" },
 ];
 
-const alerts = [
-  { text: "API latency spike detected", severity: "warning" },
-  { text: "SSL certificate renews in 7 days", severity: "info" },
-  { text: "Deployment v4.2.1 successful", severity: "success" },
+const changelog = [
+  { text: "Tuned shadow.low for crisper card edges", severity: "success" },
+  { text: "shadow.high spread reduced to -4px", severity: "info" },
+  { text: "Exported updated tokens to JSON", severity: "success" },
 ];
 
 export default function DashboardPage() {
@@ -51,7 +51,7 @@ export default function DashboardPage() {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16 }}>
-        {/* Traffic table — medium elevation */}
+        {/* Token table — medium elevation */}
         <div className="card card-medium" style={{ border: "none", padding: 0 }}>
           <div
             style={{
@@ -62,33 +62,39 @@ export default function DashboardPage() {
               borderBottom: "1px solid var(--color-border)",
             }}
           >
-            <span style={{ fontWeight: 600, fontSize: 14 }}>Top Pages</span>
+            <span style={{ fontWeight: 600, fontSize: 14 }}>Token Scale</span>
             <button className="btn btn-outline" style={{ fontSize: 12, padding: "4px 12px" }}>
-              Export
+              Edit Tokens
             </button>
           </div>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
             <thead>
               <tr style={{ background: "#f9fafb", textAlign: "left" }}>
                 <th style={{ padding: "10px 20px", fontWeight: 500, color: "var(--color-text-secondary)" }}>
-                  Path
+                  Token Path
                 </th>
                 <th style={{ padding: "10px 20px", fontWeight: 500, color: "var(--color-text-secondary)" }}>
-                  Views
+                  CSS Variable
                 </th>
                 <th style={{ padding: "10px 20px", fontWeight: 500, color: "var(--color-text-secondary)" }}>
-                  Bounce
+                  Elevation
+                </th>
+                <th style={{ padding: "10px 20px", fontWeight: 500, color: "var(--color-text-secondary)" }}>
+                  Layers
                 </th>
               </tr>
             </thead>
             <tbody>
-              {topPages.map((p) => (
-                <tr key={p.path} style={{ borderBottom: "1px solid var(--color-border)" }}>
+              {tokenScale.map((t) => (
+                <tr key={t.name} style={{ borderBottom: "1px solid var(--color-border)" }}>
                   <td style={{ padding: "10px 20px", fontFamily: "monospace", fontSize: 13 }}>
-                    {p.path}
+                    {t.name}
                   </td>
-                  <td style={{ padding: "10px 20px" }}>{p.views}</td>
-                  <td style={{ padding: "10px 20px" }}>{p.bounce}</td>
+                  <td style={{ padding: "10px 20px", fontFamily: "monospace", fontSize: 13, color: "var(--color-text-secondary)" }}>
+                    {t.cssVar}
+                  </td>
+                  <td style={{ padding: "10px 20px" }}>{t.elevation}</td>
+                  <td style={{ padding: "10px 20px" }}>{t.layers}</td>
                 </tr>
               ))}
             </tbody>
@@ -97,11 +103,11 @@ export default function DashboardPage() {
 
         {/* Right column */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {/* Alerts — high elevation */}
+          {/* Changelog — high elevation */}
           <div className="card card-high" style={{ border: "none" }}>
-            <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 12 }}>Alerts</div>
+            <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 12 }}>Recent Edits</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {alerts.map((a, i) => (
+              {changelog.map((a, i) => (
                 <div
                   key={i}
                   style={{
@@ -138,7 +144,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Floating CTA — highest elevation */}
+          {/* Presets — highest elevation */}
           <div
             className="card card-highest"
             style={{
@@ -149,10 +155,10 @@ export default function DashboardPage() {
             }}
           >
             <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 8 }}>
-              Upgrade to Pro
+              Shadow Presets
             </div>
             <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 16 }}>
-              Unlock real-time analytics, custom reports, and team dashboards.
+              Apply a curated shadow style to your entire token scale in one click.
             </div>
             <button
               className="btn"
@@ -163,8 +169,31 @@ export default function DashboardPage() {
                 fontWeight: 600,
               }}
             >
-              Start Free Trial
+              Browse Presets
             </button>
+          </div>
+
+          {/* Elevation preview cards */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {["low", "medium", "high", "highest"].map((level) => (
+              <div
+                key={level}
+                className={`card card-${level}`}
+                style={{
+                  border: "none",
+                  padding: "12px 16px",
+                  display: "flex",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <span style={{ fontSize: 13, fontWeight: 500 }}>{level}</span>
+                <span style={{ fontSize: 12, color: "var(--color-text-secondary)", fontFamily: "monospace" }}>
+                  shadow-{level}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       </div>

@@ -1,16 +1,16 @@
 const stats = [
-  { label: "Total Revenue", value: "$48,290", change: "+12.5%", up: true },
-  { label: "Active Users", value: "2,845", change: "+8.2%", up: true },
-  { label: "Bounce Rate", value: "24.3%", change: "-3.1%", up: false },
-  { label: "Avg. Session", value: "4m 32s", change: "+1.8%", up: true },
+  { label: "Shadow Tokens", value: "6", change: "+2 new", up: true },
+  { label: "Components", value: "42", change: "All elevated", up: true },
+  { label: "Depth Levels", value: "4", change: "sm to xl", up: true },
+  { label: "Avg. Layers", value: "2.5", change: "Per token", up: true },
 ];
 
-const orders = [
-  { id: "#3201", customer: "Olivia Martin", amount: "$320.00", status: "Completed" },
-  { id: "#3202", customer: "James Chen", amount: "$185.00", status: "Processing" },
-  { id: "#3203", customer: "Sophia Lee", amount: "$540.00", status: "Completed" },
-  { id: "#3204", customer: "Liam Walker", amount: "$92.00", status: "Pending" },
-  { id: "#3205", customer: "Emma Davis", amount: "$415.00", status: "Completed" },
+const elevations = [
+  { name: "shadow-sm", usage: "Cards, list items", layers: 2, status: "Active" },
+  { name: "shadow", usage: "Dropdowns, popovers", layers: 3, status: "Active" },
+  { name: "shadow-lg", usage: "Modals, drawers", layers: 3, status: "Active" },
+  { name: "shadow-inset", usage: "Input fields, wells", layers: 1, status: "Active" },
+  { name: "shadow-none", usage: "Flat surfaces", layers: 0, status: "Unused" },
 ];
 
 export default function HomePage() {
@@ -34,40 +34,38 @@ export default function HomePage() {
       </div>
 
       <div className="row g-3">
-        {/* Orders table — default shadow */}
+        {/* Elevation table — default shadow */}
         <div className="col-lg-8">
           <div className="card shadow border-0">
             <div className="card-header bg-white d-flex align-items-center justify-content-between py-3">
-              <h6 className="mb-0 fw-semibold">Recent Orders</h6>
-              <button className="btn btn-sm btn-outline-primary">View All</button>
+              <h6 className="mb-0 fw-semibold">Elevation Scale</h6>
+              <button className="btn btn-sm btn-outline-primary">Edit Tokens</button>
             </div>
             <div className="card-body p-0">
               <table className="table table-hover mb-0">
                 <thead className="table-light">
                   <tr>
-                    <th>Order</th>
-                    <th>Customer</th>
-                    <th>Amount</th>
+                    <th>Token</th>
+                    <th>Usage</th>
+                    <th>Layers</th>
                     <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {orders.map((o) => (
-                    <tr key={o.id}>
-                      <td className="fw-medium">{o.id}</td>
-                      <td>{o.customer}</td>
-                      <td>{o.amount}</td>
+                  {elevations.map((e) => (
+                    <tr key={e.name}>
+                      <td className="fw-medium font-monospace" style={{ fontSize: 13 }}>{e.name}</td>
+                      <td>{e.usage}</td>
+                      <td className="text-muted">{e.layers}</td>
                       <td>
                         <span
                           className={`badge rounded-pill ${
-                            o.status === "Completed"
+                            e.status === "Active"
                               ? "bg-success-subtle text-success"
-                              : o.status === "Processing"
-                                ? "bg-primary-subtle text-primary"
-                                : "bg-warning-subtle text-warning"
+                              : "bg-warning-subtle text-warning"
                           }`}
                         >
-                          {o.status}
+                          {e.status}
                         </span>
                       </td>
                     </tr>
@@ -84,22 +82,22 @@ export default function HomePage() {
             <div className="card-body">
               <h6 className="fw-semibold mb-3">Quick Actions</h6>
               <div className="d-grid gap-2">
-                <button className="btn btn-primary">New Order</button>
-                <button className="btn btn-outline-secondary">Generate Report</button>
-                <button className="btn btn-outline-secondary">Invite Team Member</button>
+                <button className="btn btn-primary">Apply Preset</button>
+                <button className="btn btn-outline-secondary">Export CSS</button>
+                <button className="btn btn-outline-secondary">Compare Presets</button>
               </div>
             </div>
           </div>
 
           <div className="card shadow border-0">
             <div className="card-body">
-              <h6 className="fw-semibold mb-3">Activity Feed</h6>
+              <h6 className="fw-semibold mb-3">Recent Changes</h6>
               <ul className="list-unstyled mb-0">
                 {[
-                  "Olivia completed order #3201",
-                  "New user signup: James Chen",
-                  "Report generated for Q4",
-                  "System update deployed",
+                  "Switched shadow-sm to crisp 3-layer",
+                  "Reduced shadow-lg opacity to 0.06",
+                  "Added tinted shadow color for cards",
+                  "Updated inset shadow blur radius",
                 ].map((item, i) => (
                   <li
                     key={i}
@@ -118,9 +116,9 @@ export default function HomePage() {
             style={{ boxShadow: "var(--bs-box-shadow-inset, inset 0 1px 2px rgba(0,0,0,.075))" }}
           >
             <div className="card-body text-center">
-              <small className="text-muted">Inset shadow card</small>
-              <p className="mb-0 fw-semibold">$12,450</p>
-              <small className="text-muted">Monthly target progress</small>
+              <small className="text-muted">Inset shadow preview</small>
+              <p className="mb-0 fw-semibold">shadow-inset</p>
+              <small className="text-muted">For wells and input fields</small>
             </div>
           </div>
         </div>

@@ -1,7 +1,7 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Projects — CSS Variables Demo",
+  title: "Shadow Tokens — CSS Variables Demo",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -9,16 +9,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <aside className="sidebar">
-          <div className="sidebar-brand">Workspace</div>
+          <div className="sidebar-brand">Shadow Studio</div>
           <ul className="sidebar-nav">
             <li>
               <a href="/" className="sidebar-link active">
-                Projects
+                Tokens
               </a>
             </li>
             <li>
               <a href="/" className="sidebar-link">
-                Team
+                Presets
               </a>
             </li>
             <li>

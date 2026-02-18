@@ -1,6 +1,7 @@
 import { Router } from "express";
 import fs from "fs/promises";
 import path from "path";
+import { safePath } from "@designtools/core/server";
 import {
   updateDesignTokenShadow,
   buildDesignTokensJson,
@@ -20,7 +21,7 @@ export function createShadowsRouter(projectRoot: string) {
         selector: string;       // ":root", "@theme", or "scss"
       };
 
-      const fullPath = path.join(projectRoot, filePath);
+      const fullPath = safePath(projectRoot, filePath);
 
       if (selector === "scss") {
         // Write to a Sass file
@@ -54,7 +55,7 @@ export function createShadowsRouter(projectRoot: string) {
         selector: string;       // ":root", "@theme", or "scss"
       };
 
-      const fullPath = path.join(projectRoot, filePath);
+      const fullPath = safePath(projectRoot, filePath);
 
       if (selector === "scss") {
         let scss: string;
@@ -91,7 +92,7 @@ export function createShadowsRouter(projectRoot: string) {
         value: string;      // CSS box-shadow string
       };
 
-      const fullPath = path.join(projectRoot, filePath);
+      const fullPath = safePath(projectRoot, filePath);
       await updateDesignTokenShadow(fullPath, tokenPath, value);
 
       res.json({ ok: true, filePath, tokenPath, value });
@@ -109,7 +110,7 @@ export function createShadowsRouter(projectRoot: string) {
         shadows: Array<{ name: string; value: string; description?: string }>;
       };
 
-      const fullPath = path.join(projectRoot, filePath);
+      const fullPath = safePath(projectRoot, filePath);
       const tokens = buildDesignTokensJson(shadows);
 
       // Ensure directory exists
@@ -154,12 +155,12 @@ function writeShadowToSelector(
 
   const varEscaped = variableName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const tokenRegex = new RegExp(`(${varEscaped}\\s*:\\s*)([^;]+)(;)`, "g");
+  const original = block;
+  block = block.replace(tokenRegex, `$1${newValue}$3`);
 
-  if (!tokenRegex.test(block)) {
+  if (block === original) {
     throw new Error(`Variable "${variableName}" not found in "${selector}" block`);
   }
-
-  block = block.replace(tokenRegex, `$1${newValue}$3`);
   return css.slice(0, openBrace + 1) + block + css.slice(blockEnd - 1);
 }
 
@@ -168,7 +169,7 @@ function writeShadowToTheme(
   variableName: string,
   newValue: string
 ): string {
-  const themeMatch = css.match(/@theme\s*\{/);
+  const themeMatch = css.match(/@theme\s*(?:inline\s*)?\{/);
   if (!themeMatch) {
     throw new Error("No @theme block found in CSS file");
   }
@@ -188,10 +189,10 @@ function writeShadowToTheme(
 
   const varEscaped = variableName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const tokenRegex = new RegExp(`(${varEscaped}\\s*:\\s*)([^;]+)(;)`, "g");
+  const original = block;
+  block = block.replace(tokenRegex, `$1${newValue}$3`);
 
-  if (tokenRegex.test(block)) {
-    block = block.replace(tokenRegex, `$1${newValue}$3`);
-  } else {
+  if (block === original) {
     // Variable doesn't exist in @theme — add it
     block = block.trimEnd() + `\n  ${variableName}: ${newValue};\n`;
   }
@@ -234,7 +235,7 @@ function addShadowToTheme(
   variableName: string,
   value: string
 ): string {
-  const themeMatch = css.match(/@theme\s*\{/);
+  const themeMatch = css.match(/@theme\s*(?:inline\s*)?\{/);
   if (!themeMatch) {
     // Create @theme block
     return css + `\n@theme {\n  ${variableName}: ${value};\n}\n`;
@@ -256,12 +257,13 @@ function writeShadowToScss(
     `(${varEscaped}\\s*:\\s*)(.+?)(\\s*(?:!default)?\\s*;)`,
     "g"
   );
+  const result = scss.replace(regex, `$1${newValue}$3`);
 
-  if (!regex.test(scss)) {
+  if (result === scss) {
     throw new Error(`Sass variable "${variableName}" not found in SCSS file`);
   }
 
-  return scss.replace(regex, `$1${newValue}$3`);
+  return result;
 }
 
 function addShadowToScss(

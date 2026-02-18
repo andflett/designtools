@@ -1,7 +1,7 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Analytics — W3C Design Tokens Demo",
+  title: "Shadow Tokens — W3C Design Tokens Demo",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -19,10 +19,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             boxShadow: "var(--shadow-low)",
           }}
         >
-          <span style={{ fontWeight: 700, fontSize: 15 }}>Metrics</span>
+          <span style={{ fontWeight: 700, fontSize: 15 }}>Shadow Tokens</span>
           <nav style={{ display: "flex", gap: 16, fontSize: 14 }}>
             <a href="/" style={{ color: "var(--color-accent)", textDecoration: "none" }}>
-              Dashboard
+              Elevation
             </a>
           </nav>
         </header>

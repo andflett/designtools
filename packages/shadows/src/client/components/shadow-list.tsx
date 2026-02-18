@@ -14,7 +14,7 @@ interface ShadowListProps {
   shadows: any[];
   cssFilePath: string;
   stylingType: string;
-  onPreviewShadow: (variableName: string, value: string) => void;
+  onPreviewShadow: (variableName: string, value: string, shadowName?: string) => void;
   previewSettings: PreviewSettings;
 }
 
@@ -81,12 +81,14 @@ function ShadowRow({
   onModeChange: (mode: "custom" | "preset") => void;
   cssFilePath: string;
   stylingType: string;
-  onPreviewShadow: (variableName: string, value: string) => void;
+  onPreviewShadow: (variableName: string, value: string, shadowName?: string) => void;
   previewSettings: PreviewSettings;
 }) {
   const [saving, setSaving] = useState(false);
+  const [currentValue, setCurrentValue] = useState(shadow.value);
 
   const handleSave = async (newValue: string) => {
+    setCurrentValue(newValue);
     setSaving(true);
     try {
       // Design token shadows write to their own endpoint
@@ -147,7 +149,7 @@ function ShadowRow({
       >
         {isExpanded ? <ChevronDownIcon /> : <ChevronRightIcon />}
         <ShadowPreview
-          value={shadow.value}
+          value={currentValue}
           size={24}
           showBorder={previewSettings.showBorder}
           borderColor={previewSettings.borderColor}
@@ -219,20 +221,20 @@ function ShadowRow({
 
           {mode === "custom" ? (
             <ShadowControls
-              shadow={shadow}
+              shadow={{ ...shadow, value: currentValue }}
               onPreview={(value) => {
                 const varName = shadow.cssVariable || `--${shadow.name}`;
-                onPreviewShadow(varName, value);
+                onPreviewShadow(varName, value, shadow.name);
               }}
               onSave={handleSave}
               previewSettings={previewSettings}
             />
           ) : (
             <PresetPicker
-              currentValue={shadow.value}
+              currentValue={currentValue}
               onSelect={(value) => {
                 const varName = shadow.cssVariable || `--${shadow.name}`;
-                onPreviewShadow(varName, value);
+                onPreviewShadow(varName, value, shadow.name);
                 handleSave(value);
               }}
               previewSettings={previewSettings}
@@ -253,81 +255,87 @@ function PresetPicker({
   onSelect: (value: string) => void;
   previewSettings: PreviewSettings;
 }) {
-  // Import presets inline to avoid circular deps
+  // Presets from shadow-explorer: multi-layer approaches at different depths
   const presets = [
-    { name: "Soft Small", value: "0 1px 2px 0 rgb(0 0 0 / 0.03), 0 1px 3px 0 rgb(0 0 0 / 0.06)", category: "subtle" },
-    { name: "Soft Medium", value: "0 2px 8px -2px rgb(0 0 0 / 0.05), 0 4px 12px -2px rgb(0 0 0 / 0.08)", category: "subtle" },
-    { name: "Soft Large", value: "0 4px 16px -4px rgb(0 0 0 / 0.08), 0 8px 24px -4px rgb(0 0 0 / 0.1)", category: "subtle" },
-    { name: "Card", value: "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)", category: "medium" },
-    { name: "Dropdown", value: "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)", category: "medium" },
-    { name: "Modal", value: "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)", category: "medium" },
-    { name: "Elevated", value: "0 25px 50px -12px rgb(0 0 0 / 0.25)", category: "dramatic" },
-    { name: "Floating", value: "0 20px 60px -15px rgb(0 0 0 / 0.3)", category: "dramatic" },
-    { name: "Layered Small", value: "0 1px 1px rgb(0 0 0 / 0.04), 0 2px 2px rgb(0 0 0 / 0.04), 0 4px 4px rgb(0 0 0 / 0.04)", category: "layered" },
-    { name: "Layered Medium", value: "0 1px 1px rgb(0 0 0 / 0.03), 0 2px 2px rgb(0 0 0 / 0.03), 0 4px 4px rgb(0 0 0 / 0.03), 0 8px 8px rgb(0 0 0 / 0.03), 0 16px 16px rgb(0 0 0 / 0.03)", category: "layered" },
-    { name: "Blue Glow", value: "0 4px 14px 0 rgb(59 130 246 / 0.3)", category: "colored" },
-    { name: "Purple Glow", value: "0 4px 14px 0 rgb(147 51 234 / 0.3)", category: "colored" },
-    { name: "None", value: "none", category: "reset" },
+    // Crisp 2-layer
+    { name: "Crisp 2L", value: "0px 0.3px 0.7px 0px rgb(0 0 0 / 0.1), 0px 0.7px 2.1px 0px rgb(0 0 0 / 0.07)", desc: "Subtle" },
+    { name: "Crisp 2L +", value: "0px 0.5px 1px 0px rgb(0 0 0 / 0.1), 0px 1px 3px 0px rgb(0 0 0 / 0.07), 0px 2px 6px 0px rgb(0 0 0 / 0.07)", desc: "Elevated" },
+    // Crisp 3-layer (doubling)
+    { name: "Crisp 3L", value: "0px 1px 1px 0px rgb(0 0 0 / 0.08), 0px 2px 2px 0px rgb(0 0 0 / 0.08), 0px 4px 4px 0px rgb(0 0 0 / 0.08)", desc: "Card" },
+    { name: "Crisp 3L +", value: "0px 1px 1px 0px rgb(0 0 0 / 0.08), 0px 2px 2px 0px rgb(0 0 0 / 0.08), 0px 4px 4px 0px rgb(0 0 0 / 0.08), 0px 8px 8px 0px rgb(0 0 0 / 0.08)", desc: "Elevated" },
+    // Crisp 3-layer tight
+    { name: "Crisp Tight", value: "0px 0.5px 0.5px 0px rgb(0 0 0 / 0.09), 0px 1px 1.5px 0px rgb(0 0 0 / 0.07), 0px 3px 3px 0px rgb(0 0 0 / 0.06)", desc: "Card" },
+    { name: "Crisp Tight +", value: "0px 0.5px 0.5px 0px rgb(0 0 0 / 0.09), 0px 1px 1.5px 0px rgb(0 0 0 / 0.07), 0px 3px 3px 0px rgb(0 0 0 / 0.06), 0px 6px 6px 0px rgb(0 0 0 / 0.06)", desc: "Elevated" },
+    // Crisp 4-layer
+    { name: "Crisp 4L", value: "0px 0.5px 0.5px 0px rgb(0 0 0 / 0.07), 0px 1px 1px 0px rgb(0 0 0 / 0.06), 0px 2px 2px 0px rgb(0 0 0 / 0.06), 0px 4px 4px 0px rgb(0 0 0 / 0.06)", desc: "Card" },
+    { name: "Crisp 4L +", value: "0px 0.5px 0.5px 0px rgb(0 0 0 / 0.07), 0px 1px 1px 0px rgb(0 0 0 / 0.06), 0px 2px 2px 0px rgb(0 0 0 / 0.06), 0px 4px 4px 0px rgb(0 0 0 / 0.06), 0px 8px 8px 0px rgb(0 0 0 / 0.06)", desc: "Elevated" },
+    // Crisp 4-layer with hard edge
+    { name: "Edge 4L", value: "0px 0px 0.5px -0.5px rgb(0 0 0 / 0.12), 0px 1px 1px 0px rgb(0 0 0 / 0.06), 0px 2px 2px 0px rgb(0 0 0 / 0.06), 0px 4px 4px 0px rgb(0 0 0 / 0.05)", desc: "Card" },
+    { name: "Edge 4L +", value: "0px 0px 0.5px -0.5px rgb(0 0 0 / 0.12), 0px 1px 1px 0px rgb(0 0 0 / 0.06), 0px 2px 2px 0px rgb(0 0 0 / 0.06), 0px 4px 4px 0px rgb(0 0 0 / 0.05), 0px 8px 8px 0px rgb(0 0 0 / 0.05)", desc: "Elevated" },
+    // Soft / diffuse
+    { name: "Soft", value: "0px 1px 2px 0px rgb(0 0 0 / 0.04), 0px 2px 4px 0px rgb(0 0 0 / 0.04), 0px 4px 8px 0px rgb(0 0 0 / 0.04)", desc: "Diffuse" },
+    { name: "Soft +", value: "0px 1px 2px 0px rgb(0 0 0 / 0.04), 0px 2px 4px 0px rgb(0 0 0 / 0.04), 0px 4px 8px 0px rgb(0 0 0 / 0.04), 0px 8px 16px 0px rgb(0 0 0 / 0.04)", desc: "Elevated" },
+    // Chunky — solid, hard shadow with minimal blur
+    { name: "Chunky", value: "0px 2px 0px 0px rgb(0 0 0 / 0.15), 0px 4px 0px 0px rgb(0 0 0 / 0.1)", desc: "Hard" },
+    { name: "Chunky +", value: "0px 2px 0px 0px rgb(0 0 0 / 0.15), 0px 4px 0px 0px rgb(0 0 0 / 0.1), 0px 8px 0px 0px rgb(0 0 0 / 0.07)", desc: "Elevated" },
+    // None
+    { name: "None", value: "none", desc: "Remove" },
   ];
 
-  const categories = ["subtle", "medium", "dramatic", "layered", "colored", "reset"];
-  const categoryLabels: Record<string, string> = {
-    subtle: "Subtle",
-    medium: "Medium",
-    dramatic: "Dramatic",
-    layered: "Layered",
-    colored: "Colored",
-    reset: "Reset",
-  };
-
   return (
-    <div className="flex flex-col gap-2">
-      {categories.map((cat) => {
-        const catPresets = presets.filter((p) => p.category === cat);
-        if (catPresets.length === 0) return null;
+    <div
+      className="grid gap-2"
+      style={{ gridTemplateColumns: "repeat(2, 1fr)" }}
+    >
+      {presets.map((preset) => {
+        const isActive = currentValue === preset.value;
         return (
-          <div key={cat}>
+          <button
+            key={preset.name}
+            onClick={() => onSelect(preset.value)}
+            className="flex flex-col items-center gap-1.5 p-3 rounded-lg cursor-pointer"
+            style={{
+              background: isActive
+                ? "var(--studio-accent-muted)"
+                : "transparent",
+              border: "1px solid",
+              borderColor: isActive
+                ? "var(--studio-accent)"
+                : "var(--studio-border-subtle)",
+            }}
+          >
             <div
-              className="text-[9px] font-semibold uppercase tracking-wide mb-1"
-              style={{ color: "var(--studio-text-dimmed)" }}
+              className="flex items-center justify-center rounded-lg w-full"
+              style={{
+                background: previewSettings.previewBg,
+                height: 72,
+              }}
             >
-              {categoryLabels[cat]}
+              <ShadowPreview
+                value={preset.value}
+                size={48}
+                background="white"
+                showBorder={previewSettings.showBorder}
+                borderColor={previewSettings.borderColor}
+              />
             </div>
-            <div className="flex flex-col gap-1">
-              {catPresets.map((preset) => (
-                <button
-                  key={preset.name}
-                  onClick={() => onSelect(preset.value)}
-                  className="flex items-center gap-2 p-1.5 rounded text-left w-full"
-                  style={{
-                    background:
-                      currentValue === preset.value
-                        ? "var(--studio-accent-muted)"
-                        : "transparent",
-                    border: "1px solid",
-                    borderColor:
-                      currentValue === preset.value
-                        ? "var(--studio-accent)"
-                        : "var(--studio-border-subtle)",
-                    cursor: "pointer",
-                  }}
+            <div className="text-center">
+              <div
+                className="text-[10px] font-medium"
+                style={{ color: "var(--studio-text-muted)" }}
+              >
+                {preset.name}
+              </div>
+              {preset.desc && (
+                <div
+                  className="text-[9px]"
+                  style={{ color: "var(--studio-text-dimmed)" }}
                 >
-                  <ShadowPreview
-                    value={preset.value}
-                    size={32}
-                    showBorder={previewSettings.showBorder}
-                    borderColor={previewSettings.borderColor}
-                  />
-                  <span
-                    className="text-[11px]"
-                    style={{ color: "var(--studio-text)" }}
-                  >
-                    {preset.name}
-                  </span>
-                </button>
-              ))}
+                  {preset.desc}
+                </div>
+              )}
             </div>
-          </div>
+          </button>
         );
       })}
     </div>
