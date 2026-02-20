@@ -92,7 +92,7 @@ interface ComputedPropertyPanelProps {
   tokenGroups: Record<string, any[]>;
   onPreviewInlineStyle: (property: string, value: string) => void;
   onRevertInlineStyles: () => void;
-  onCommitClass: (tailwindClass: string) => void;
+  onCommitClass: (tailwindClass: string, oldClass?: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -1302,7 +1302,7 @@ function ScaleInput({
   prefix: string;
   cssProp: string;
   onPreview?: (v: string) => void;
-  onCommitClass: (c: string) => void;
+  onCommitClass: (c: string, oldClass?: string) => void;
   onCommitValue?: (v: string) => void;
 }) {
   const isInScale = scale.includes(value);
@@ -1326,7 +1326,12 @@ function ScaleInput({
       setArbitraryMode(true);
       return;
     }
-    onCommitClass(`${prefix}-${selected}`);
+    const newClass = `${prefix}-${selected}`;
+    // Pass the old class so the editor can replace instead of append.
+    // value may be the full class ("text-2xl") — strip prefix to check scale membership.
+    const suffix = value.startsWith(prefix + "-") ? value.slice(prefix.length + 1) : value;
+    const oldClass = scale.includes(suffix) ? `${prefix}-${suffix}` : undefined;
+    onCommitClass(newClass, oldClass);
   };
 
   const handleArbitraryCommit = (v: string) => {

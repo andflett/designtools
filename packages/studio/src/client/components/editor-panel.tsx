@@ -66,11 +66,17 @@ export function EditorPanel({
 
   // Resolve the source file path for this element's page.
   useEffect(() => {
-    fetch(`/scan/resolve-route?path=${encodeURIComponent(iframePath)}`)
-      .then((r) => r.json())
-      .then((data) => setPageFilePath(data.filePath || null))
-      .catch(() => setPageFilePath(null));
-  }, [iframePath]);
+    if (element.sourceFile) {
+      // Babel plugin gave us exact source file
+      setPageFilePath(element.sourceFile);
+    } else {
+      // Fallback for apps without the plugin
+      fetch(`/scan/resolve-route?path=${encodeURIComponent(iframePath)}`)
+        .then((r) => r.json())
+        .then((data) => setPageFilePath(data.filePath || null))
+        .catch(() => setPageFilePath(null));
+    }
+  }, [iframePath, element.sourceFile]);
 
   // When element or filePath changes: clean up old marker, then eagerly
   // mark the new element in source so we have an eid BEFORE any writes.
@@ -94,6 +100,7 @@ export function EditorPanel({
         element.tag,
         element.textContent?.slice(0, 30),
         element.dataSlot || undefined,
+        element.sourceLine || undefined,
       ).then((eid) => {
         if (eid && !eidRef.current) {
           eidRef.current = { eid, filePath: pageFilePath };
@@ -314,7 +321,7 @@ export function EditorPanel({
                 tokenGroups={scanData?.tokens.groups || {}}
                 onPreviewInlineStyle={onPreviewInlineStyle}
                 onRevertInlineStyles={onRevertInlineStyles}
-                onCommitClass={(tailwindClass) => {
+                onCommitClass={(tailwindClass, oldClass) => {
                   const classesForWrite = element.className;
                   if (isComponent && componentEntry) {
                     const filePath = pageFilePath || "";
@@ -323,16 +330,37 @@ export function EditorPanel({
                       const returnedEid = await handleInstanceOverride(
                         filePath,
                         componentEntry.name,
-                        "",
+                        oldClass || "",
                         tailwindClass,
                         currentEid,
-                        element.textContent?.slice(0, 30)
+                        element.textContent?.slice(0, 30),
+                        element.sourceLine || undefined
+                      );
+                      if (returnedEid) {
+                        eidRef.current = { eid: returnedEid, filePath };
+                      }
+                    });
+                  } else if (oldClass) {
+                    // Replace: swap oldClass → newClass in source
+                    const filePath = pageFilePath || componentEntry?.filePath || "";
+                    withSave(async () => {
+                      const currentEid = eidRef.current?.eid || null;
+                      const returnedEid = await handleElementClassChange(
+                        filePath,
+                        classesForWrite,
+                        oldClass,
+                        tailwindClass,
+                        currentEid,
+                        element.tag,
+                        element.textContent?.slice(0, 30),
+                        element.sourceLine || undefined
                       );
                       if (returnedEid) {
                         eidRef.current = { eid: returnedEid, filePath };
                       }
                     });
                   } else {
+                    // Add: no old class known, append
                     const filePath = pageFilePath || componentEntry?.filePath || "";
                     withSave(async () => {
                       const currentEid = eidRef.current?.eid || null;
@@ -342,7 +370,8 @@ export function EditorPanel({
                         tailwindClass,
                         currentEid,
                         element.tag,
-                        element.textContent?.slice(0, 30)
+                        element.textContent?.slice(0, 30),
+                        element.sourceLine || undefined
                       );
                       if (returnedEid) {
                         eidRef.current = { eid: returnedEid, filePath };
@@ -607,7 +636,8 @@ async function handleInstanceOverride(
   oldClass: string,
   newClass: string,
   eid?: string | null,
-  textHint?: string
+  textHint?: string,
+  lineHint?: number
 ): Promise<string | null> {
   try {
     const res = await fetch("/api/element", {
@@ -621,6 +651,7 @@ async function handleInstanceOverride(
         newClass,
         eid: eid || undefined,
         textHint,
+        lineHint,
       }),
     });
     const data = await res.json();
@@ -642,7 +673,8 @@ async function handleElementClassChange(
   newClass: string,
   eid?: string | null,
   tag?: string,
-  textHint?: string
+  textHint?: string,
+  lineHint?: number
 ): Promise<string | null> {
   try {
     const res = await fetch("/api/element", {
@@ -657,6 +689,7 @@ async function handleElementClassChange(
         eid: eid || undefined,
         tag,
         textHint,
+        lineHint,
       }),
     });
     const data = await res.json();
@@ -677,7 +710,8 @@ async function handleElementAddClass(
   newClass: string,
   eid?: string | null,
   tag?: string,
-  textHint?: string
+  textHint?: string,
+  lineHint?: number
 ): Promise<string | null> {
   try {
     const res = await fetch("/api/element", {
@@ -691,6 +725,7 @@ async function handleElementAddClass(
         eid: eid || undefined,
         tag,
         textHint,
+        lineHint,
       }),
     });
     const data = await res.json();
@@ -711,6 +746,7 @@ async function markElementOnSelection(
   tag: string,
   textHint?: string,
   componentName?: string,
+  lineHint?: number,
 ): Promise<string | null> {
   try {
     const res = await fetch("/api/element", {
@@ -723,6 +759,7 @@ async function markElementOnSelection(
         tag,
         textHint,
         componentName,
+        lineHint,
       }),
     });
     const data = await res.json();

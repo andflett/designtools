@@ -1,0 +1,22 @@
+{
+  "name": "@designtools/next-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "exports": {
+    ".": {
+      "require": "./dist/index.js",
+      "import": "./dist/index.mjs"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts src/loader.ts --format cjs,esm --dts --external @babel/core"
+  },
+  "peerDependencies": {
+    "next": ">=14.0.0"
+  },
+  "devDependencies": {
+    "next": "^15.0.0",
+    "tsup": "^8.0.0"
+  }
+}

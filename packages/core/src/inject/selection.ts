@@ -145,6 +145,22 @@ function extractElementData(el: Element) {
       attributes[attr.name] = attr.value;
     }
   }
+  // Parse data-source from Babel plugin: "path/to/file.tsx:10:4"
+  let sourceFile: string | null = null;
+  let sourceLine: number | null = null;
+  let sourceCol: number | null = null;
+
+  const dataSource = el.getAttribute("data-source");
+  if (dataSource) {
+    const lastColon = dataSource.lastIndexOf(":");
+    const secondLastColon = dataSource.lastIndexOf(":", lastColon - 1);
+    if (secondLastColon > 0) {
+      sourceFile = dataSource.slice(0, secondLastColon);
+      sourceLine = parseInt(dataSource.slice(secondLastColon + 1, lastColon), 10);
+      sourceCol = parseInt(dataSource.slice(lastColon + 1), 10);
+    }
+  }
+
   return {
     tag: el.tagName.toLowerCase(),
     className: (el.getAttribute("class") || "").trim(),
@@ -157,6 +173,9 @@ function extractElementData(el: Element) {
     domPath: getDomPath(el),
     textContent: (el.textContent || "").trim().slice(0, 100),
     attributes,
+    sourceFile,
+    sourceLine,
+    sourceCol,
   };
 }
 

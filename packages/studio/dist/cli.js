@@ -637,6 +637,22 @@ function replaceClassInComponent(source, oldClass, newClass, variantContext) {
 import { Router as Router3 } from "express";
 import fs7 from "fs/promises";
 import crypto from "crypto";
+import * as recast from "recast";
+import { visit, namedTypes as n } from "ast-types";
+var b = recast.types.builders;
+var babelTsParser;
+async function getParser() {
+  if (!babelTsParser) {
+    babelTsParser = await import("recast/parsers/babel-ts.js");
+  }
+  return babelTsParser;
+}
+function parseSource(source, parser) {
+  return recast.parse(source, { parser });
+}
+function printSource(ast) {
+  return recast.print(ast).code;
+}
 function createElementRouter(projectRoot) {
   const router = Router3();
   router.post("/", async (req, res) => {
@@ -644,8 +660,9 @@ function createElementRouter(projectRoot) {
       const body = req.body;
       const fullPath = safePath(projectRoot, body.filePath);
       let source = await fs7.readFile(fullPath, "utf-8");
+      const parser = await getParser();
       if (body.type === "class") {
-        const result = replaceClassInElement(source, {
+        const result = replaceClassInElement(source, parser, {
           eid: body.eid,
           classIdentifier: body.classIdentifier,
           oldClass: body.oldClass,
@@ -660,6 +677,7 @@ function createElementRouter(projectRoot) {
       } else if (body.type === "prop") {
         source = replacePropInElement(
           source,
+          parser,
           body.componentName,
           body.propName,
           body.propValue,
@@ -669,7 +687,7 @@ function createElementRouter(projectRoot) {
         await fs7.writeFile(fullPath, source, "utf-8");
         res.json({ ok: true });
       } else if (body.type === "addClass") {
-        const result = addClassToElement(source, {
+        const result = addClassToElement(source, parser, {
           eid: body.eid,
           classIdentifier: body.classIdentifier,
           newClass: body.newClass,
@@ -681,7 +699,7 @@ function createElementRouter(projectRoot) {
         await fs7.writeFile(fullPath, source, "utf-8");
         res.json({ ok: true, eid: result.eid });
       } else if (body.type === "instanceOverride") {
-        const result = overrideClassOnInstance(source, {
+        const result = overrideClassOnInstance(source, parser, {
           eid: body.eid,
           componentName: body.componentName,
           oldClass: body.oldClass,
@@ -691,6 +709,18 @@ function createElementRouter(projectRoot) {
         });
         source = result.source;
         await fs7.writeFile(fullPath, source, "utf-8");
+        res.json({ ok: true, eid: result.eid });
+      } else if (body.type === "markElement") {
+        const result = markElementInSource(source, parser, {
+          classIdentifier: body.classIdentifier,
+          componentName: body.componentName,
+          tag: body.tag,
+          textHint: body.textHint,
+          lineHint: body.lineHint
+        });
+        if (result.modified) {
+          await fs7.writeFile(fullPath, result.source, "utf-8");
+        }
         res.json({ ok: true, eid: result.eid });
       } else if (body.type === "removeMarker") {
         source = removeMarker(source, body.eid);
@@ -739,313 +769,378 @@ function removeMarker(source, eid) {
     ""
   );
 }
-function insertMarkerNearLine(lines, nearIdx, eid) {
-  for (let i = nearIdx; i >= Math.max(0, nearIdx - 10); i--) {
-    const tagMatch = lines[i].match(/<([A-Za-z][A-Za-z0-9.]*)/);
-    if (tagMatch) {
-      const tagPos = lines[i].indexOf(tagMatch[0]) + tagMatch[0].length;
-      lines[i] = lines[i].slice(0, tagPos) + ` data-studio-eid="${eid}"` + lines[i].slice(tagPos);
-      return;
+function getTagName(node) {
+  if (n.JSXIdentifier.check(node.name)) {
+    return node.name.name;
+  }
+  if (n.JSXMemberExpression.check(node.name)) {
+    return getTagName({ name: node.name.object }) + "." + node.name.property.name;
+  }
+  return "";
+}
+function findAttr(openingElement, attrName) {
+  for (const attr of openingElement.attributes) {
+    if (n.JSXAttribute.check(attr) && n.JSXIdentifier.check(attr.name) && attr.name.name === attrName) {
+      return attr;
     }
   }
+  return null;
+}
+function getClassNameString(openingElement) {
+  const attr = findAttr(openingElement, "className");
+  if (!attr) return null;
+  if (n.StringLiteral.check(attr.value) || n.Literal.check(attr.value)) {
+    return typeof attr.value.value === "string" ? attr.value.value : null;
+  }
+  return null;
+}
+function findElementAtLine(ast, lineHint) {
+  let best = null;
+  let bestDist = Infinity;
+  visit(ast, {
+    visitJSXOpeningElement(path10) {
+      const loc = path10.node.loc;
+      if (loc) {
+        const dist = Math.abs(loc.start.line - lineHint);
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = path10;
+        }
+      }
+      this.traverse(path10);
+    }
+  });
+  return bestDist <= 3 ? best : null;
+}
+function findElementByEid(ast, eid) {
+  let found = null;
+  visit(ast, {
+    visitJSXOpeningElement(path10) {
+      const attr = findAttr(path10.node, "data-studio-eid");
+      if (attr) {
+        const val = n.StringLiteral.check(attr.value) || n.Literal.check(attr.value) ? attr.value.value : null;
+        if (val === eid) {
+          found = path10;
+          return false;
+        }
+      }
+      this.traverse(path10);
+    }
+  });
+  return found;
+}
+function findElementByScoring(ast, opts) {
+  const identifierClasses = (opts.classIdentifier || "").split(/\s+/).filter(Boolean);
+  let pascalComponent = null;
+  if (opts.componentName) {
+    pascalComponent = opts.componentName.includes("-") ? opts.componentName.replace(/(^|-)([a-z])/g, (_m, _sep, c) => c.toUpperCase()) : opts.componentName;
+  }
+  let bestPath = null;
+  let bestScore = -Infinity;
+  visit(ast, {
+    visitJSXOpeningElement(path10) {
+      let score = 0;
+      const tagName = getTagName(path10.node);
+      if (pascalComponent && tagName === pascalComponent) {
+        score += 10;
+      } else if (opts.tag && tagName.toLowerCase() === opts.tag.toLowerCase()) {
+        score += 3;
+      }
+      const classStr = getClassNameString(path10.node);
+      if (classStr && identifierClasses.length > 0) {
+        let matchCount = 0;
+        for (const cls of identifierClasses) {
+          if (classStr.includes(cls)) matchCount++;
+        }
+        const threshold = Math.max(1, Math.ceil(identifierClasses.length * 0.3));
+        if (matchCount >= threshold) {
+          score += matchCount * 2;
+        }
+      }
+      if (opts.textHint && opts.textHint.length >= 2) {
+        const parent = path10.parent;
+        if (n.JSXElement.check(parent.node)) {
+          for (const child of parent.node.children) {
+            if (n.JSXText.check(child) && child.value.includes(opts.textHint)) {
+              score += 15;
+              break;
+            }
+          }
+        }
+      }
+      if (score > 0 && score > bestScore) {
+        bestScore = score;
+        bestPath = path10;
+      }
+      this.traverse(path10);
+    }
+  });
+  return bestPath;
+}
+function findElement(ast, opts) {
+  if (opts.eid) {
+    const found = findElementByEid(ast, opts.eid);
+    if (found) return found;
+  }
+  if (opts.lineHint !== void 0) {
+    const found = findElementAtLine(ast, opts.lineHint);
+    if (found) return found;
+  }
+  return findElementByScoring(ast, opts);
+}
+function addEidAttribute(openingElement, eid) {
+  openingElement.attributes.push(
+    b.jsxAttribute(
+      b.jsxIdentifier("data-studio-eid"),
+      b.stringLiteral(eid)
+    )
+  );
+}
+function replaceClassInAttr(openingElement, oldClass, newClass) {
+  const attr = findAttr(openingElement, "className");
+  if (!attr) return false;
+  if (n.StringLiteral.check(attr.value) || n.Literal.check(attr.value)) {
+    const val = attr.value.value;
+    const regex = classBoundaryRegex(oldClass, "g");
+    if (regex.test(val)) {
+      attr.value = b.stringLiteral(val.replace(classBoundaryRegex(oldClass, "g"), newClass));
+      return true;
+    }
+    return false;
+  }
+  if (n.JSXExpressionContainer.check(attr.value)) {
+    return replaceClassInExpression(attr.value.expression, oldClass, newClass);
+  }
+  return false;
+}
+function replaceClassInExpression(expr, oldClass, newClass) {
+  if (n.StringLiteral.check(expr) || n.Literal.check(expr)) {
+    if (typeof expr.value === "string") {
+      const regex = classBoundaryRegex(oldClass);
+      if (regex.test(expr.value)) {
+        expr.value = expr.value.replace(classBoundaryRegex(oldClass, "g"), newClass);
+        return true;
+      }
+    }
+    return false;
+  }
+  if (n.TemplateLiteral.check(expr)) {
+    for (const quasi of expr.quasis) {
+      const regex = classBoundaryRegex(oldClass);
+      if (regex.test(quasi.value.raw)) {
+        quasi.value = {
+          raw: quasi.value.raw.replace(classBoundaryRegex(oldClass, "g"), newClass),
+          cooked: (quasi.value.cooked || quasi.value.raw).replace(classBoundaryRegex(oldClass, "g"), newClass)
+        };
+        return true;
+      }
+    }
+    return false;
+  }
+  if (n.CallExpression.check(expr)) {
+    for (const arg of expr.arguments) {
+      if (replaceClassInExpression(arg, oldClass, newClass)) return true;
+    }
+    return false;
+  }
+  if (n.ConditionalExpression.check(expr)) {
+    if (replaceClassInExpression(expr.consequent, oldClass, newClass)) return true;
+    if (replaceClassInExpression(expr.alternate, oldClass, newClass)) return true;
+    return false;
+  }
+  if (n.LogicalExpression.check(expr)) {
+    if (replaceClassInExpression(expr.left, oldClass, newClass)) return true;
+    if (replaceClassInExpression(expr.right, oldClass, newClass)) return true;
+    return false;
+  }
+  if (n.ArrayExpression.check(expr)) {
+    for (const el of expr.elements) {
+      if (el && replaceClassInExpression(el, oldClass, newClass)) return true;
+    }
+    return false;
+  }
+  return false;
+}
+function appendClassToAttr(openingElement, newClass) {
+  const attr = findAttr(openingElement, "className");
+  if (!attr) return false;
+  if (n.StringLiteral.check(attr.value) || n.Literal.check(attr.value)) {
+    const val = attr.value.value;
+    attr.value = b.stringLiteral(val + " " + newClass);
+    return true;
+  }
+  if (n.JSXExpressionContainer.check(attr.value)) {
+    return appendClassToExpression(attr.value.expression, newClass);
+  }
+  return false;
+}
+function appendClassToExpression(expr, newClass) {
+  if (n.StringLiteral.check(expr) || n.Literal.check(expr)) {
+    if (typeof expr.value === "string") {
+      expr.value = expr.value + " " + newClass;
+      return true;
+    }
+    return false;
+  }
+  if (n.TemplateLiteral.check(expr)) {
+    const last = expr.quasis[expr.quasis.length - 1];
+    if (last) {
+      last.value = {
+        raw: last.value.raw + " " + newClass,
+        cooked: (last.value.cooked || last.value.raw) + " " + newClass
+      };
+      return true;
+    }
+    return false;
+  }
+  if (n.CallExpression.check(expr)) {
+    for (const arg of expr.arguments) {
+      if ((n.StringLiteral.check(arg) || n.Literal.check(arg)) && typeof arg.value === "string") {
+        arg.value = arg.value + " " + newClass;
+        return true;
+      }
+    }
+    return false;
+  }
+  return false;
+}
+function addClassNameAttr(openingElement, className) {
+  openingElement.attributes.push(
+    b.jsxAttribute(
+      b.jsxIdentifier("className"),
+      b.stringLiteral(className)
+    )
+  );
 }
 function classBoundaryRegex(cls, flags = "") {
   const escaped = cls.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`(?<=^|[\\s"'\`])${escaped}(?=$|[\\s"'\`])`, flags);
 }
-function lineContainsClass(line, cls) {
-  return classBoundaryRegex(cls).test(line);
+function markElementInSource(source, parser, opts) {
+  const ast = parseSource(source, parser);
+  const elementPath = findElement(ast, {
+    classIdentifier: opts.classIdentifier,
+    tag: opts.tag,
+    textHint: opts.textHint,
+    componentName: opts.componentName,
+    lineHint: opts.lineHint
+  });
+  if (!elementPath) {
+    const eid2 = generateEid();
+    return { source, eid: eid2, modified: false };
+  }
+  const existingMarker = findAttr(elementPath.node, "data-studio-eid");
+  if (existingMarker) {
+    const val = n.StringLiteral.check(existingMarker.value) || n.Literal.check(existingMarker.value) ? existingMarker.value.value : null;
+    if (val) return { source, eid: val, modified: false };
+  }
+  const eid = generateEid();
+  addEidAttribute(elementPath.node, eid);
+  return { source: printSource(ast), eid, modified: true };
 }
-function findElementLine(lines, opts) {
-  if (opts.eid) {
-    const markerStr = `data-studio-eid="${opts.eid}"`;
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].includes(markerStr)) {
-        for (let j = Math.max(0, i - 5); j <= Math.min(lines.length - 1, i + 10); j++) {
-          if (lineContainsClass(lines[j], opts.oldClass)) return j;
-        }
-        return i;
-      }
-    }
+function replaceClassInElement(source, parser, opts) {
+  const ast = parseSource(source, parser);
+  const elementPath = findElement(ast, opts);
+  if (!elementPath) {
+    throw new Error(`Could not find element with class "${opts.oldClass}" in source`);
   }
-  const candidates = [];
-  for (let i = 0; i < lines.length; i++) {
-    if (lineContainsClass(lines[i], opts.oldClass)) {
-      candidates.push(i);
-    }
-  }
-  if (candidates.length === 0) return -1;
-  if (candidates.length === 1) return candidates[0];
-  const identifierClasses = opts.classIdentifier.split(/\s+/).filter(Boolean);
-  let bestIdx = -1;
-  let bestScore = -Infinity;
-  for (const cIdx of candidates) {
-    let score = 0;
-    const nearbyText = lines.slice(Math.max(0, cIdx - 5), Math.min(lines.length, cIdx + 6)).join(" ");
-    let classMatches = 0;
-    for (const cls of identifierClasses) {
-      if (lineContainsClass(nearbyText, cls)) {
-        classMatches++;
-        score += 2;
-      }
-    }
-    if (opts.tag) {
-      const lcTag = `<${opts.tag}`;
-      const ucTag = `<${opts.tag.charAt(0).toUpperCase()}${opts.tag.slice(1)}`;
-      if (nearbyText.includes(lcTag) || nearbyText.includes(ucTag)) {
-        score += 5;
-      }
-    }
-    if (opts.textHint) {
-      const textNearby = lines.slice(Math.max(0, cIdx - 2), Math.min(lines.length, cIdx + 5)).join(" ");
-      if (textNearby.includes(opts.textHint)) {
-        score += 3;
-      }
-    }
-    if (opts.lineHint !== void 0) {
-      const distance = Math.abs(cIdx - opts.lineHint);
-      score += Math.max(0, 10 - distance);
-    }
-    const minRequired = Math.min(3, Math.ceil(identifierClasses.length * 0.3));
-    if (classMatches < minRequired) {
-      score = -1e3;
-    }
-    if (score > bestScore) {
-      bestScore = score;
-      bestIdx = cIdx;
-    }
-  }
-  return bestIdx;
-}
-function replaceClassInElement(source, opts) {
-  const lines = source.split("\n");
-  const targetLineIdx = findElementLine(lines, opts);
-  if (targetLineIdx === -1) {
-    throw new Error(
-      `Could not find element with class "${opts.oldClass}" in source`
-    );
-  }
-  const replaceRegex = classBoundaryRegex(opts.oldClass, "g");
-  let replaced = false;
-  for (let i = Math.max(0, targetLineIdx - 2); i <= Math.min(lines.length - 1, targetLineIdx + 2); i++) {
-    if (lineContainsClass(lines[i], opts.oldClass)) {
-      lines[i] = lines[i].replace(replaceRegex, opts.newClass);
-      replaced = true;
-      break;
-    }
-  }
+  const replaced = replaceClassInAttr(elementPath.node, opts.oldClass, opts.newClass);
   if (!replaced) {
-    throw new Error(`Class "${opts.oldClass}" not found near the identified element`);
+    throw new Error(`Class "${opts.oldClass}" not found on the identified element`);
   }
   let eid = opts.eid || "";
   if (!eid) {
-    eid = generateEid();
-    insertMarkerNearLine(lines, targetLineIdx, eid);
+    const existingMarker = findAttr(elementPath.node, "data-studio-eid");
+    if (existingMarker) {
+      eid = existingMarker.value.value;
+    } else {
+      eid = generateEid();
+      addEidAttribute(elementPath.node, eid);
+    }
   }
-  return { source: lines.join("\n"), eid };
+  return { source: printSource(ast), eid };
 }
-function addClassToElement(source, opts) {
-  const lines = source.split("\n");
-  let targetLineIdx = -1;
-  if (opts.eid) {
-    const markerStr = `data-studio-eid="${opts.eid}"`;
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].includes(markerStr)) {
-        targetLineIdx = i;
-        break;
-      }
-    }
-  }
-  if (targetLineIdx === -1) {
-    const identifierClasses = opts.classIdentifier.split(/\s+/).filter(Boolean);
-    const anchor = identifierClasses.sort((a, b) => b.length - a.length)[0];
-    if (anchor) {
-      const escaped = anchor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const anchorRegex = new RegExp(`\\b${escaped}\\b`);
-      const candidates = [];
-      for (let i = 0; i < lines.length; i++) {
-        if (anchorRegex.test(lines[i])) candidates.push(i);
-      }
-      if (candidates.length === 1) {
-        targetLineIdx = candidates[0];
-      } else if (candidates.length > 1 && opts.lineHint !== void 0) {
-        targetLineIdx = candidates.reduce(
-          (closest, c) => Math.abs(c - opts.lineHint) < Math.abs(closest - opts.lineHint) ? c : closest
-        );
-      } else if (candidates.length > 0) {
-        targetLineIdx = candidates[0];
-      }
-    }
-  }
-  if (targetLineIdx === -1) {
+function addClassToElement(source, parser, opts) {
+  const ast = parseSource(source, parser);
+  const elementPath = findElement(ast, opts);
+  if (!elementPath) {
     throw new Error(`Could not find element with class identifier "${opts.classIdentifier}"`);
   }
-  const classNameRegex = /className="([^"]*)"/;
-  for (let i = Math.max(0, targetLineIdx - 3); i <= Math.min(lines.length - 1, targetLineIdx + 5); i++) {
-    const match = lines[i].match(classNameRegex);
-    if (match) {
-      const existingClasses = match[1];
-      lines[i] = lines[i].replace(
-        `className="${existingClasses}"`,
-        `className="${existingClasses} ${opts.newClass}"`
-      );
-      let eid = opts.eid || "";
-      if (!eid) {
-        eid = generateEid();
-        insertMarkerNearLine(lines, i, eid);
-      }
-      return { source: lines.join("\n"), eid };
+  const classAttr = findAttr(elementPath.node, "className");
+  if (classAttr) {
+    const appended = appendClassToAttr(elementPath.node, opts.newClass);
+    if (!appended) {
+      throw new Error("Could not append class to className attribute");
     }
-  }
-  throw new Error(`Could not find className near the identified element`);
-}
-function overrideClassOnInstance(source, opts) {
-  const lines = source.split("\n");
-  let componentLineIdx = -1;
-  if (opts.eid) {
-    const markerStr = `data-studio-eid="${opts.eid}"`;
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].includes(markerStr)) {
-        componentLineIdx = i;
-        break;
-      }
-    }
-  }
-  if (componentLineIdx === -1) {
-    const candidateLines = [];
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].includes(`<${opts.componentName}`)) {
-        candidateLines.push(i);
-      }
-    }
-    if (candidateLines.length === 0) {
-      throw new Error(`Component <${opts.componentName}> not found`);
-    }
-    if (candidateLines.length === 1) {
-      componentLineIdx = candidateLines[0];
-    } else {
-      let bestIdx = candidateLines[0];
-      let bestScore = -Infinity;
-      for (const cIdx of candidateLines) {
-        let score = 0;
-        if (opts.textHint) {
-          const nearby = lines.slice(cIdx, Math.min(cIdx + 5, lines.length)).join(" ");
-          if (nearby.includes(opts.textHint)) score += 10;
-        }
-        if (opts.lineHint !== void 0) {
-          score += Math.max(0, 20 - Math.abs(cIdx - opts.lineHint));
-        }
-        if (score > bestScore) {
-          bestScore = score;
-          bestIdx = cIdx;
-        }
-      }
-      componentLineIdx = bestIdx;
-    }
-  }
-  let tagEnd = componentLineIdx;
-  let depth = 0;
-  for (let i = componentLineIdx; i < lines.length; i++) {
-    for (const ch of lines[i]) {
-      if (ch === "<") depth++;
-      if (ch === ">") {
-        depth--;
-        if (depth <= 0) {
-          tagEnd = i;
-          break;
-        }
-      }
-    }
-    if (depth <= 0) break;
-  }
-  const classNameRegex = /className="([^"]*)"/;
-  let classNameFound = false;
-  for (let i = componentLineIdx; i <= tagEnd; i++) {
-    const match = lines[i].match(classNameRegex);
-    if (match) {
-      classNameFound = true;
-      const existingClasses = match[1];
-      if (lineContainsClass(existingClasses, opts.oldClass)) {
-        const updated = existingClasses.replace(classBoundaryRegex(opts.oldClass), opts.newClass).replace(/\s+/g, " ").trim();
-        lines[i] = lines[i].replace(
-          `className="${existingClasses}"`,
-          `className="${updated}"`
-        );
-      } else {
-        lines[i] = lines[i].replace(
-          `className="${existingClasses}"`,
-          `className="${existingClasses} ${opts.newClass}"`
-        );
-      }
-      break;
-    }
-  }
-  if (!classNameFound) {
-    const componentTag = lines[componentLineIdx];
-    const insertPos = componentTag.indexOf(`<${opts.componentName}`) + `<${opts.componentName}`.length;
-    lines[componentLineIdx] = componentTag.slice(0, insertPos) + ` className="${opts.newClass}"` + componentTag.slice(insertPos);
+  } else {
+    addClassNameAttr(elementPath.node, opts.newClass);
   }
   let eid = opts.eid || "";
   if (!eid) {
-    eid = generateEid();
-    insertMarkerNearLine(lines, componentLineIdx, eid);
-  }
-  return { source: lines.join("\n"), eid };
-}
-function replacePropInElement(source, componentName, propName, propValue, lineHint, textHint) {
-  const lines = source.split("\n");
-  const candidateLines = [];
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i].includes(`<${componentName}`)) {
-      candidateLines.push(i);
+    const existingMarker = findAttr(elementPath.node, "data-studio-eid");
+    if (existingMarker) {
+      eid = existingMarker.value.value;
+    } else {
+      eid = generateEid();
+      addEidAttribute(elementPath.node, eid);
     }
   }
-  if (candidateLines.length === 0) {
+  return { source: printSource(ast), eid };
+}
+function overrideClassOnInstance(source, parser, opts) {
+  const ast = parseSource(source, parser);
+  const elementPath = findElement(ast, {
+    eid: opts.eid,
+    lineHint: opts.lineHint,
+    componentName: opts.componentName,
+    textHint: opts.textHint
+  });
+  if (!elementPath) {
+    throw new Error(`Component <${opts.componentName}> not found`);
+  }
+  const classAttr = findAttr(elementPath.node, "className");
+  if (classAttr) {
+    const replaced = replaceClassInAttr(elementPath.node, opts.oldClass, opts.newClass);
+    if (!replaced) {
+      appendClassToAttr(elementPath.node, opts.newClass);
+    }
+  } else {
+    addClassNameAttr(elementPath.node, opts.newClass);
+  }
+  let eid = opts.eid || "";
+  if (!eid) {
+    const existingMarker = findAttr(elementPath.node, "data-studio-eid");
+    if (existingMarker) {
+      eid = existingMarker.value.value;
+    } else {
+      eid = generateEid();
+      addEidAttribute(elementPath.node, eid);
+    }
+  }
+  return { source: printSource(ast), eid };
+}
+function replacePropInElement(source, parser, componentName, propName, propValue, lineHint, textHint) {
+  const ast = parseSource(source, parser);
+  const elementPath = findElement(ast, {
+    lineHint,
+    textHint,
+    componentName
+  });
+  if (!elementPath) {
     throw new Error(`Component <${componentName}> not found`);
   }
-  let componentLineIdx = candidateLines[0];
-  if (textHint && candidateLines.length > 1) {
-    for (const lineIdx of candidateLines) {
-      const nearby = lines.slice(lineIdx, Math.min(lineIdx + 3, lines.length)).join(" ");
-      if (nearby.includes(textHint)) {
-        componentLineIdx = lineIdx;
-        break;
-      }
-    }
+  const existingProp = findAttr(elementPath.node, propName);
+  if (existingProp) {
+    existingProp.value = b.stringLiteral(propValue);
+  } else {
+    elementPath.node.attributes.push(
+      b.jsxAttribute(
+        b.jsxIdentifier(propName),
+        b.stringLiteral(propValue)
+      )
+    );
   }
-  if (lineHint && candidateLines.length > 1) {
-    let closest = candidateLines[0];
-    for (const c of candidateLines) {
-      if (Math.abs(c - lineHint) < Math.abs(closest - lineHint)) closest = c;
-    }
-    componentLineIdx = closest;
-  }
-  let tagEnd = componentLineIdx;
-  let depth = 0;
-  for (let i = componentLineIdx; i < lines.length; i++) {
-    for (const ch of lines[i]) {
-      if (ch === "<") depth++;
-      if (ch === ">") {
-        depth--;
-        if (depth <= 0) {
-          tagEnd = i;
-          break;
-        }
-      }
-    }
-    if (depth <= 0) break;
-  }
-  const propRegex = new RegExp(`${propName}=["']([^"']*)["']`);
-  for (let i = componentLineIdx; i <= tagEnd; i++) {
-    if (propRegex.test(lines[i])) {
-      lines[i] = lines[i].replace(propRegex, `${propName}="${propValue}"`);
-      return lines.join("\n");
-    }
-  }
-  const componentTag = lines[componentLineIdx];
-  const insertPos = componentTag.indexOf(`<${componentName}`) + `<${componentName}`.length;
-  lines[componentLineIdx] = componentTag.slice(0, insertPos) + ` ${propName}="${propValue}"` + componentTag.slice(insertPos);
-  return lines.join("\n");
+  return printSource(ast);
 }
 
 // src/server/scanner/index.ts
@@ -1135,8 +1230,8 @@ function categorizeToken(name, value) {
   return "other";
 }
 function getTokenGroup(name) {
-  const n = name.replace(/^--/, "");
-  const scaleMatch = n.match(/^([\w]+)-\d+$/);
+  const n2 = name.replace(/^--/, "");
+  const scaleMatch = n2.match(/^([\w]+)-\d+$/);
   if (scaleMatch) return scaleMatch[1];
   const semanticPrefixes = [
     "primary",
@@ -1147,18 +1242,18 @@ function getTokenGroup(name) {
     "warning"
   ];
   for (const prefix of semanticPrefixes) {
-    if (n === prefix || n.startsWith(`${prefix}-`)) return prefix;
+    if (n2 === prefix || n2.startsWith(`${prefix}-`)) return prefix;
   }
-  if (["background", "foreground", "card", "card-foreground", "popover", "popover-foreground"].includes(n)) {
+  if (["background", "foreground", "card", "card-foreground", "popover", "popover-foreground"].includes(n2)) {
     return "surface";
   }
-  if (["border", "input", "ring", "muted", "muted-foreground", "accent", "accent-foreground"].includes(n)) {
+  if (["border", "input", "ring", "muted", "muted-foreground", "accent", "accent-foreground"].includes(n2)) {
     return "utility";
   }
-  if (n.startsWith("chart")) return "chart";
-  if (n.startsWith("sidebar")) return "sidebar";
-  if (n.startsWith("radius")) return "radius";
-  if (n.startsWith("shadow")) return "shadow";
+  if (n2.startsWith("chart")) return "chart";
+  if (n2.startsWith("sidebar")) return "sidebar";
+  if (n2.startsWith("radius")) return "radius";
+  if (n2.startsWith("shadow")) return "shadow";
   return "other";
 }
 function detectColorFormat(value) {

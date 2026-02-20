@@ -33,6 +33,9 @@ export interface ElementData {
   domPath: string;
   textContent: string;
   attributes: Record<string, string>;
+  sourceFile: string | null;
+  sourceLine: number | null;
+  sourceCol: number | null;
 }
 
 export function sendToIframe(
