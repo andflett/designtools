@@ -4,6 +4,20 @@
  */
 import { useEffect, useRef, useState, useCallback, type RefObject } from "react";
 import { createPortal } from "react-dom";
+import { RgbaColorPicker } from "react-colorful";
+import { converter } from "culori";
+import type { RgbaColor } from "react-colorful";
+import {
+  type InputMode,
+  clamp,
+  cssToRgba,
+  rgbaToCss,
+  ModeTabs,
+  ColorInputFields,
+} from "./color-picker.js";
+
+const toRgb = converter("rgb");
+const toOklch = converter("oklch");
 
 // ---------------------------------------------------------------------------
 // Color token picker popover (used by computed-property-panel's ColorControl)
@@ -167,17 +181,32 @@ export function TokenPopover({
     parseOklch(token.resolvedValue)
   );
   const [position, setPosition] = useState({ top: 0, left: 0 });
+  const [inputMode, setInputMode] = useState<InputMode>("oklch");
+
+  // Derive RGBA from OKLCH for the visual picker
+  const rgba: RgbaColor = (() => {
+    const rgb = toRgb({ mode: "oklch" as const, l: color.l, c: color.c, h: color.h });
+    if (rgb) {
+      return {
+        r: clamp(Math.round((rgb.r ?? 0) * 255), 0, 255),
+        g: clamp(Math.round((rgb.g ?? 0) * 255), 0, 255),
+        b: clamp(Math.round((rgb.b ?? 0) * 255), 0, 255),
+        a: 1,
+      };
+    }
+    return { r: 0, g: 0, b: 0, a: 1 };
+  })();
 
   useEffect(() => {
     if (!anchorRef.current) return;
     const rect = anchorRef.current.getBoundingClientRect();
-    const popoverHeight = 300;
+    const popoverHeight = 460;
     const spaceBelow = window.innerHeight - rect.bottom;
     const above = spaceBelow < popoverHeight && rect.top > popoverHeight;
 
     setPosition({
       top: above ? rect.top - popoverHeight - 4 : rect.bottom + 4,
-      left: Math.min(rect.left, window.innerWidth - 252),
+      left: Math.min(rect.left, window.innerWidth - 272),
     });
   }, [anchorRef]);
 
@@ -213,6 +242,40 @@ export function TokenPopover({
     [color, onPreview, token.name]
   );
 
+  // Handle visual picker (RGBA) changes → convert to OKLCH
+  const handlePickerChange = useCallback(
+    (c: RgbaColor) => {
+      const oklch = toOklch({ mode: "rgb" as const, r: c.r / 255, g: c.g / 255, b: c.b / 255 });
+      if (oklch) {
+        const newColor: OklchColor = {
+          l: oklch.l ?? 0.5,
+          c: oklch.c ?? 0.1,
+          h: oklch.h ?? 0,
+        };
+        setColor(newColor);
+        onPreview(token.name, formatOklch(newColor));
+      }
+    },
+    [onPreview, token.name]
+  );
+
+  // Handle ColorInputFields changes (RGBA) → convert to OKLCH
+  const handleInputFieldsChange = useCallback(
+    (c: RgbaColor) => {
+      const oklch = toOklch({ mode: "rgb" as const, r: c.r / 255, g: c.g / 255, b: c.b / 255 });
+      if (oklch) {
+        const newColor: OklchColor = {
+          l: oklch.l ?? 0.5,
+          c: oklch.c ?? 0.1,
+          h: oklch.h ?? 0,
+        };
+        setColor(newColor);
+        onPreview(token.name, formatOklch(newColor));
+      }
+    },
+    [onPreview, token.name]
+  );
+
   const handleSave = async () => {
     const selector = theme === "dark" ? ".dark" : ":root";
     try {
@@ -242,16 +305,10 @@ export function TokenPopover({
     <div
       ref={popoverRef}
       className="studio-popover"
-      style={{ top: position.top, left: position.left }}
+      style={{ top: position.top, left: position.left, width: 260 }}
     >
-      {/* Preview swatch */}
-      <div
-        className="studio-popover-swatch"
-        style={{ "--swatch-color": formatOklch(color) } as React.CSSProperties}
-      />
-
-      {/* Token name + value */}
-      <div className="flex items-center justify-between px-1 mb-2">
+      {/* Token name + contrast */}
+      <div className="flex items-center justify-between px-1 mb-1.5">
         <span
           className="text-[11px] font-mono truncate"
           style={{ color: "var(--studio-text)" }}
@@ -276,35 +333,39 @@ export function TokenPopover({
         )}
       </div>
 
-      {/* OKLCH Sliders */}
-      <div className="flex flex-col gap-2 px-1 mb-3">
-        <SliderRow
-          label="L"
-          value={color.l}
-          min={0}
-          max={1}
-          step={0.005}
-          displayValue={`${(color.l * 100).toFixed(0)}%`}
-          onChange={(v) => updateColor({ l: v })}
-        />
-        <SliderRow
-          label="C"
-          value={color.c}
-          min={0}
-          max={0.4}
-          step={0.005}
-          displayValue={color.c.toFixed(3)}
-          onChange={(v) => updateColor({ c: v })}
-        />
-        <SliderRow
-          label="H"
-          value={color.h}
-          min={0}
-          max={360}
-          step={1}
-          displayValue={`${color.h.toFixed(0)}\u00B0`}
-          onChange={(v) => updateColor({ h: v })}
-        />
+      {/* Visual color picker */}
+      <style>{`
+        .token-color-picker .react-colorful {
+          width: 100% !important;
+          height: 140px !important;
+          gap: 8px !important;
+        }
+        .token-color-picker .react-colorful__saturation {
+          border-radius: 6px !important;
+        }
+        .token-color-picker .react-colorful__hue,
+        .token-color-picker .react-colorful__alpha {
+          height: 10px !important;
+          border-radius: 5px !important;
+        }
+        .token-color-picker .react-colorful__pointer {
+          width: 14px !important;
+          height: 14px !important;
+          border-width: 2px !important;
+        }
+      `}</style>
+      <div className="token-color-picker" style={{ marginBottom: 8 }}>
+        <RgbaColorPicker color={rgba} onChange={handlePickerChange} />
+      </div>
+
+      {/* Mode tabs */}
+      <div style={{ marginBottom: 8 }}>
+        <ModeTabs mode={inputMode} onChange={setInputMode} />
+      </div>
+
+      {/* Channel inputs per mode */}
+      <div style={{ marginBottom: 8 }}>
+        <ColorInputFields color={rgba} onChange={handleInputFieldsChange} mode={inputMode} />
       </div>
 
       {/* Save */}

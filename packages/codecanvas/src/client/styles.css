@@ -252,7 +252,6 @@ body {
   color: var(--studio-text-dimmed);
   min-width: 42px;
   flex-shrink: 0;
-  text-transform: uppercase;
   letter-spacing: 0.03em;
 }
 
@@ -269,6 +268,25 @@ body {
   transition: border-color 0.15s;
   min-width: 0;
   min-height: 32px;
+}
+.studio-input-sm {
+  background: var(--studio-input-bg);
+  border: 1px solid var(--studio-border-subtle);
+  border-radius: 4px;
+  color: var(--studio-text);
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  font-size: 11px;
+  padding: 4px 8px;
+  outline: none;
+  transition: border-color 0.15s;
+  min-width: 0;
+  min-height: 28px;
+}
+.studio-input-sm:focus {
+  border-color: var(--studio-accent);
+}
+.studio-input-sm::placeholder {
+  color: var(--studio-text-dimmed);
 }
 .studio-input:focus {
   border-color: var(--studio-accent);
@@ -330,6 +348,7 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  height: 28px;
   padding: 3px 8px;
   border: 1px solid var(--studio-border-subtle);
   border-radius: 4px;
@@ -701,4 +720,45 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .studio-addable-row:hover .plus {
   opacity: 1;
   background: var(--studio-surface-active);
+}
+
+/* Radius preview */
+.studio-radius-preview {
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--studio-text-dimmed);
+  flex-shrink: 0;
+  background: transparent;
+}
+
+/* Gradient swatch grid */
+.studio-gradient-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.studio-gradient-swatch {
+  position: relative;
+  height: 40px;
+  border-radius: 6px;
+  border: 1px solid var(--studio-border-subtle);
+  cursor: pointer;
+  transition: box-shadow 0.15s, transform 0.1s;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  padding: 3px 5px;
+}
+.studio-gradient-swatch:hover {
+  box-shadow: 0 0 0 1px var(--studio-accent);
+  transform: scale(1.04);
+}
+.studio-gradient-label {
+  font-size: 8px;
+  font-weight: 600;
+  color: white;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 3px;
 }

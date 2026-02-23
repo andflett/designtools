@@ -1,7 +1,15 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, type PointerEvent as ReactPointerEvent } from "react";
 import {
   ChevronRightIcon,
   ChevronDownIcon,
+  SpaceBetweenHorizontallyIcon,
+  CornersIcon,
+  BorderWidthIcon,
+  PlusIcon,
+  TrashIcon,
+  CheckIcon,
+  Cross2Icon,
+  Pencil1Icon,
 } from "@radix-ui/react-icons";
 import type { ScanData } from "../app.js";
 import { TokenPopover } from "./color-popover.js";
@@ -44,9 +52,19 @@ export function TokenEditor({
     .slice(0, 8);
 
   const spacingTokens = tokens.filter((t: any) => t.category === "spacing");
-  const radiusTokens = tokens.filter((t: any) => t.category === "radius");
+
+  // Border color tokens from the token scanner
+  const borderColorTokens = tokens.filter((t: any) =>
+    t.category === "color" && ["--border", "--input", "--ring"].includes(t.name)
+  );
 
   const shadowData = scanData.shadows;
+  const borderData = scanData.borders;
+  const gradientData = scanData.gradients;
+
+  // Determine the selector for the current styling system
+  const stylingType = scanData.styling?.type || "";
+  const selector = stylingType === "tailwind-v4" ? "@theme" : (theme === "dark" ? ".dark" : ":root");
 
   return (
     <div className="">
@@ -94,11 +112,19 @@ export function TokenEditor({
 
       {/* Spacing — always visible */}
       <Section title="Spacing" count={spacingTokens.length} defaultCollapsed>
+        <div
+          className="px-4 pb-2 text-[10px] leading-relaxed"
+          style={{ color: "var(--studio-text-dimmed)" }}
+        >
+          Base spacing unit and scale. Spacing multiplies from the base value
+          (e.g. <code className="font-mono" style={{ color: "var(--studio-text-muted)" }}>--spacing: 0.25rem</code> {"\u2192"} <code className="font-mono" style={{ color: "var(--studio-text-muted)" }}>spacing-4</code> = 1rem).
+        </div>
         {spacingTokens.length > 0 ? (
           spacingTokens.map((token: any) => (
-            <SpacingTokenRow
+            <TokenScrubRow
               key={token.name}
               token={token}
+              icon={SpaceBetweenHorizontallyIcon}
               onSave={(value) => handleTokenSave(cssFilePath, token.name, value, theme === "dark" ? ".dark" : ":root")}
             />
           ))
@@ -121,18 +147,34 @@ export function TokenEditor({
         )}
       </Section>
 
-      {/* Gradients — placeholder */}
-      <Section title="Gradients" count={0} defaultCollapsed>
-        <EmptyState message="Coming soon." />
+      {/* Borders — uses scan-borders data */}
+      <Section title="Borders" count={(borderData?.borders?.length || 0) + borderColorTokens.length} defaultCollapsed>
+        <BordersSection
+          borders={borderData?.borders || []}
+          borderColorTokens={borderColorTokens}
+          theme={theme}
+          cssFilePath={borderData?.cssFilePath || cssFilePath}
+          stylingType={borderData?.stylingType || stylingType}
+          allTokens={tokens}
+          onPreviewToken={onPreviewToken}
+        />
       </Section>
 
-      {/* Borders — placeholder */}
-      <Section title="Borders" count={0} defaultCollapsed>
-        <EmptyState message="Coming soon." />
+      {/* Gradients — gradient builder */}
+      <Section title="Gradients" count={gradientData?.gradients?.length || 0} defaultCollapsed>
+        <GradientBuilder
+          gradients={gradientData?.gradients || []}
+          cssFilePath={gradientData?.cssFilePath || cssFilePath}
+          stylingType={gradientData?.stylingType || stylingType}
+        />
       </Section>
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Section / SubSection / EmptyState
+// ---------------------------------------------------------------------------
 
 function Section({
   title,
@@ -191,6 +233,17 @@ function SubSection({
   );
 }
 
+function SectionLabel({ label }: { label: string }) {
+  return (
+    <div
+      className="text-[10px] font-semibold uppercase tracking-wider mb-2"
+      style={{ color: "var(--studio-text-dimmed)" }}
+    >
+      {label}
+    </div>
+  );
+}
+
 function EmptyState({ message }: { message: string }) {
   return (
     <div
@@ -201,6 +254,10 @@ function EmptyState({ message }: { message: string }) {
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// TokenRow — color tokens with swatch and popover
+// ---------------------------------------------------------------------------
 
 function TokenRow({
   token,
@@ -220,7 +277,6 @@ function TokenRow({
   const value = theme === "dark" && token.darkValue ? token.darkValue : token.lightValue;
   const resolvedValue = value;
 
-  // Find contrast pair
   const fgTokenName = token.name.endsWith("-foreground")
     ? token.name.replace("-foreground", "")
     : `${token.name}-foreground`;
@@ -280,33 +336,719 @@ function TokenRow({
   );
 }
 
-function SpacingTokenRow({
+// ---------------------------------------------------------------------------
+// TokenScrubRow — scrub-enabled input for spacing/radius/border tokens
+// ---------------------------------------------------------------------------
+
+function parseTokenNumeric(v: string): { num: number; unit: string } | null {
+  const match = v.match(/^(-?[\d.]+)\s*(px|rem|em|%|vh|vw|pt)$/);
+  if (match) return { num: parseFloat(match[1]), unit: match[2] };
+  const num = parseFloat(v);
+  if (!isNaN(num) && String(num) === v.trim()) return { num, unit: "" };
+  return null;
+}
+
+function getStep(unit: string): number {
+  if (unit === "rem" || unit === "em") return 0.0625;
+  return 1;
+}
+
+function TokenScrubRow({
   token,
+  icon: Icon,
   onSave,
 }: {
   token: any;
+  icon?: React.ComponentType<{ style?: React.CSSProperties }>;
   onSave: (value: string) => void;
 }) {
-  const [value, setValue] = useState(token.lightValue);
+  const displayVal = token.value ?? token.lightValue ?? "";
+  const [value, setValue] = useState(displayVal);
+  const [focused, setFocused] = useState(false);
+  const [scrubbing, setScrubbing] = useState(false);
+  const scrubRef = useRef<{ startX: number; startVal: number; unit: string } | null>(null);
+  const draftRef = useRef(value);
+  draftRef.current = value;
+
+  useEffect(() => {
+    if (!focused && !scrubbing) setValue(displayVal);
+  }, [displayVal, focused, scrubbing]);
+
+  const isScrubbable = parseTokenNumeric(value) !== null;
+
+  const handlePointerDown = (e: ReactPointerEvent) => {
+    const parsed = parseTokenNumeric(value);
+    if (!parsed) return;
+
+    e.preventDefault();
+    scrubRef.current = { startX: e.clientX, startVal: parsed.num, unit: parsed.unit };
+    setScrubbing(true);
+    const step = getStep(parsed.unit);
+
+    const handleMove = (me: globalThis.PointerEvent) => {
+      if (!scrubRef.current) return;
+      const multiplier = me.shiftKey ? 10 : 1;
+      const delta = Math.round((me.clientX - scrubRef.current.startX) / 2);
+      const newVal = scrubRef.current.startVal + delta * step * multiplier;
+      const formatted = scrubRef.current.unit
+        ? `${parseFloat(newVal.toFixed(4))}${scrubRef.current.unit}`
+        : `${Math.round(newVal)}`;
+      setValue(formatted);
+      draftRef.current = formatted;
+    };
+
+    const handleUp = () => {
+      document.removeEventListener("pointermove", handleMove);
+      document.removeEventListener("pointerup", handleUp);
+      if (scrubRef.current) {
+        onSave(draftRef.current);
+        scrubRef.current = null;
+      }
+      setScrubbing(false);
+    };
+
+    document.addEventListener("pointermove", handleMove);
+    document.addEventListener("pointerup", handleUp);
+  };
+
+  const displayName = (token.name || "").replace(/^--/, "");
 
   return (
-    <div className="studio-prop-row">
+    <div className="studio-prop-row" style={{ gap: 6 }}>
+      {Icon && (
+        <div
+          className={isScrubbable ? "studio-scrub-icon" : "studio-scrub-icon no-scrub"}
+          onPointerDown={isScrubbable ? handlePointerDown : undefined}
+          style={{ width: 24, minWidth: 24, height: 26 }}
+        >
+          <Icon style={{ width: 12, height: 12 }} />
+        </div>
+      )}
       <span
         className="flex-1 text-[11px] font-mono truncate"
         style={{ color: "var(--studio-text)" }}
       >
-        {token.name.replace(/^--/, "")}
+        {displayName}
       </span>
       <input
         type="text"
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        onBlur={() => onSave(value)}
-        className="studio-input w-16 text-right"
+        onFocus={() => setFocused(true)}
+        onBlur={() => {
+          setFocused(false);
+          onSave(value);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+        }}
+        className="studio-input-sm w-20 text-right"
       />
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Borders Section — uses scan-borders data with framework defaults
+// ---------------------------------------------------------------------------
+
+function BordersSection({
+  borders,
+  borderColorTokens,
+  theme,
+  cssFilePath,
+  stylingType,
+  allTokens,
+  onPreviewToken,
+}: {
+  borders: any[];
+  borderColorTokens: any[];
+  theme: "light" | "dark";
+  cssFilePath: string;
+  stylingType: string;
+  allTokens: any[];
+  onPreviewToken: (token: string, value: string) => void;
+}) {
+  const radiusBorders = borders.filter((b: any) => b.kind === "radius");
+  const widthBorders = borders.filter((b: any) => b.kind === "width");
+  const hasContent = radiusBorders.length > 0 || widthBorders.length > 0 || borderColorTokens.length > 0;
+
+  if (!hasContent) {
+    return <EmptyState message="No border tokens found." />;
+  }
+
+  const selector = stylingType === "tailwind-v4" ? "@theme" : (theme === "dark" ? ".dark" : ":root");
+
+  const handleSave = async (border: any, newValue: string) => {
+    const variableName = border.cssVariable || `--${border.name}`;
+    const isNew = border.source === "framework-preset" && !border.isOverridden;
+    const endpoint = isNew ? "/api/gradients/create" : "/api/gradients";
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          filePath: cssFilePath,
+          variableName,
+          value: newValue,
+          selector,
+        }),
+      });
+      const data = await res.json();
+      if (!data.ok) console.error("Border save failed:", data.error);
+    } catch (err) {
+      console.error("Border save error:", err);
+    }
+  };
+
+  return (
+    <div className="px-4 pb-2 flex flex-col gap-3">
+      {/* Radius subsection */}
+      {radiusBorders.length > 0 && (
+        <div>
+          <SectionLabel label="Radius" />
+          <div className="flex flex-col gap-1">
+            {radiusBorders.map((border: any) => (
+              <div key={border.name} className="flex items-center gap-2">
+                <div
+                  className="studio-radius-preview"
+                  style={{ borderRadius: border.value }}
+                />
+                <TokenScrubRow
+                  token={border}
+                  icon={CornersIcon}
+                  onSave={(v) => handleSave(border, v)}
+                />
+                {border.source === "framework-preset" && !border.isOverridden && (
+                  <span
+                    className="text-[9px] px-1.5 py-0.5 rounded shrink-0"
+                    style={{
+                      background: "var(--studio-input-bg)",
+                      color: "var(--studio-text-dimmed)",
+                    }}
+                  >
+                    default
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Border Width subsection */}
+      {widthBorders.length > 0 && (
+        <div>
+          <SectionLabel label="Width" />
+          <div className="flex flex-col gap-1">
+            {widthBorders.map((border: any) => (
+              <div key={border.name} className="flex items-center gap-2">
+                <TokenScrubRow
+                  token={border}
+                  icon={BorderWidthIcon}
+                  onSave={(v) => handleSave(border, v)}
+                />
+                {border.source === "framework-preset" && !border.isOverridden && (
+                  <span
+                    className="text-[9px] px-1.5 py-0.5 rounded shrink-0"
+                    style={{
+                      background: "var(--studio-input-bg)",
+                      color: "var(--studio-text-dimmed)",
+                    }}
+                  >
+                    default
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Border Color subsection */}
+      {borderColorTokens.length > 0 && (
+        <div>
+          <SectionLabel label="Color" />
+          <div className="flex flex-col gap-0">
+            {borderColorTokens.map((token: any) => (
+              <TokenRow
+                key={token.name}
+                token={token}
+                theme={theme}
+                onPreview={onPreviewToken}
+                cssFilePath={cssFilePath}
+                allTokens={allTokens}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Gradient Builder
+// ---------------------------------------------------------------------------
+
+interface GradientStop {
+  color: string;
+  position: number; // 0-100
+}
+
+interface GradientState {
+  name: string;
+  direction: string;
+  stops: GradientStop[];
+}
+
+const DIRECTION_OPTIONS = [
+  { value: "to right", label: "→" },
+  { value: "to bottom right", label: "↘" },
+  { value: "to bottom", label: "↓" },
+  { value: "to bottom left", label: "↙" },
+  { value: "to left", label: "←" },
+  { value: "to top left", label: "↖" },
+  { value: "to top", label: "↑" },
+  { value: "to top right", label: "↗" },
+];
+
+function formatGradientCss(direction: string, stops: GradientStop[]): string {
+  const sorted = [...stops].sort((a, b) => a.position - b.position);
+  const stopStrings = sorted.map((s) => `${s.color} ${s.position}%`);
+  return `linear-gradient(${direction}, ${stopStrings.join(", ")})`;
+}
+
+function parseGradientValue(value: string): { direction: string; stops: GradientStop[] } | null {
+  const match = value.match(/linear-gradient\(([^,]+),\s*(.*)\)$/);
+  if (!match) return null;
+
+  const direction = match[1].trim();
+  const stopsStr = match[2];
+
+  // Split stops by comma, respecting color function parens
+  const stops: GradientStop[] = [];
+  let depth = 0;
+  let current = "";
+  for (const char of stopsStr) {
+    if (char === "(") depth++;
+    if (char === ")") depth--;
+    if (char === "," && depth === 0) {
+      const parsed = parseStop(current.trim());
+      if (parsed) stops.push(parsed);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  if (current.trim()) {
+    const parsed = parseStop(current.trim());
+    if (parsed) stops.push(parsed);
+  }
+
+  return { direction, stops };
+}
+
+function parseStop(s: string): GradientStop | null {
+  // Match "color position%" e.g. "#ff0000 50%" or "rgb(0,0,0) 100%"
+  const posMatch = s.match(/\s+(\d+)%$/);
+  if (posMatch) {
+    return {
+      color: s.slice(0, posMatch.index).trim(),
+      position: parseInt(posMatch[1]),
+    };
+  }
+  // No position — return with default
+  return { color: s.trim(), position: 0 };
+}
+
+function GradientBuilder({
+  gradients,
+  cssFilePath,
+  stylingType,
+}: {
+  gradients: any[];
+  cssFilePath: string;
+  stylingType: string;
+}) {
+  const [editing, setEditing] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+
+  const selector = stylingType === "tailwind-v4" ? "@theme" : ":root";
+
+  const handleSave = async (variableName: string, value: string, isNew: boolean) => {
+    const endpoint = isNew ? "/api/gradients/create" : "/api/gradients";
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filePath: cssFilePath, variableName, value, selector }),
+      });
+      const data = await res.json();
+      if (!data.ok) console.error("Gradient save failed:", data.error);
+    } catch (err) {
+      console.error("Gradient save error:", err);
+    }
+  };
+
+  const handleDelete = async (variableName: string) => {
+    try {
+      const res = await fetch("/api/gradients/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filePath: cssFilePath, variableName, selector }),
+      });
+      const data = await res.json();
+      if (!data.ok) console.error("Gradient delete failed:", data.error);
+    } catch (err) {
+      console.error("Gradient delete error:", err);
+    }
+  };
+
+  return (
+    <div className="px-4 pb-2">
+      {/* Existing gradients */}
+      {gradients.length > 0 && (
+        <div className="flex flex-col gap-2 mb-3">
+          {gradients.map((g: any) => (
+            <GradientRow
+              key={g.cssVariable}
+              gradient={g}
+              isEditing={editing === g.cssVariable}
+              onEdit={() => setEditing(editing === g.cssVariable ? null : g.cssVariable)}
+              onSave={(value) => {
+                handleSave(g.cssVariable, value, false);
+                setEditing(null);
+              }}
+              onDelete={() => {
+                handleDelete(g.cssVariable);
+                setEditing(null);
+              }}
+              onCancel={() => setEditing(null)}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Create new */}
+      {creating ? (
+        <GradientCreator
+          onSave={(name, value) => {
+            handleSave(`--${name}`, value, true);
+            setCreating(false);
+          }}
+          onCancel={() => setCreating(false)}
+        />
+      ) : (
+        <button
+          onClick={() => setCreating(true)}
+          className="studio-addable-row w-full"
+          style={{ justifyContent: "center", gap: 6 }}
+        >
+          <PlusIcon style={{ width: 12, height: 12 }} />
+          <span className="text-[11px]" style={{ color: "var(--studio-text-dimmed)" }}>
+            Add gradient
+          </span>
+        </button>
+      )}
+
+      {gradients.length === 0 && !creating && (
+        <div
+          className="text-[10px] leading-relaxed text-center mt-2"
+          style={{ color: "var(--studio-text-dimmed)" }}
+        >
+          No gradient tokens yet. Add one to store a reusable gradient as a CSS custom property.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GradientRow({
+  gradient,
+  isEditing,
+  onEdit,
+  onSave,
+  onDelete,
+  onCancel,
+}: {
+  gradient: any;
+  isEditing: boolean;
+  onEdit: () => void;
+  onSave: (value: string) => void;
+  onDelete: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div>
+      <button
+        onClick={onEdit}
+        className="flex items-center gap-2 w-full text-left p-0"
+        style={{ background: "none", border: "none", cursor: "pointer" }}
+      >
+        <div
+          className="studio-gradient-swatch"
+          style={{
+            background: gradient.value,
+            width: 32,
+            height: 24,
+            flexShrink: 0,
+          }}
+        />
+        <span
+          className="flex-1 text-[11px] font-mono truncate"
+          style={{ color: "var(--studio-text)" }}
+        >
+          {gradient.name}
+        </span>
+        <Pencil1Icon style={{ width: 10, height: 10, color: "var(--studio-text-dimmed)" }} />
+      </button>
+
+      {isEditing && (
+        <div className="mt-2">
+          <GradientEditor
+            initialValue={gradient.value}
+            onSave={onSave}
+            onDelete={onDelete}
+            onCancel={onCancel}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GradientCreator({
+  onSave,
+  onCancel,
+}: {
+  onSave: (name: string, value: string) => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState("gradient-1");
+
+  const handleSave = (value: string) => {
+    const cleanName = name.replace(/^--/, "").replace(/[^a-z0-9-]/g, "-");
+    onSave(cleanName, value);
+  };
+
+  return (
+    <div
+      className="rounded-lg p-3"
+      style={{
+        background: "var(--studio-input-bg)",
+        border: "1px solid var(--studio-border-subtle)",
+      }}
+    >
+      <div className="flex items-center gap-2 mb-3">
+        <label className="text-[10px] shrink-0" style={{ color: "var(--studio-text-dimmed)" }}>Name</label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="studio-input-sm flex-1"
+          placeholder="gradient-name"
+        />
+      </div>
+      <GradientEditor
+        initialValue="linear-gradient(to right, #3b82f6 0%, #8b5cf6 100%)"
+        onSave={handleSave}
+        onDelete={undefined}
+        onCancel={onCancel}
+      />
+    </div>
+  );
+}
+
+function GradientEditor({
+  initialValue,
+  onSave,
+  onDelete,
+  onCancel,
+}: {
+  initialValue: string;
+  onSave: (value: string) => void;
+  onDelete?: () => void;
+  onCancel: () => void;
+}) {
+  const parsed = parseGradientValue(initialValue);
+  const [direction, setDirection] = useState(parsed?.direction || "to right");
+  const [stops, setStops] = useState<GradientStop[]>(
+    parsed?.stops?.length
+      ? parsed.stops
+      : [
+          { color: "#3b82f6", position: 0 },
+          { color: "#8b5cf6", position: 100 },
+        ]
+  );
+
+  const gradientCss = formatGradientCss(direction, stops);
+
+  const updateStop = (index: number, updates: Partial<GradientStop>) => {
+    setStops((prev) =>
+      prev.map((s, i) => (i === index ? { ...s, ...updates } : s))
+    );
+  };
+
+  const addStop = () => {
+    // Add a stop midway between last two stops
+    const sorted = [...stops].sort((a, b) => a.position - b.position);
+    const last = sorted[sorted.length - 1];
+    const secondLast = sorted.length > 1 ? sorted[sorted.length - 2] : { position: 0 };
+    const newPos = Math.round((last.position + secondLast.position) / 2);
+    setStops([...stops, { color: "#6366f1", position: newPos }]);
+  };
+
+  const removeStop = (index: number) => {
+    if (stops.length <= 2) return;
+    setStops(stops.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      {/* Preview bar */}
+      <div
+        className="w-full rounded-md"
+        style={{
+          background: gradientCss,
+          height: 32,
+          border: "1px solid var(--studio-border-subtle)",
+        }}
+      />
+
+      {/* Direction */}
+      <div className="flex items-center gap-2">
+        <label className="text-[10px] shrink-0" style={{ color: "var(--studio-text-dimmed)" }}>Dir</label>
+        <div className="studio-segmented" style={{ flex: 1 }}>
+          {DIRECTION_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => setDirection(opt.value)}
+              className={direction === opt.value ? "active" : ""}
+              title={opt.value}
+              style={{ flex: 1, padding: "3px 2px", fontSize: 11 }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Stops */}
+      <div className="flex flex-col gap-1.5">
+        {stops.map((stop, i) => (
+          <div key={i} className="flex items-center gap-1.5">
+            <input
+              type="color"
+              value={stop.color.startsWith("#") ? stop.color : "#000000"}
+              onChange={(e) => updateStop(i, { color: e.target.value })}
+              className="studio-color-input"
+              style={{
+                width: 24,
+                height: 24,
+                border: "1px solid var(--studio-border-subtle)",
+                borderRadius: 4,
+                padding: 1,
+                cursor: "pointer",
+                background: "var(--studio-input-bg)",
+              }}
+            />
+            <input
+              type="text"
+              value={stop.color}
+              onChange={(e) => updateStop(i, { color: e.target.value })}
+              className="studio-input-sm flex-1"
+              style={{ fontSize: 10 }}
+            />
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={stop.position}
+              onChange={(e) => updateStop(i, { position: parseInt(e.target.value) || 0 })}
+              className="studio-input-sm"
+              style={{ width: 48, textAlign: "right", fontSize: 10 }}
+            />
+            <span className="text-[9px]" style={{ color: "var(--studio-text-dimmed)" }}>%</span>
+            {stops.length > 2 && (
+              <button
+                onClick={() => removeStop(i)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "var(--studio-text-dimmed)",
+                  padding: 2,
+                  display: "flex",
+                }}
+              >
+                <Cross2Icon style={{ width: 10, height: 10 }} />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Add stop */}
+      <button
+        onClick={addStop}
+        className="studio-addable-row"
+        style={{ justifyContent: "center", gap: 4, padding: "3px 8px" }}
+      >
+        <PlusIcon style={{ width: 10, height: 10 }} />
+        <span className="text-[10px]" style={{ color: "var(--studio-text-dimmed)" }}>Add stop</span>
+      </button>
+
+      {/* Actions */}
+      <div className="flex items-center gap-2 mt-1">
+        <button
+          onClick={() => onSave(gradientCss)}
+          className="flex items-center gap-1 px-3 py-1.5 rounded text-[10px] font-medium"
+          style={{
+            background: "var(--studio-accent)",
+            color: "white",
+            border: "none",
+            cursor: "pointer",
+          }}
+        >
+          <CheckIcon style={{ width: 10, height: 10 }} />
+          Save
+        </button>
+        <button
+          onClick={onCancel}
+          className="flex items-center gap-1 px-3 py-1.5 rounded text-[10px]"
+          style={{
+            background: "transparent",
+            color: "var(--studio-text-dimmed)",
+            border: "1px solid var(--studio-border-subtle)",
+            cursor: "pointer",
+          }}
+        >
+          Cancel
+        </button>
+        {onDelete && (
+          <button
+            onClick={onDelete}
+            className="flex items-center gap-1 px-3 py-1.5 rounded text-[10px] ml-auto"
+            style={{
+              background: "transparent",
+              color: "var(--studio-danger)",
+              border: "1px solid var(--studio-border-subtle)",
+              cursor: "pointer",
+            }}
+          >
+            <TrashIcon style={{ width: 10, height: 10 }} />
+            Delete
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// handleTokenSave
+// ---------------------------------------------------------------------------
 
 async function handleTokenSave(
   cssFilePath: string,

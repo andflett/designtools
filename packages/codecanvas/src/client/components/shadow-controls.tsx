@@ -155,7 +155,7 @@ function LayerEditor({
       {/* Layer header */}
       <div className="flex items-center justify-between mb-2">
         <span
-          className="text-[9px] font-semibold uppercase tracking-wide"
+          className="text-[9px] font-semibold tracking-wide"
           style={{ color: "var(--studio-text-dimmed)" }}
         >
           Layer {index + 1}

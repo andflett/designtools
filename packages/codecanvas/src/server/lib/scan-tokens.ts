@@ -4,7 +4,7 @@ import type { FrameworkInfo } from "./detect-framework.js";
 
 export interface TokenDefinition {
   name: string;
-  category: "color" | "spacing" | "radius" | "shadow" | "typography" | "other";
+  category: "color" | "spacing" | "radius" | "shadow" | "typography" | "border" | "other";
   group: string;
   lightValue: string;
   darkValue: string;
@@ -109,6 +109,7 @@ function categorizeToken(name: string, value: string): TokenDefinition["category
   if (name.includes("radius")) return "radius";
   if (name.includes("shadow")) return "shadow";
   if (name.includes("spacing")) return "spacing";
+  if (name.includes("border") && !value.includes("oklch") && !value.includes("hsl") && !value.includes("rgb") && !value.startsWith("#")) return "border";
   if (
     name.includes("font") ||
     name.includes("text") ||
@@ -151,6 +152,7 @@ function getTokenGroup(name: string): string {
   if (n.startsWith("sidebar")) return "sidebar";
   if (n.startsWith("radius")) return "radius";
   if (n.startsWith("shadow")) return "shadow";
+  if (n.startsWith("border-width")) return "border";
 
   return "other";
 }

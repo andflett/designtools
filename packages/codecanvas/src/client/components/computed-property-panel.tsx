@@ -1925,11 +1925,10 @@ function getPropertyIcon(cssProp: string): React.ComponentType<{ style?: React.C
 function PropLabel({ label, inherited }: { label: string; inherited?: boolean }) {
   return (
     <div
-      className="text-[11px] font-medium mb-0.5"
+      className="text-[11px] font-medium mb-1"
       style={{
         color: "var(--studio-text-dimmed)",
         letterSpacing: "0.03em",
-        opacity: inherited ? 0.6 : 1,
       }}
     >
       {label}
@@ -1945,7 +1944,7 @@ function PropLabel({ label, inherited }: { label: string; inherited?: boolean })
 function SubSectionLabel({ label }: { label: string }) {
   return (
     <div
-      className="text-[11px] font-medium uppercase tracking-wider mt-1 mb-0.5"
+      className="text-[11px] font-medium tracking-wider mt-1 mb-1"
       style={{ color: "var(--studio-text-dimmed)" }}
     >
       {label}

@@ -4,7 +4,7 @@ import { formatHex, converter } from "culori";
 import * as Popover from "@radix-ui/react-popover";
 import type { RgbaColor } from "react-colorful";
 
-type InputMode = "hex" | "rgb" | "hsl" | "oklch";
+export type InputMode = "hex" | "rgb" | "hsl" | "oklch";
 
 const INPUT_MODES: { value: InputMode; label: string }[] = [
   { value: "hex", label: "Hex" },
@@ -17,11 +17,11 @@ const toRgb = converter("rgb");
 const toHsl = converter("hsl");
 const toOklch = converter("oklch");
 
-function clamp(v: number, min: number, max: number) {
+export function clamp(v: number, min: number, max: number) {
   return Math.min(max, Math.max(min, v));
 }
 
-function cssToRgba(color: string): RgbaColor {
+export function cssToRgba(color: string): RgbaColor {
   const modernRgb = color.match(
     /rgba?\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*(?:\/\s*([\d.]+%?))?\s*\)/
   );
@@ -64,7 +64,7 @@ function cssToRgba(color: string): RgbaColor {
   return { r: 0, g: 0, b: 0, a: 1 };
 }
 
-function rgbaToCss(c: RgbaColor): string {
+export function rgbaToCss(c: RgbaColor): string {
   if (c.a >= 1) return `rgb(${c.r} ${c.g} ${c.b})`;
   const alpha = Math.round(c.a * 100) / 100;
   return `rgb(${c.r} ${c.g} ${c.b} / ${alpha})`;
@@ -82,7 +82,7 @@ function rgbaToHex(c: RgbaColor): string {
 /*  Shared sub-components                                              */
 /* ------------------------------------------------------------------ */
 
-function ChannelInput({
+export function ChannelInput({
   label,
   value,
   onChange,
@@ -104,8 +104,8 @@ function ChannelInput({
         style={{
           fontSize: 9,
           fontFamily: "'SF Mono', 'Fira Code', 'Cascadia Code', monospace",
-          textTransform: "uppercase",
           color: "var(--studio-text-dimmed)",
+          marginBottom: 4,
         }}
       >
         {label}
@@ -144,7 +144,7 @@ function ChannelInput({
   );
 }
 
-function AlphaInput({ color, onChange }: { color: RgbaColor; onChange: (c: RgbaColor) => void }) {
+export function AlphaInput({ color, onChange }: { color: RgbaColor; onChange: (c: RgbaColor) => void }) {
   return (
     <ChannelInput
       label="A"
@@ -163,7 +163,7 @@ function AlphaInput({ color, onChange }: { color: RgbaColor; onChange: (c: RgbaC
 /*  Color input fields (per mode)                                      */
 /* ------------------------------------------------------------------ */
 
-function ColorInputFields({
+export function ColorInputFields({
   color,
   onChange,
   mode,
@@ -204,8 +204,8 @@ function ColorInputFields({
             style={{
               fontSize: 9,
               fontFamily: "'SF Mono', 'Fira Code', 'Cascadia Code', monospace",
-              textTransform: "uppercase",
               color: "var(--studio-text-dimmed)",
+              marginBottom: 4,
             }}
           >
             Hex
@@ -325,7 +325,7 @@ function ColorInputFields({
 /*  Mode tabs                                                          */
 /* ------------------------------------------------------------------ */
 
-function ModeTabs({ mode, onChange }: { mode: InputMode; onChange: (mode: InputMode) => void }) {
+export function ModeTabs({ mode, onChange }: { mode: InputMode; onChange: (mode: InputMode) => void }) {
   return (
     <div
       style={{
@@ -385,7 +385,7 @@ export function ColorPicker({ color, onChange }: ColorPickerProps) {
   return (
     <div className="mt-1.5">
       <div
-        className="text-[9px] font-medium mb-0.5"
+        className="text-[9px] font-medium mb-1"
         style={{ color: "var(--studio-text-dimmed)" }}
       >
         Color

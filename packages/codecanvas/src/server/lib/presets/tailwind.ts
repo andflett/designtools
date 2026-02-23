@@ -51,6 +51,34 @@ export const TAILWIND_SHADOW_PRESETS: ShadowPreset[] = [
 ];
 
 /**
+ * Tailwind CSS default border-radius presets.
+ */
+export interface BorderPreset {
+  name: string;
+  value: string;
+  kind: "radius" | "width";
+}
+
+export const TAILWIND_RADIUS_PRESETS: BorderPreset[] = [
+  { name: "radius-xs", value: "0.125rem", kind: "radius" },
+  { name: "radius-sm", value: "0.25rem", kind: "radius" },
+  { name: "radius-md", value: "0.375rem", kind: "radius" },
+  { name: "radius-lg", value: "0.5rem", kind: "radius" },
+  { name: "radius-xl", value: "0.75rem", kind: "radius" },
+  { name: "radius-2xl", value: "1rem", kind: "radius" },
+  { name: "radius-3xl", value: "1.5rem", kind: "radius" },
+  { name: "radius-full", value: "9999px", kind: "radius" },
+];
+
+export const TAILWIND_BORDER_WIDTH_PRESETS: BorderPreset[] = [
+  { name: "border-width-0", value: "0px", kind: "width" },
+  { name: "border-width-1", value: "1px", kind: "width" },
+  { name: "border-width-2", value: "2px", kind: "width" },
+  { name: "border-width-4", value: "4px", kind: "width" },
+  { name: "border-width-8", value: "8px", kind: "width" },
+];
+
+/**
  * Curated presets that ship with the shadows tool.
  * These are common shadow patterns designers use.
  */

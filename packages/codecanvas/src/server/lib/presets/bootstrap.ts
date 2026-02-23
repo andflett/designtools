@@ -126,6 +126,23 @@ export async function scanBootstrapCssOverrides(
 }
 
 /**
+ * Bootstrap 5 default border-radius values.
+ * Source: https://github.com/twbs/bootstrap/blob/main/scss/_variables.scss
+ */
+export const BOOTSTRAP_RADIUS_PRESETS: import("./tailwind.js").BorderPreset[] = [
+  { name: "border-radius", value: "0.375rem", kind: "radius" },
+  { name: "border-radius-sm", value: "0.25rem", kind: "radius" },
+  { name: "border-radius-lg", value: "0.5rem", kind: "radius" },
+  { name: "border-radius-xl", value: "1rem", kind: "radius" },
+  { name: "border-radius-xxl", value: "2rem", kind: "radius" },
+  { name: "border-radius-pill", value: "50rem", kind: "radius" },
+];
+
+export const BOOTSTRAP_BORDER_WIDTH_PRESETS: import("./tailwind.js").BorderPreset[] = [
+  { name: "border-width", value: "1px", kind: "width" },
+];
+
+/**
  * Replace common Bootstrap Sass color variables with CSS equivalents.
  * This handles simple cases; complex Sass expressions are left as-is.
  */

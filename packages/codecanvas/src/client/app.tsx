@@ -5,6 +5,10 @@ import { usePostMessage } from "./lib/use-postmessage.js";
 import { ToolChrome } from "./components/tool-chrome.js";
 import { EditorPanel } from "./components/editor-panel.js";
 import { TooltipProvider } from "./components/tooltip.js";
+import { BootScreen } from "./components/boot-screen.js";
+
+/** Set to false to skip the boot screen (disable before publishing) */
+const SHOW_BOOT_SCREEN = true;
 
 export interface ScanData {
   framework: any;
@@ -21,6 +25,16 @@ export interface ScanData {
     cssFilePath: string;
     stylingType: string;
     designTokenFiles: string[];
+  };
+  borders: {
+    borders: any[];
+    cssFilePath: string;
+    stylingType: string;
+  };
+  gradients: {
+    gradients: any[];
+    cssFilePath: string;
+    stylingType: string;
   };
   styling: {
     type: string;
@@ -41,6 +55,7 @@ export function App() {
   const [iframePath, setIframePath] = useState("/");
   const [injectedReady, setInjectedReady] = useState(false);
   const [scanData, setScanData] = useState<ScanData | null>(null);
+  const [bootDone, setBootDone] = useState(!SHOW_BOOT_SCREEN);
 
   // Fetch config from server
   useEffect(() => {
@@ -136,6 +151,12 @@ export function App() {
       >
         Loading...
       </div>
+    );
+  }
+
+  if (!bootDone) {
+    return (
+      <BootScreen scanData={scanData} onContinue={() => setBootDone(true)} />
     );
   }
 

@@ -75,7 +75,14 @@ export function EditorPanel({
     : ["token", "instance"];
 
   const [activeMode, setActiveMode] = useState<EditMode>("token");
-  const [componentSubTab, setComponentSubTab] = useState<"styles" | "variants">("styles");
+
+  // Auto-select tab when a new element is selected
+  useEffect(() => {
+    if (!element) return;
+    setActiveMode(isComponent ? "component" : "instance");
+  }, [element?.source?.file, element?.source?.line, element?.source?.col]);
+
+  const [componentSubTab, setComponentSubTab] = useState<"styles" | "props">("styles");
   const [saving, setSaving] = useState(false);
   // Serialize writes so only one goes at a time
   const writeQueueRef = useRef<Promise<void>>(Promise.resolve());
@@ -255,7 +262,7 @@ export function EditorPanel({
           </div>
         )}
 
-        {activeMode === "component" && element && componentEntry && (
+        {activeMode === "component" && element && isComponent && (
           <>
             <div className="studio-tab-explainer">
               <InfoCircledIcon />
@@ -263,20 +270,22 @@ export function EditorPanel({
                 {componentSubTab === "styles"
                   ? "Edit the component's root element styles. Changes apply to all instances."
                   : "Edit variant definitions. Changes apply to all instances."}
-                <button
-                  onClick={() => openInEditor(componentEntry.filePath)}
-                  className="studio-explainer-file truncate block text-left w-full"
-                  style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
-                  onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
-                  title="Open in editor"
-                >
-                  {componentEntry.filePath}
-                </button>
+                {componentEntry && (
+                  <button
+                    onClick={() => openInEditor(componentEntry.filePath)}
+                    className="studio-explainer-file truncate block text-left w-full"
+                    style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
+                    onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
+                    title="Open in editor"
+                  >
+                    {componentEntry.filePath}
+                  </button>
+                )}
               </div>
             </div>
 
-            {/* Sub-tabs: Styles vs Variants */}
+            {/* Sub-tabs: Styles vs Props */}
             <div className="px-4 pb-2">
               <div className="studio-segmented" style={{ width: "100%" }}>
                 <button
@@ -287,11 +296,11 @@ export function EditorPanel({
                   Styles
                 </button>
                 <button
-                  onClick={() => setComponentSubTab("variants")}
-                  className={componentSubTab === "variants" ? "active" : ""}
+                  onClick={() => setComponentSubTab("props")}
+                  className={componentSubTab === "props" ? "active" : ""}
                   style={{ flex: 1 }}
                 >
-                  Variants
+                  Props
                 </button>
               </div>
             </div>
@@ -324,7 +333,7 @@ export function EditorPanel({
               </div>
             )}
 
-            {componentSubTab === "variants" && (
+            {componentSubTab === "props" && componentEntry && (
               <div className="">
                 {componentEntry.variants.map((dim: any) => (
                   <ComponentVariantSection
@@ -362,16 +371,16 @@ export function EditorPanel({
                 )}
               </div>
             )}
-          </>
-        )}
 
-        {activeMode === "component" && element && !componentEntry && isComponent && (
-          <div
-            className="px-4 py-3 text-[11px]"
-            style={{ color: "var(--studio-text-dimmed)" }}
-          >
-            This component doesn't use variant definitions (CVA). Edit its styles directly in the Element tab.
-          </div>
+            {componentSubTab === "props" && !componentEntry && (
+              <div
+                className="px-4 py-3 text-[11px]"
+                style={{ color: "var(--studio-text-dimmed)" }}
+              >
+                This component doesn't use variant definitions (CVA). Edit its styles directly in the Element tab.
+              </div>
+            )}
+          </>
         )}
 
         {activeMode === "instance" && !element && (

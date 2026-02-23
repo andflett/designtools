@@ -29,7 +29,6 @@ export default function HomePage() {
           </Button>
         </div>
       </section>
-
       {/* Feature Cards */}
       <section className="mt-[4rem] grid gap-[1.5rem] sm:grid-cols-2 lg:grid-cols-3">
         <Card>
@@ -86,13 +85,12 @@ export default function HomePage() {
             </p>
           </CardContent>
           <CardFooter>
-            <Button variant="secondary" size="sm">
+            <Button variant="default" size="lg">
               Explore
             </Button>
           </CardFooter>
         </Card>
       </section>
-
       {/* CTA Section */}
       <section className="mt-[4rem] rounded-[0.75rem] border bg-card p-[2rem] text-center">
         <h2 className="text-[1.5rem] font-semibold tracking-[-0.02em]">
@@ -110,7 +108,6 @@ export default function HomePage() {
           <Button variant="ghost">View Docs</Button>
         </div>
       </section>
-
       {/* Badge Variants */}
       <section className="mt-[4rem]">
         <h2 className="mb-[1rem] text-[1.25rem] font-semibold tracking-[-0.01em]">
@@ -123,7 +120,6 @@ export default function HomePage() {
           <Badge variant="outline">Outline</Badge>
         </div>
       </section>
-
       {/* Button Variants */}
       <section className="mt-[2rem]">
         <h2 className="mb-[1rem] text-[1.25rem] font-semibold tracking-[-0.01em]">

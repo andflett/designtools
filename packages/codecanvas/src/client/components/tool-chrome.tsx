@@ -105,8 +105,8 @@ export function ToolChrome({
             type="text"
             value={urlInput}
             onChange={(e) => setUrlInput(e.target.value)}
-            className="studio-input"
-            style={{ padding: "3px 8px", width: 180 }}
+            className="studio-input-sm"
+            style={{ width: 180 }}
             placeholder="/"
           />
         </form>
@@ -145,8 +145,7 @@ export function ToolChrome({
               const val = parseInt(e.target.value, 10);
               if (!isNaN(val) && val >= 320) onViewportWidthChange(val);
             }}
-            className="studio-input w-14 text-center"
-            style={{ fontSize: "11px" }}
+            className="studio-input-sm w-14 text-center"
           />
         </div>
 

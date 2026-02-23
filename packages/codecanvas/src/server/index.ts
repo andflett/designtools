@@ -7,6 +7,7 @@ import { createWriteElementRouter } from "./api/write-element.js";
 import { createTokensRouter } from "./api/write-tokens.js";
 import { createComponentRouter } from "./api/write-component.js";
 import { createShadowsRouter } from "./api/write-shadows.js";
+import { createGradientsRouter } from "./api/write-gradients.js";
 import { createScanRouter } from "./lib/scanner.js";
 
 export interface ServerConfig {
@@ -49,6 +50,9 @@ export async function createServer(config: ServerConfig) {
 
   // API: write shadow changes
   app.use("/api/shadows", createShadowsRouter(config.projectRoot));
+
+  // API: write gradient changes
+  app.use("/api/gradients", createGradientsRouter(config.projectRoot));
 
   // API: open file in the user's editor
   app.get("/api/open-file", (req, res) => {

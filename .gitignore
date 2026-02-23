@@ -4,8 +4,7 @@ node_modules
 .DS_Store
 
 # build output
-/dist
-/src/client/dist
+dist/
 
 # next.js (demo)
 .next/
