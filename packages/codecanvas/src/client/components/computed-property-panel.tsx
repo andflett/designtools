@@ -83,6 +83,7 @@ import {
 } from "../../shared/tailwind-parser.js";
 import { ColorPopover } from "./color-popover.js";
 import { Tooltip } from "./tooltip.js";
+import { useTokens, useShadows, useGradients } from "../lib/scan-hooks.js";
 
 // ---------------------------------------------------------------------------
 // Shared utilities
@@ -105,12 +106,23 @@ function getStep(unit: string): number {
 // Props
 // ---------------------------------------------------------------------------
 
+interface ShadowItem {
+  name: string;
+  value: string;
+  cssVariable?: string;
+}
+
+interface GradientItem {
+  name: string;
+  value: string;
+  cssVariable: string;
+}
+
 interface ComputedPropertyPanelProps {
   tag: string;
   className: string;
   computedStyles: Record<string, string>;
   parentComputedStyles: Record<string, string>;
-  tokenGroups: Record<string, any[]>;
   onPreviewInlineStyle: (property: string, value: string) => void;
   onRevertInlineStyles: () => void;
   onCommitClass: (tailwindClass: string, oldClass?: string) => void;
@@ -125,11 +137,16 @@ export function ComputedPropertyPanel({
   className,
   computedStyles,
   parentComputedStyles,
-  tokenGroups,
   onPreviewInlineStyle,
   onRevertInlineStyles,
   onCommitClass,
 }: ComputedPropertyPanelProps) {
+  const tokenData = useTokens();
+  const shadowData = useShadows();
+  const gradientData = useGradients();
+  const tokenGroups = tokenData?.groups || {};
+  const shadows: ShadowItem[] | undefined = shadowData?.shadows;
+  const gradients: GradientItem[] | undefined = gradientData?.gradients;
   const categorized = buildUnifiedProperties(
     tag, className, computedStyles, parentComputedStyles, tokenGroups,
   );
@@ -169,6 +186,8 @@ export function ComputedPropertyPanel({
           properties={categorized[section.key]}
           computedStyles={computedStyles}
           tokenGroups={tokenGroups}
+          shadows={shadows}
+          gradients={gradients}
           displayValue={displayValue}
           onPreviewInlineStyle={onPreviewInlineStyle}
           onRevertInlineStyles={onRevertInlineStyles}
@@ -189,6 +208,8 @@ function UnifiedSection({
   properties,
   computedStyles,
   tokenGroups,
+  shadows,
+  gradients,
   displayValue,
   onPreviewInlineStyle,
   onRevertInlineStyles,
@@ -199,6 +220,8 @@ function UnifiedSection({
   properties: UnifiedProperty[];
   computedStyles: Record<string, string>;
   tokenGroups: Record<string, any[]>;
+  shadows?: ShadowItem[];
+  gradients?: GradientItem[];
   displayValue: string;
   onPreviewInlineStyle: (p: string, v: string) => void;
   onRevertInlineStyles: () => void;
@@ -265,6 +288,16 @@ function UnifiedSection({
               onRevertInlineStyles={onRevertInlineStyles}
               onCommitClass={onCommitClass}
             />
+          ) : category === "effects" ? (
+            <EffectsSection
+              properties={properties}
+              tokenGroups={tokenGroups}
+              shadows={shadows}
+              gradients={gradients}
+              onPreviewInlineStyle={onPreviewInlineStyle}
+              onRevertInlineStyles={onRevertInlineStyles}
+              onCommitClass={onCommitClass}
+            />
           ) : (
             activeProps.map((prop) => (
               <UnifiedControl
@@ -278,8 +311,8 @@ function UnifiedSection({
             ))
           )}
 
-          {/* Addable rows — layout/spacing/border/size/typography handle their own */}
-          {!["layout", "spacing", "border", "size", "typography"].includes(category) && addableProps.length > 0 && (
+          {/* Addable rows — layout/spacing/border/size/typography/effects handle their own */}
+          {!["layout", "spacing", "border", "size", "typography", "effects"].includes(category) && addableProps.length > 0 && (
             <AddableRows
               properties={addableProps}
               tokenGroups={tokenGroups}
@@ -1157,6 +1190,312 @@ function BorderSection({
         />
       ))}
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Effects section — opacity slider + shadow/gradient pickers
+// ---------------------------------------------------------------------------
+
+/** Tailwind shadow scale classes */
+const SHADOW_SCALE = ["none", "2xs", "xs", "sm", "", "md", "lg", "xl", "2xl"];
+
+function EffectsSection({
+  properties,
+  tokenGroups,
+  shadows,
+  gradients,
+  onPreviewInlineStyle,
+  onRevertInlineStyles,
+  onCommitClass,
+}: {
+  properties: UnifiedProperty[];
+  tokenGroups: Record<string, any[]>;
+  shadows?: ShadowItem[];
+  gradients?: GradientItem[];
+  onPreviewInlineStyle: (p: string, v: string) => void;
+  onRevertInlineStyles: () => void;
+  onCommitClass: (c: string, oldClass?: string) => void;
+}) {
+  const opacityProp = properties.find((p) => p.cssProperty === "opacity");
+  const shadowProp = properties.find((p) => p.cssProperty === "box-shadow");
+  const gradientProp = properties.find((p) => p.cssProperty === "background-image");
+  const transformProp = properties.find((p) => p.cssProperty === "transform");
+  const otherProps = properties.filter(
+    (p) => !["opacity", "box-shadow", "background-image", "transform"].includes(p.cssProperty) && p.hasValue
+  );
+
+  return (
+    <>
+      {/* Opacity */}
+      {opacityProp && (
+        <div>
+          <PropLabel label={opacityProp.label} inherited={opacityProp.inherited} />
+          <SliderInput
+            value={opacityProp.computedValue}
+            onPreview={(v) => onPreviewInlineStyle("opacity", v)}
+            onCommitClass={onCommitClass}
+          />
+        </div>
+      )}
+
+      {/* Shadow picker */}
+      {shadowProp && (
+        <div>
+          <PropLabel label="Shadow" inherited={shadowProp.inherited} />
+          <ShadowPicker
+            prop={shadowProp}
+            shadows={shadows}
+            onPreviewInlineStyle={onPreviewInlineStyle}
+            onCommitClass={onCommitClass}
+          />
+        </div>
+      )}
+
+      {/* Gradient picker */}
+      {gradientProp && gradientProp.hasValue && (
+        <div>
+          <PropLabel label="Gradient" inherited={gradientProp.inherited} />
+          <GradientPicker
+            prop={gradientProp}
+            gradients={gradients}
+            onPreviewInlineStyle={onPreviewInlineStyle}
+            onCommitClass={onCommitClass}
+          />
+        </div>
+      )}
+      {!gradientProp && gradients && gradients.length > 0 && (
+        <div>
+          <PropLabel label="Gradient" inherited={false} />
+          <GradientPicker
+            prop={null}
+            gradients={gradients}
+            onPreviewInlineStyle={onPreviewInlineStyle}
+            onCommitClass={onCommitClass}
+          />
+        </div>
+      )}
+
+      {/* Transform (readonly) */}
+      {transformProp && transformProp.hasValue && (
+        <UnifiedControl
+          prop={transformProp}
+          tokenGroups={tokenGroups}
+          onPreviewInlineStyle={onPreviewInlineStyle}
+          onRevertInlineStyles={onRevertInlineStyles}
+          onCommitClass={onCommitClass}
+        />
+      )}
+
+      {/* Other effects */}
+      {otherProps.map((prop) => (
+        <UnifiedControl
+          key={prop.cssProperty}
+          prop={prop}
+          tokenGroups={tokenGroups}
+          onPreviewInlineStyle={onPreviewInlineStyle}
+          onRevertInlineStyles={onRevertInlineStyles}
+          onCommitClass={onCommitClass}
+        />
+      ))}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Shadow picker — dropdown of scanned shadows
+// ---------------------------------------------------------------------------
+
+function ShadowPicker({
+  prop,
+  shadows,
+  onPreviewInlineStyle,
+  onCommitClass,
+}: {
+  prop: UnifiedProperty;
+  shadows?: ShadowItem[];
+  onPreviewInlineStyle: (p: string, v: string) => void;
+  onCommitClass: (c: string, oldClass?: string) => void;
+}) {
+  const currentValue = prop.computedValue;
+  const isNone = !currentValue || currentValue === "none";
+
+  // Determine current shadow name from tailwind class
+  const currentShadowName = prop.tailwindValue || (isNone ? "none" : null);
+
+  const handleSelect = (shadowName: string) => {
+    if (shadowName === "none") {
+      onPreviewInlineStyle("box-shadow", "none");
+      onCommitClass("shadow-none", prop.fullClass || undefined);
+      return;
+    }
+
+    // Check if it's a standard Tailwind shadow scale value
+    if (SHADOW_SCALE.includes(shadowName)) {
+      const cls = shadowName === "" ? "shadow" : `shadow-${shadowName}`;
+      // Find the shadow value for preview
+      const shadowDef = shadows?.find((s) => s.name === `shadow-${shadowName}` || s.name === shadowName);
+      if (shadowDef) {
+        onPreviewInlineStyle("box-shadow", shadowDef.value);
+      }
+      onCommitClass(cls, prop.fullClass || undefined);
+      return;
+    }
+
+    // Custom shadow — find definition and apply as arbitrary value or class
+    const shadowDef = shadows?.find((s) => s.name === shadowName);
+    if (shadowDef) {
+      onPreviewInlineStyle("box-shadow", shadowDef.value);
+      // If it has a CSS variable, use shadow-[var(--name)]
+      if (shadowDef.cssVariable) {
+        onCommitClass(`shadow-[var(${shadowDef.cssVariable})]`, prop.fullClass || undefined);
+      } else {
+        // Use the Tailwind shadow class if name matches convention
+        const cls = shadowName.startsWith("shadow-") ? shadowName : `shadow-${shadowName}`;
+        onCommitClass(cls, prop.fullClass || undefined);
+      }
+    }
+  };
+
+  return (
+    <div className="studio-scrub-input">
+      <Tooltip content="box-shadow" side="left">
+        <div className="studio-scale-icon">
+          <ShadowIcon style={{ width: 12, height: 12 }} />
+        </div>
+      </Tooltip>
+      <select
+        value={currentShadowName || "__current__"}
+        onChange={(e) => handleSelect(e.target.value)}
+        style={{
+          flex: 1,
+          minWidth: 0,
+          background: "transparent",
+          border: "none",
+          color: "var(--studio-text)",
+          fontFamily: '"SF Mono", "Fira Code", "Cascadia Code", monospace',
+          fontSize: "11px",
+          padding: "6px 8px",
+          outline: "none",
+          cursor: "pointer",
+          WebkitAppearance: "none" as any,
+        }}
+      >
+        {currentShadowName === null && (
+          <option value="__current__">
+            {currentValue.length > 30 ? currentValue.slice(0, 30) + "..." : currentValue}
+          </option>
+        )}
+        <option value="none">none</option>
+        {/* Standard Tailwind shadow scale */}
+        <optgroup label="Scale">
+          {SHADOW_SCALE.filter(s => s !== "none").map((s) => (
+            <option key={s || "__default__"} value={s}>
+              {s === "" ? "shadow (default)" : s}
+            </option>
+          ))}
+        </optgroup>
+        {/* Scanned shadows from the project */}
+        {shadows && shadows.length > 0 && (
+          <optgroup label="Project Shadows">
+            {shadows
+              .filter((s) => !SHADOW_SCALE.includes(s.name.replace(/^shadow-?/, "")))
+              .map((s) => (
+                <option key={s.name} value={s.name}>
+                  {s.name}
+                </option>
+              ))}
+          </optgroup>
+        )}
+      </select>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Gradient picker — dropdown of scanned gradients
+// ---------------------------------------------------------------------------
+
+function GradientPicker({
+  prop,
+  gradients,
+  onPreviewInlineStyle,
+  onCommitClass,
+}: {
+  prop: UnifiedProperty | null;
+  gradients?: GradientItem[];
+  onPreviewInlineStyle: (p: string, v: string) => void;
+  onCommitClass: (c: string, oldClass?: string) => void;
+}) {
+  const currentValue = prop?.computedValue || "none";
+  const hasGradient = currentValue !== "none" && currentValue.includes("gradient");
+  const currentClass = prop?.fullClass || undefined;
+
+  const handleSelect = (value: string) => {
+    if (value === "none") {
+      onPreviewInlineStyle("background-image", "none");
+      onCommitClass("bg-none", currentClass);
+      return;
+    }
+
+    // Find the gradient definition
+    const grad = gradients?.find((g) => g.name === value);
+    if (grad) {
+      onPreviewInlineStyle("background-image", grad.value);
+      // Apply using the CSS variable
+      onCommitClass(`bg-[var(${grad.cssVariable})]`, currentClass);
+    }
+  };
+
+  return (
+    <div className="studio-scrub-input">
+      <Tooltip content="background-image (gradient)" side="left">
+        <div className="studio-scale-icon">
+          <div
+            style={{
+              width: 12,
+              height: 12,
+              borderRadius: 2,
+              background: hasGradient ? currentValue : "linear-gradient(135deg, var(--studio-accent), transparent)",
+              opacity: hasGradient ? 1 : 0.5,
+            }}
+          />
+        </div>
+      </Tooltip>
+      <select
+        value={hasGradient ? "__current__" : "none"}
+        onChange={(e) => handleSelect(e.target.value)}
+        style={{
+          flex: 1,
+          minWidth: 0,
+          background: "transparent",
+          border: "none",
+          color: "var(--studio-text)",
+          fontFamily: '"SF Mono", "Fira Code", "Cascadia Code", monospace',
+          fontSize: "11px",
+          padding: "6px 8px",
+          outline: "none",
+          cursor: "pointer",
+          WebkitAppearance: "none" as any,
+        }}
+      >
+        <option value="none">none</option>
+        {hasGradient && (
+          <option value="__current__">
+            {currentValue.length > 30 ? currentValue.slice(0, 30) + "..." : currentValue}
+          </option>
+        )}
+        {gradients && gradients.length > 0 && (
+          <optgroup label="Project Gradients">
+            {gradients.map((g) => (
+              <option key={g.name} value={g.name}>
+                {g.name}
+              </option>
+            ))}
+          </optgroup>
+        )}
+      </select>
+    </div>
   );
 }
 

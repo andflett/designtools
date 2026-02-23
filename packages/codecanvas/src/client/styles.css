@@ -451,7 +451,6 @@ input[type="range"]::-webkit-slider-thumb:hover {
 
 /* Popover */
 .studio-popover {
-  position: fixed;
   z-index: 10000;
   background: var(--studio-surface);
   border: 1px solid var(--studio-border);

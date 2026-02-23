@@ -79,6 +79,12 @@ The `StylingSystem.type` union drives framework-specific behavior:
 type: "tailwind-v4" | "tailwind-v3" | "bootstrap" | "css-variables" | "plain-css" | "unknown"
 ```
 
+### Color picker & popover conventions
+
+- **Always use the shared color picker** from `packages/codecanvas/src/client/components/color-picker.tsx` (`ColorPicker`, `ColorInputFields`, `ModeTabs`, `cssToRgba`, `rgbaToCss`). Never use native `<input type="color">` for color selection.
+- **All popovers must use `@radix-ui/react-popover`** — never use manual `createPortal` with hand-rolled positioning/dismiss logic. Radix handles focus trapping, Escape dismissal, click-outside, and collision-aware positioning.
+- Color token popovers are in `color-popover.tsx` (`ColorPopover`, `TokenPopover`). Gradient stop color pickers use `StopColorPicker` in `token-editor.tsx`. All use Radix Popover + react-colorful internally.
+
 ## CodeCanvas architecture (active)
 
 ### How it works

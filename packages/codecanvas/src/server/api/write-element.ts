@@ -40,7 +40,7 @@ interface WriteElementBody {
     col: number;
   };
   changes?: StyleChange[];
-  type?: "replaceClass" | "addClass" | "instanceOverride" | "prop";
+  type?: "replaceClass" | "addClass" | "instanceOverride" | "prop" | "resetInstanceClassName";
   oldClass?: string;
   newClass?: string;
   componentName?: string;
@@ -173,6 +173,45 @@ export function createWriteElementRouter(config: WriteElementConfig) {
         } else {
           addClassNameAttr(openingElement, body.newClass);
         }
+
+        const output = printSource(ast);
+        await fs.writeFile(fullPath, output, "utf-8");
+        res.json({ ok: true });
+        return;
+      }
+
+      // Handle resetInstanceClassName: remove className attribute from a component instance
+      if (body.type === "resetInstanceClassName") {
+        if (!body.componentName) {
+          res.status(400).json({ error: "Missing componentName" });
+          return;
+        }
+
+        const fullPath = safePath(config.projectRoot, body.source.file);
+        const parser = await getParser();
+        const source = await fs.readFile(fullPath, "utf-8");
+        const ast = parseSource(source, parser);
+
+        if (body.source.col == null) {
+          res.status(400).json({ error: "Missing col — rebuild next-plugin" });
+          return;
+        }
+        const elementPath = findComponentAtSource(ast, body.componentName, body.source.line, body.source.col);
+
+        if (!elementPath) {
+          res.status(404).json({
+            error: `Component <${body.componentName}> not found at ${body.source.file}:${body.source.line}:${body.source.col}`,
+          });
+          return;
+        }
+
+        const openingElement = elementPath.node;
+        openingElement.attributes = openingElement.attributes.filter((attr: any) => {
+          if (attr.type === "JSXAttribute" && attr.name?.type === "JSXIdentifier") {
+            return attr.name.name !== "className";
+          }
+          return true;
+        });
 
         const output = printSource(ast);
         await fs.writeFile(fullPath, output, "utf-8");

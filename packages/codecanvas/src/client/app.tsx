@@ -6,43 +6,11 @@ import { ToolChrome } from "./components/tool-chrome.js";
 import { EditorPanel } from "./components/editor-panel.js";
 import { TooltipProvider } from "./components/tooltip.js";
 import { BootScreen } from "./components/boot-screen.js";
+import { scanStore, type RawScanData } from "./lib/scan-store.js";
+import { useScanReady } from "./lib/scan-hooks.js";
 
 /** Set to false to skip the boot screen (disable before publishing) */
 const SHOW_BOOT_SCREEN = true;
-
-export interface ScanData {
-  framework: any;
-  tokens: {
-    tokens: any[];
-    groups: Record<string, any[]>;
-    cssFilePath: string;
-  };
-  components: {
-    components: any[];
-  };
-  shadows: {
-    shadows: any[];
-    cssFilePath: string;
-    stylingType: string;
-    designTokenFiles: string[];
-  };
-  borders: {
-    borders: any[];
-    cssFilePath: string;
-    stylingType: string;
-  };
-  gradients: {
-    gradients: any[];
-    cssFilePath: string;
-    stylingType: string;
-  };
-  styling: {
-    type: string;
-    cssFiles: string[];
-    scssFiles: string[];
-    hasDarkMode: boolean;
-  };
-}
 
 export function App() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -54,8 +22,8 @@ export function App() {
   const [viewportWidth, setViewportWidth] = useState<number | "fill">("fill");
   const [iframePath, setIframePath] = useState("/");
   const [injectedReady, setInjectedReady] = useState(false);
-  const [scanData, setScanData] = useState<ScanData | null>(null);
   const [bootDone, setBootDone] = useState(!SHOW_BOOT_SCREEN);
+  const scanReady = useScanReady();
 
   // Fetch config from server
   useEffect(() => {
@@ -68,12 +36,12 @@ export function App() {
       .catch(console.error);
   }, []);
 
-  // Fetch unified scan data
+  // Fetch unified scan data and populate the store
   useEffect(() => {
     fetch("/scan/all")
       .then((res) => res.json())
-      .then((data) => {
-        setScanData(data);
+      .then((data: RawScanData) => {
+        scanStore.setAll(data);
       })
       .catch(console.error);
   }, []);
@@ -156,14 +124,13 @@ export function App() {
 
   if (!bootDone) {
     return (
-      <BootScreen scanData={scanData} onContinue={() => setBootDone(true)} />
+      <BootScreen onContinue={() => setBootDone(true)} />
     );
   }
 
   const editorPanel = (
     <EditorPanel
       element={selectedElement}
-      scanData={scanData}
       theme={theme}
       iframePath={iframePath}
       onPreviewToken={handlePreviewToken}
@@ -172,12 +139,6 @@ export function App() {
       onRevertInlineStyles={handleRevertInlineStyles}
       onClose={handleCloseEditor}
       onReselectElement={handleReselectElement}
-      onRescan={() => {
-        fetch("/scan/rescan", { method: "POST" })
-          .then((r) => r.json())
-          .then((data) => setScanData(data))
-          .catch(console.error);
-      }}
     />
   );
 

@@ -6,6 +6,7 @@ import {
   buildDesignTokensJson,
   writeDesignTokensFile,
 } from "../lib/presets/w3c-design-tokens.js";
+import { rescanShadows } from "../lib/scanner.js";
 
 /** Resolve and validate a file path is within the project root. */
 function safePath(projectRoot: string, filePath: string): string {
@@ -46,7 +47,8 @@ export function createShadowsRouter(projectRoot: string) {
         await fs.writeFile(fullPath, css, "utf-8");
       }
 
-      res.json({ ok: true, filePath, variableName, value });
+      const shadows = await rescanShadows(projectRoot);
+      res.json({ ok: true, filePath, variableName, value, shadows });
     } catch (err: any) {
       console.error("Shadow write error:", err);
       res.status(500).json({ error: err.message });
@@ -84,7 +86,8 @@ export function createShadowsRouter(projectRoot: string) {
         await fs.writeFile(fullPath, css, "utf-8");
       }
 
-      res.json({ ok: true, filePath, variableName, value });
+      const shadows = await rescanShadows(projectRoot);
+      res.json({ ok: true, filePath, variableName, value, shadows });
     } catch (err: any) {
       console.error("Shadow create error:", err);
       res.status(500).json({ error: err.message });
@@ -103,7 +106,8 @@ export function createShadowsRouter(projectRoot: string) {
       const fullPath = safePath(projectRoot, filePath);
       await updateDesignTokenShadow(fullPath, tokenPath, value);
 
-      res.json({ ok: true, filePath, tokenPath, value });
+      const shadows = await rescanShadows(projectRoot);
+      res.json({ ok: true, filePath, tokenPath, value, shadows });
     } catch (err: any) {
       console.error("Design token write error:", err);
       res.status(500).json({ error: err.message });

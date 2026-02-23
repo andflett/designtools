@@ -1,6 +1,7 @@
 import { Router } from "express";
 import fs from "fs/promises";
 import path from "path";
+import { rescanGradients, rescanBorders } from "../lib/scanner.js";
 
 function safePath(projectRoot: string, filePath: string): string {
   const resolved = path.resolve(projectRoot, filePath);
@@ -33,7 +34,11 @@ export function createGradientsRouter(projectRoot: string) {
       }
 
       await fs.writeFile(fullPath, css, "utf-8");
-      res.json({ ok: true, filePath, variableName, value });
+      const [gradients, borders] = await Promise.all([
+        rescanGradients(projectRoot),
+        rescanBorders(projectRoot),
+      ]);
+      res.json({ ok: true, filePath, variableName, value, gradients, borders });
     } catch (err: any) {
       console.error("Gradient write error:", err);
       res.status(500).json({ error: err.message });
@@ -60,7 +65,11 @@ export function createGradientsRouter(projectRoot: string) {
       }
 
       await fs.writeFile(fullPath, css, "utf-8");
-      res.json({ ok: true, filePath, variableName, value });
+      const [gradients, borders] = await Promise.all([
+        rescanGradients(projectRoot),
+        rescanBorders(projectRoot),
+      ]);
+      res.json({ ok: true, filePath, variableName, value, gradients, borders });
     } catch (err: any) {
       console.error("Gradient create error:", err);
       res.status(500).json({ error: err.message });
@@ -82,7 +91,11 @@ export function createGradientsRouter(projectRoot: string) {
       css = deleteFromBlock(css, selector, variableName);
 
       await fs.writeFile(fullPath, css, "utf-8");
-      res.json({ ok: true, filePath, variableName });
+      const [gradients, borders] = await Promise.all([
+        rescanGradients(projectRoot),
+        rescanBorders(projectRoot),
+      ]);
+      res.json({ ok: true, filePath, variableName, gradients, borders });
     } catch (err: any) {
       console.error("Gradient delete error:", err);
       res.status(500).json({ error: err.message });

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import fs from "fs/promises";
 import { safePath } from "../lib/safe-path.js";
+import { rescanTokens } from "../lib/scanner.js";
 
 export function createTokensRouter(projectRoot: string) {
   const router = Router();
@@ -22,7 +23,10 @@ export function createTokensRouter(projectRoot: string) {
 
       await fs.writeFile(fullPath, css, "utf-8");
 
-      res.json({ ok: true, filePath, token, value });
+      // Targeted rescan: only re-scan tokens
+      const tokens = await rescanTokens(projectRoot);
+
+      res.json({ ok: true, filePath, token, value, tokens });
     } catch (err: any) {
       console.error("Token write error:", err);
       res.status(500).json({ error: err.message });

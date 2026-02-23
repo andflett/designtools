@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type PointerEvent as ReactPointerEvent } from "react";
+import { useState, useRef, useEffect, useCallback, type PointerEvent as ReactPointerEvent } from "react";
 import {
   ChevronRightIcon,
   ChevronDownIcon,
@@ -11,13 +11,23 @@ import {
   Cross2Icon,
   Pencil1Icon,
 } from "@radix-ui/react-icons";
-import type { ScanData } from "../app.js";
+import * as Popover from "@radix-ui/react-popover";
+import { RgbaColorPicker } from "react-colorful";
+import type { RgbaColor } from "react-colorful";
 import { TokenPopover } from "./color-popover.js";
 import { ShadowList } from "./shadow-list.js";
+import {
+  cssToRgba,
+  rgbaToCss,
+  ModeTabs,
+  ColorInputFields,
+  type InputMode,
+} from "./color-picker.js";
+import { useTokens, useShadows, useBorders, useGradients, useStyling } from "../lib/scan-hooks.js";
+import { saveToken, saveGradient, saveBorder } from "../lib/scan-actions.js";
 
 interface TokenEditorProps {
   tokenRefs: string[];
-  scanData: ScanData | null;
   theme: "light" | "dark";
   onPreviewToken: (token: string, value: string) => void;
   onPreviewShadow: (variableName: string, value: string, shadowName?: string) => void;
@@ -25,12 +35,17 @@ interface TokenEditorProps {
 
 export function TokenEditor({
   tokenRefs,
-  scanData,
   theme,
   onPreviewToken,
   onPreviewShadow,
 }: TokenEditorProps) {
-  if (!scanData) {
+  const tokenData = useTokens();
+  const shadowData = useShadows();
+  const borderData = useBorders();
+  const gradientData = useGradients();
+  const styling = useStyling();
+
+  if (!tokenData) {
     return (
       <div
         className="px-4 py-3 text-[11px]"
@@ -41,29 +56,23 @@ export function TokenEditor({
     );
   }
 
-  const tokens = scanData.tokens.tokens;
-  const cssFilePath = scanData.tokens.cssFilePath;
+  const tokens = tokenData.tokens;
+  const cssFilePath = tokenData.cssFilePath;
 
-  const referencedTokens = tokens.filter((t: any) =>
+  const referencedTokens = tokens.filter((t) =>
     tokenRefs.includes(t.name)
   );
-  const colorTokenGroups = Object.entries(scanData.tokens.groups)
-    .filter(([_, tokens]) => (tokens as any[]).some((t) => t.category === "color"))
+  const colorTokenGroups = Object.entries(tokenData.groups)
+    .filter(([_, tokens]) => tokens.some((t) => t.category === "color"))
     .slice(0, 8);
 
-  const spacingTokens = tokens.filter((t: any) => t.category === "spacing");
+  const spacingTokens = tokens.filter((t) => t.category === "spacing");
 
-  // Border color tokens from the token scanner
-  const borderColorTokens = tokens.filter((t: any) =>
+  const borderColorTokens = tokens.filter((t) =>
     t.category === "color" && ["--border", "--input", "--ring"].includes(t.name)
   );
 
-  const shadowData = scanData.shadows;
-  const borderData = scanData.borders;
-  const gradientData = scanData.gradients;
-
-  // Determine the selector for the current styling system
-  const stylingType = scanData.styling?.type || "";
+  const stylingType = styling?.type || "";
   const selector = stylingType === "tailwind-v4" ? "@theme" : (theme === "dark" ? ".dark" : ":root");
 
   return (
@@ -125,7 +134,7 @@ export function TokenEditor({
               key={token.name}
               token={token}
               icon={SpaceBetweenHorizontallyIcon}
-              onSave={(value) => handleTokenSave(cssFilePath, token.name, value, theme === "dark" ? ".dark" : ":root")}
+              onSave={(value) => saveToken(cssFilePath, token.name, value, theme === "dark" ? ".dark" : ":root")}
             />
           ))
         ) : (
@@ -483,22 +492,12 @@ function BordersSection({
     const variableName = border.cssVariable || `--${border.name}`;
     const isNew = border.source === "framework-preset" && !border.isOverridden;
     const endpoint = isNew ? "/api/gradients/create" : "/api/gradients";
-    try {
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          filePath: cssFilePath,
-          variableName,
-          value: newValue,
-          selector,
-        }),
-      });
-      const data = await res.json();
-      if (!data.ok) console.error("Border save failed:", data.error);
-    } catch (err) {
-      console.error("Border save error:", err);
-    }
+    await saveBorder(endpoint, {
+      filePath: cssFilePath,
+      variableName,
+      value: newValue,
+      selector,
+    });
   };
 
   return (
@@ -678,31 +677,11 @@ function GradientBuilder({
 
   const handleSave = async (variableName: string, value: string, isNew: boolean) => {
     const endpoint = isNew ? "/api/gradients/create" : "/api/gradients";
-    try {
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filePath: cssFilePath, variableName, value, selector }),
-      });
-      const data = await res.json();
-      if (!data.ok) console.error("Gradient save failed:", data.error);
-    } catch (err) {
-      console.error("Gradient save error:", err);
-    }
+    await saveGradient(endpoint, { filePath: cssFilePath, variableName, value, selector });
   };
 
   const handleDelete = async (variableName: string) => {
-    try {
-      const res = await fetch("/api/gradients/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filePath: cssFilePath, variableName, selector }),
-      });
-      const data = await res.json();
-      if (!data.ok) console.error("Gradient delete failed:", data.error);
-    } catch (err) {
-      console.error("Gradient delete error:", err);
-    }
+    await saveGradient("/api/gradients/delete", { filePath: cssFilePath, variableName, selector });
   };
 
   return (
@@ -860,6 +839,91 @@ function GradientCreator({
   );
 }
 
+// ---------------------------------------------------------------------------
+// StopColorPicker — inline swatch that opens the shared Radix color picker
+// ---------------------------------------------------------------------------
+
+function StopColorPicker({
+  color,
+  onChange,
+}: {
+  color: string;
+  onChange: (color: string) => void;
+}) {
+  const [inputMode, setInputMode] = useState<InputMode>("hex");
+  const rgba = cssToRgba(color);
+
+  const handleChange = useCallback(
+    (c: RgbaColor) => onChange(rgbaToCss(c)),
+    [onChange]
+  );
+
+  return (
+    <Popover.Root>
+      <Popover.Trigger asChild>
+        <button
+          type="button"
+          style={{
+            width: 24,
+            height: 24,
+            borderRadius: 4,
+            border: "1px solid var(--studio-border-subtle)",
+            background: color,
+            cursor: "pointer",
+            padding: 0,
+            flexShrink: 0,
+          }}
+        />
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          side="left"
+          sideOffset={8}
+          collisionPadding={12}
+          style={{
+            width: 232,
+            padding: 12,
+            background: "var(--studio-surface)",
+            border: "1px solid var(--studio-border)",
+            borderRadius: 8,
+            boxShadow: "0 8px 24px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3)",
+            zIndex: 10000,
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+          }}
+        >
+          <style>{`
+            .gradient-stop-picker .react-colorful {
+              width: 100% !important;
+              height: 150px !important;
+              gap: 8px !important;
+            }
+            .gradient-stop-picker .react-colorful__saturation {
+              border-radius: 6px !important;
+            }
+            .gradient-stop-picker .react-colorful__hue,
+            .gradient-stop-picker .react-colorful__alpha {
+              height: 12px !important;
+              border-radius: 6px !important;
+            }
+            .gradient-stop-picker .react-colorful__pointer {
+              width: 16px !important;
+              height: 16px !important;
+              border-width: 2px !important;
+            }
+          `}</style>
+          <div className="gradient-stop-picker">
+            <RgbaColorPicker color={rgba} onChange={handleChange} />
+          </div>
+          <ModeTabs mode={inputMode} onChange={setInputMode} />
+          <ColorInputFields color={rgba} onChange={handleChange} mode={inputMode} />
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  );
+}
+
 function GradientEditor({
   initialValue,
   onSave,
@@ -938,20 +1002,9 @@ function GradientEditor({
       <div className="flex flex-col gap-1.5">
         {stops.map((stop, i) => (
           <div key={i} className="flex items-center gap-1.5">
-            <input
-              type="color"
-              value={stop.color.startsWith("#") ? stop.color : "#000000"}
-              onChange={(e) => updateStop(i, { color: e.target.value })}
-              className="studio-color-input"
-              style={{
-                width: 24,
-                height: 24,
-                border: "1px solid var(--studio-border-subtle)",
-                borderRadius: 4,
-                padding: 1,
-                cursor: "pointer",
-                background: "var(--studio-input-bg)",
-              }}
+            <StopColorPicker
+              color={stop.color}
+              onChange={(c) => updateStop(i, { color: c })}
             />
             <input
               type="text"
@@ -1046,25 +1099,3 @@ function GradientEditor({
   );
 }
 
-// ---------------------------------------------------------------------------
-// handleTokenSave
-// ---------------------------------------------------------------------------
-
-async function handleTokenSave(
-  cssFilePath: string,
-  token: string,
-  value: string,
-  selector: string
-) {
-  try {
-    const res = await fetch("/api/tokens", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filePath: cssFilePath, token, value, selector }),
-    });
-    const data = await res.json();
-    if (!data.ok) console.error("Token save failed:", data.error);
-  } catch (err) {
-    console.error("Token save error:", err);
-  }
-}

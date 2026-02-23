@@ -125,7 +125,8 @@ const PROP_DEFS: PropDef[] = [
 
   // Effects
   { property: "opacity", label: "Opacity", category: "effects", controlType: "text", alwaysShow: true },
-  { property: "box-shadow", label: "Shadow", category: "effects", controlType: "readonly" },
+  { property: "box-shadow", label: "Shadow", category: "effects", controlType: "text", alwaysShow: true },
+  { property: "background-image", label: "Gradient", category: "effects", controlType: "text" },
   { property: "transform", label: "Transform", category: "effects", controlType: "readonly" },
 ];
 
@@ -165,8 +166,8 @@ const HIDE_WHEN_VALUES: Record<string, string[]> = {
   "border-right-width": ["0px"],
   "border-bottom-width": ["0px"],
   "border-left-width": ["0px"],
-  // Effects: hide only shadow/transform when at default (opacity is alwaysShow)
-  "box-shadow": ["none"],
+  // Effects: hide only gradient/transform when at default (opacity & shadow are alwaysShow)
+  "background-image": ["none"],
   "transform": ["none"],
   // Align self: hide when auto (follows parent)
   "align-self": ["auto"],
@@ -423,6 +424,9 @@ const TW_PROP_TO_CSS: Record<string, string | string[]> = {
   justifyContent: "justify-content",
   alignSelf: "align-self",
   overflow: "overflow",
+  // Effects
+  boxShadow: "box-shadow",
+  backgroundImage: "background-image",
   // Size
   width: "width",
   height: "height",

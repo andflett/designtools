@@ -36,6 +36,49 @@ async function runScan(projectRoot: string): Promise<ScanResult> {
   return cachedScan;
 }
 
+// ---------------------------------------------------------------------------
+// Targeted rescan functions (for use by write endpoints)
+// ---------------------------------------------------------------------------
+
+/** Patch a single key in the cached scan result. */
+export function patchCachedScan<K extends keyof ScanResult>(key: K, value: ScanResult[K]): void {
+  if (cachedScan) {
+    cachedScan = { ...cachedScan, [key]: value };
+  }
+}
+
+export async function rescanTokens(projectRoot: string): Promise<TokenMap> {
+  const scan = cachedScan || await runScan(projectRoot);
+  const tokens = await scanTokens(projectRoot, scan.framework);
+  patchCachedScan("tokens", tokens);
+  return tokens;
+}
+
+export async function rescanShadows(projectRoot: string): Promise<ShadowMap> {
+  const scan = cachedScan || await runScan(projectRoot);
+  const shadows = await scanShadows(projectRoot, scan.framework, scan.styling);
+  patchCachedScan("shadows", shadows);
+  return shadows;
+}
+
+export async function rescanBorders(projectRoot: string): Promise<BorderMap> {
+  const scan = cachedScan || await runScan(projectRoot);
+  const borders = await scanBorders(projectRoot, scan.framework, scan.styling);
+  patchCachedScan("borders", borders);
+  return borders;
+}
+
+export async function rescanGradients(projectRoot: string): Promise<GradientMap> {
+  const scan = cachedScan || await runScan(projectRoot);
+  const gradients = await scanGradients(projectRoot, scan.framework, scan.styling);
+  patchCachedScan("gradients", gradients);
+  return gradients;
+}
+
+// ---------------------------------------------------------------------------
+// Router
+// ---------------------------------------------------------------------------
+
 export function createScanRouter(projectRoot: string) {
   const router = Router();
 
@@ -100,10 +143,48 @@ export function createScanRouter(projectRoot: string) {
     }
   });
 
+  // Full rescan — escape hatch
   router.post("/rescan", async (_req, res) => {
     try {
       const result = await runScan(projectRoot);
       res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Targeted rescan endpoints
+  router.post("/rescan/tokens", async (_req, res) => {
+    try {
+      const tokens = await rescanTokens(projectRoot);
+      res.json(tokens);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.post("/rescan/shadows", async (_req, res) => {
+    try {
+      const shadows = await rescanShadows(projectRoot);
+      res.json(shadows);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.post("/rescan/borders", async (_req, res) => {
+    try {
+      const borders = await rescanBorders(projectRoot);
+      res.json(borders);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.post("/rescan/gradients", async (_req, res) => {
+    try {
+      const gradients = await rescanGradients(projectRoot);
+      res.json(gradients);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

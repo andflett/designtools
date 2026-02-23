@@ -20,18 +20,20 @@ import {
   ChevronRightIcon,
   ChevronDownIcon,
   InfoCircledIcon,
+  ResetIcon,
 } from "@radix-ui/react-icons";
-import type { ScanData } from "../app.js";
 import type { SelectedElementData, SourceLocation } from "../../shared/protocol.js";
 import { TokenEditor } from "./token-editor.js";
 import { PropertyPanel } from "./property-panel.js";
 import { ComputedPropertyPanel } from "./computed-property-panel.js";
+import { Tooltip } from "./tooltip.js";
+import { useTokens, useComponents } from "../lib/scan-hooks.js";
+import type { IndexedTokenMap } from "../lib/scan-store.js";
 
 type EditMode = "token" | "component" | "instance";
 
 interface EditorPanelProps {
   element: SelectedElementData | null;
-  scanData: ScanData | null;
   theme: "light" | "dark";
   iframePath: string;
   onPreviewToken: (token: string, value: string) => void;
@@ -40,7 +42,6 @@ interface EditorPanelProps {
   onRevertInlineStyles: () => void;
   onClose: () => void;
   onReselectElement: () => void;
-  onRescan: () => void;
 }
 
 /** Open a file in the user's editor via the local server. */
@@ -53,7 +54,6 @@ function openInEditor(file: string, line?: number, col?: number) {
 
 export function EditorPanel({
   element,
-  scanData,
   theme,
   iframePath,
   onPreviewToken,
@@ -62,13 +62,15 @@ export function EditorPanel({
   onRevertInlineStyles,
   onClose,
   onReselectElement,
-  onRescan,
 }: EditorPanelProps) {
+  const tokenData = useTokens();
+  const componentData = useComponents();
+
   const dataSlot = element?.attributes?.["data-slot"] || null;
   const isComponent = !!dataSlot;
-  const componentEntry = scanData?.components.components.find(
-    (c: any) => c.dataSlot === dataSlot
-  );
+  const componentEntry = dataSlot
+    ? componentData?.byDataSlot.get(dataSlot) ?? null
+    : null;
 
   const availableModes: EditMode[] = isComponent
     ? ["token", "component", "instance"]
@@ -83,6 +85,7 @@ export function EditorPanel({
   }, [element?.source?.file, element?.source?.line, element?.source?.col]);
 
   const [componentSubTab, setComponentSubTab] = useState<"styles" | "props">("styles");
+  const [instanceSubTab, setInstanceSubTab] = useState<"props" | "styles">("props");
   const [saving, setSaving] = useState(false);
   // Serialize writes so only one goes at a time
   const writeQueueRef = useRef<Promise<void>>(Promise.resolve());
@@ -93,7 +96,7 @@ export function EditorPanel({
       : `<${element.tag}>`
     : null;
 
-  const tokenRefs = extractTokenReferences(element?.className || "", scanData);
+  const tokenRefs = extractTokenReferences(element?.className || "", tokenData);
 
   // Fetch current prop values for component instances (variant, size, etc.)
   const [instanceProps, setInstanceProps] = useState<Record<string, string> | null>(null);
@@ -127,7 +130,6 @@ export function EditorPanel({
         setTimeout(() => {
           onReselectElement();
           onRevertInlineStyles();
-          onRescan();
         }, 500);
       } catch (err) {
         console.error("Write error:", err);
@@ -245,7 +247,6 @@ export function EditorPanel({
             </div>
             <TokenEditor
               tokenRefs={tokenRefs}
-              scanData={scanData}
               theme={theme}
               onPreviewToken={onPreviewToken}
               onPreviewShadow={onPreviewShadow}
@@ -312,7 +313,6 @@ export function EditorPanel({
                   className={element.className}
                   computedStyles={element.computed}
                   parentComputedStyles={element.parentComputed || {}}
-                  tokenGroups={scanData?.tokens.groups || {}}
                   onPreviewInlineStyle={onPreviewInlineStyle}
                   onRevertInlineStyles={onRevertInlineStyles}
                   onCommitClass={(tailwindClass, oldClass) => {
@@ -340,7 +340,6 @@ export function EditorPanel({
                     key={dim.name}
                     dim={dim}
                     componentEntry={componentEntry}
-                    scanData={scanData}
                     onClassChange={(oldClass, newClass, variantContext) => {
                       withSave(async () => {
                         await handleComponentClassChange(
@@ -357,7 +356,6 @@ export function EditorPanel({
                 {componentEntry.baseClasses && (
                   <ComponentBaseSection
                     componentEntry={componentEntry}
-                    scanData={scanData}
                     onClassChange={(oldClass, newClass) => {
                       withSave(async () => {
                         await handleComponentClassChange(
@@ -396,73 +394,131 @@ export function EditorPanel({
           <>
             <div className="studio-tab-explainer">
               <InfoCircledIcon />
-              <span>
+              <span className="flex-1">
                 {isComponent
-                  ? "Edit this element's variant, size, and styles."
+                  ? "Edit this instance's props and style overrides."
                   : "Edit this element's styles."}
               </span>
-            </div>
-            {isComponent && componentEntry && componentEntry.variants.length > 0 && (
-              <div className="">
-                {componentEntry.variants.map((dim: any) => (
-                  <InstanceVariantSection
-                    key={dim.name}
-                    dim={dim}
-                    currentValue={instanceProps?.[dim.name] ?? dim.default ?? null}
-                    onSelect={(value) => {
+              {isComponent && element.instanceSource && element.componentName && (
+                <Tooltip content="Remove all className overrides from this instance, reverting to component defaults">
+                  <button
+                    onClick={() => {
                       if (!element.instanceSource || !element.componentName) return;
                       withSave(async () => {
-                        await handleInstancePropChange(
+                        await handleResetInstanceClassName(
                           element.instanceSource!,
                           element.componentName!,
-                          dim.name,
-                          value,
                         );
-                        setInstancePropsVersion((v) => v + 1);
                       });
                     }}
-                  />
-                ))}
+                    className="studio-icon-btn shrink-0"
+                    style={{ width: 20, height: 20 }}
+                  >
+                    <ResetIcon />
+                  </button>
+                </Tooltip>
+              )}
+            </div>
+
+            {isComponent && componentEntry && componentEntry.variants.length > 0 ? (
+              <>
+                {/* Sub-tabs: Props vs Styles */}
+                <div className="px-4 pb-2">
+                  <div className="studio-segmented" style={{ width: "100%" }}>
+                    <button
+                      onClick={() => setInstanceSubTab("props")}
+                      className={instanceSubTab === "props" ? "active" : ""}
+                      style={{ flex: 1 }}
+                    >
+                      Props
+                    </button>
+                    <button
+                      onClick={() => setInstanceSubTab("styles")}
+                      className={instanceSubTab === "styles" ? "active" : ""}
+                      style={{ flex: 1 }}
+                    >
+                      Styles
+                    </button>
+                  </div>
+                </div>
+
+                {instanceSubTab === "props" && (
+                  <div className="">
+                    {componentEntry.variants.map((dim: any) => (
+                      <InstanceVariantSection
+                        key={dim.name}
+                        dim={dim}
+                        currentValue={instanceProps?.[dim.name] ?? dim.default ?? null}
+                        onSelect={(value) => {
+                          if (!element.instanceSource || !element.componentName) return;
+                          withSave(async () => {
+                            await handleInstancePropChange(
+                              element.instanceSource!,
+                              element.componentName!,
+                              dim.name,
+                              value,
+                            );
+                            setInstancePropsVersion((v) => v + 1);
+                          });
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {instanceSubTab === "styles" && (
+                  <div className="">
+                    <ComputedPropertyPanel
+                      tag={element.tag}
+                      className={element.className}
+                      computedStyles={element.computed}
+                      parentComputedStyles={element.parentComputed || {}}
+                      onPreviewInlineStyle={onPreviewInlineStyle}
+                      onRevertInlineStyles={onRevertInlineStyles}
+                      onCommitClass={(tailwindClass, oldClass) => {
+                        if (oldClass && tailwindClass === oldClass) return;
+                        if (element.instanceSource && element.componentName) {
+                          withSave(async () => {
+                            await handleInstanceOverride(
+                              element.instanceSource!,
+                              element.componentName!,
+                              tailwindClass,
+                              oldClass || undefined,
+                            );
+                          });
+                        }
+                      }}
+                    />
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="">
+                <ComputedPropertyPanel
+                  tag={element.tag}
+                  className={element.className}
+                  computedStyles={element.computed}
+                  parentComputedStyles={element.parentComputed || {}}
+                  onPreviewInlineStyle={onPreviewInlineStyle}
+                  onRevertInlineStyles={onRevertInlineStyles}
+                  onCommitClass={(tailwindClass, oldClass) => {
+                    if (oldClass && tailwindClass === oldClass) return;
+                    if (element.source) {
+                      const source = element.source;
+                      if (oldClass) {
+                        withSave(async () => {
+                          await handleWriteElement(source, "replaceClass", tailwindClass, oldClass);
+                        });
+                      } else {
+                        withSave(async () => {
+                          await handleWriteElement(source, "addClass", tailwindClass);
+                        });
+                      }
+                    }
+                  }}
+                />
               </div>
             )}
-            <div className="">
-              <ComputedPropertyPanel
-                tag={element.tag}
-                className={element.className}
-                computedStyles={element.computed}
-                parentComputedStyles={element.parentComputed || {}}
-                tokenGroups={scanData?.tokens.groups || {}}
-                onPreviewInlineStyle={onPreviewInlineStyle}
-                onRevertInlineStyles={onRevertInlineStyles}
-                onCommitClass={(tailwindClass, oldClass) => {
-                  // Skip if the new class is the same as the old class
-                  if (oldClass && tailwindClass === oldClass) return;
-                  if (isComponent && element.instanceSource && element.componentName) {
-                    // Component instance: write to the page file (usage site)
-                    withSave(async () => {
-                      await handleInstanceOverride(
-                        element.instanceSource!,
-                        element.componentName!,
-                        tailwindClass,
-                        oldClass || undefined,
-                      );
-                    });
-                  } else if (element.source) {
-                    // Plain element: write to the element's source file
-                    const source = element.source;
-                    if (oldClass) {
-                      withSave(async () => {
-                        await handleWriteElement(source, "replaceClass", tailwindClass, oldClass);
-                      });
-                    } else {
-                      withSave(async () => {
-                        await handleWriteElement(source, "addClass", tailwindClass);
-                      });
-                    }
-                  }
-                }}
-              />
-            </div>
           </>
         )}
       </div>
@@ -475,14 +531,13 @@ export function EditorPanel({
 function ComponentVariantSection({
   dim,
   componentEntry,
-  scanData,
   onClassChange,
 }: {
   dim: any;
   componentEntry: any;
-  scanData: ScanData | null;
   onClassChange: (oldClass: string, newClass: string, variantContext: string) => void;
 }) {
+  const tokenData = useTokens();
   const [collapsed, setCollapsed] = useState(true);
   const [expandedOptions, setExpandedOptions] = useState<Set<string>>(new Set());
 
@@ -538,7 +593,7 @@ function ComponentVariantSection({
                     onClassChange={(oldClass, newClass) => {
                       onClassChange(oldClass, newClass, opt);
                     }}
-                    tokenGroups={scanData?.tokens.groups || {}}
+                    tokenGroups={tokenData?.groups || {}}
                     flat
                   />
                 </div>
@@ -553,13 +608,12 @@ function ComponentVariantSection({
 
 function ComponentBaseSection({
   componentEntry,
-  scanData,
   onClassChange,
 }: {
   componentEntry: any;
-  scanData: ScanData | null;
   onClassChange: (oldClass: string, newClass: string) => void;
 }) {
+  const tokenData = useTokens();
   const [collapsed, setCollapsed] = useState(true);
 
   return (
@@ -576,7 +630,7 @@ function ComponentBaseSection({
           <PropertyPanel
             classes={componentEntry.baseClasses}
             onClassChange={onClassChange}
-            tokenGroups={scanData?.tokens.groups || {}}
+            tokenGroups={tokenData?.groups || {}}
             flat
           />
         </div>
@@ -721,6 +775,27 @@ async function handleInstancePropChange(
   }
 }
 
+async function handleResetInstanceClassName(
+  instanceSource: SourceLocation,
+  componentName: string,
+) {
+  try {
+    const res = await fetch("/api/write-element", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "resetInstanceClassName",
+        source: instanceSource,
+        componentName,
+      }),
+    });
+    const data = await res.json();
+    if (!data.ok) console.error("Reset instance className failed:", data.error);
+  } catch (err) {
+    console.error("Reset instance className error:", err);
+  }
+}
+
 async function handleComponentClassChange(
   filePath: string,
   oldClass: string,
@@ -742,9 +817,9 @@ async function handleComponentClassChange(
 
 function extractTokenReferences(
   className: string,
-  scanData: ScanData | null
+  tokenData: IndexedTokenMap | null,
 ): string[] {
-  if (!scanData || !className) return [];
+  if (!tokenData || !className) return [];
 
   const tokens = new Set<string>();
   const classes = className.split(/\s+/);
@@ -756,10 +831,7 @@ function extractTokenReferences(
     if (match) {
       const ref = match[1].split("/")[0];
       const tokenName = `--${ref}`;
-      const found = scanData.tokens.tokens.find(
-        (t: any) => t.name === tokenName
-      );
-      if (found) tokens.add(tokenName);
+      if (tokenData.byName.has(tokenName)) tokens.add(tokenName);
     }
   }
 

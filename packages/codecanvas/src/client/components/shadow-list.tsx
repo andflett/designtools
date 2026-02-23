@@ -8,6 +8,7 @@ import {
 } from "@radix-ui/react-icons";
 import { ShadowControls } from "./shadow-controls.js";
 import { ShadowPreview } from "./shadow-preview.js";
+import { saveShadow } from "../lib/scan-actions.js";
 
 interface ShadowListProps {
   shadows: any[];
@@ -85,21 +86,13 @@ function ShadowRow({
     setCurrentValue(newValue);
     setSaving(true);
     try {
-      // Design token shadows write to their own endpoint
       if (shadow.source === "design-token" && shadow.tokenFilePath && shadow.tokenPath) {
-        const res = await fetch("/api/shadows/design-token", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            filePath: shadow.tokenFilePath,
-            tokenPath: shadow.tokenPath,
-            value: newValue,
-          }),
+        await saveShadow("/api/shadows/design-token", {
+          filePath: shadow.tokenFilePath,
+          tokenPath: shadow.tokenPath,
+          value: newValue,
         });
-        const data = await res.json();
-        if (!data.ok) console.error("Design token save failed:", data.error);
       } else {
-        // CSS/SCSS shadow writes
         const variableName = shadow.sassVariable || shadow.cssVariable || `--${shadow.name}`;
         let selector: string;
         let filePath = cssFilePath;
@@ -108,25 +101,13 @@ function ShadowRow({
           selector = "@theme";
         } else if (stylingType === "bootstrap" && shadow.sassVariable) {
           selector = "scss";
-          // Use the SCSS file if available, fall back to CSS file
           filePath = shadow.filePath || cssFilePath;
         } else {
           selector = ":root";
         }
 
         const endpoint = shadow.isOverridden ? "/api/shadows" : "/api/shadows/create";
-        const res = await fetch(endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            filePath,
-            variableName,
-            value: newValue,
-            selector,
-          }),
-        });
-        const data = await res.json();
-        if (!data.ok) console.error("Shadow save failed:", data.error);
+        await saveShadow(endpoint, { filePath, variableName, value: newValue, selector });
       }
     } catch (err) {
       console.error("Shadow save error:", err);

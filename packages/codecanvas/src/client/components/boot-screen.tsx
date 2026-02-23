@@ -5,14 +5,20 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
-import type { ScanData } from "../app.js";
+import { useFramework, useStyling, useTokens, useShadows, useComponents, useScanReady } from "../lib/scan-hooks.js";
 
 interface BootStep {
   label: string;
   duration: number; // ms to "complete" this step
 }
 
-function useBootSequence(scanData: ScanData | null) {
+function useBootSequence() {
+  const framework = useFramework();
+  const styling = useStyling();
+  const tokenData = useTokens();
+  const shadowData = useShadows();
+  const componentData = useComponents();
+
   const [currentStep, setCurrentStep] = useState(0);
   const [stepProgress, setStepProgress] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<
@@ -21,27 +27,21 @@ function useBootSequence(scanData: ScanData | null) {
   const [done, setDone] = useState(false);
 
   const steps: BootStep[] = [
-    { label: "Connecting to dev server", duration: 600 },
-    { label: "Detecting framework", duration: 900 },
-    { label: "Detecting styling system", duration: 700 },
-    { label: "Parsing components via AST", duration: 1200 },
-    { label: "Scanning design tokens", duration: 900 },
-    { label: "Injecting data-source attributes", duration: 800 },
-    { label: "Resolving routes", duration: 500 },
-    { label: "Ready", duration: 400 },
+    { label: "Detecting framework", duration: 130 },
+    { label: "Detecting styling system", duration: 323 },
+    { label: "Parsing components with AST", duration: 365 },
+    { label: "Scanning design tokens", duration: 235 },
+    { label: "Instrumenting JSX source locations", duration: 562 },
   ];
 
-  function getDetail(stepIndex: number, scan: ScanData | null): string {
-    if (!scan) return "";
+  function getDetail(stepIndex: number): string {
     switch (stepIndex) {
       case 0:
-        return "localhost:3000";
-      case 1:
-        return scan.framework?.name
-          ? `→ ${scan.framework.name}`
+        return framework?.name
+          ? `→ ${framework.name}`
           : "→ Next.js + React";
-      case 2: {
-        const t = scan.styling?.type || "tailwind-v4";
+      case 1: {
+        const t = styling?.type || "tailwind-v4";
         const labels: Record<string, string> = {
           "tailwind-v4": "Tailwind CSS v4",
           "tailwind-v3": "Tailwind CSS v3",
@@ -51,35 +51,25 @@ function useBootSequence(scanData: ScanData | null) {
         };
         return `→ ${labels[t] || t}`;
       }
-      case 3: {
-        const count = scan.components?.components?.length ?? 0;
-        const totalVariants = scan.components?.components?.reduce(
+      case 2: {
+        const count = componentData?.components?.length ?? 0;
+        const totalVariants = componentData?.components?.reduce(
           (sum, c) => sum + (c.variants?.length ?? 0),
           0
         ) ?? 0;
         return `→ ${count} component${count !== 1 ? "s" : ""}, ${totalVariants} variant prop${totalVariants !== 1 ? "s" : ""} extracted`;
       }
-      case 4: {
-        const tokens = scan.tokens?.tokens?.length ?? 0;
-        const shadows = scan.shadows?.shadows?.length ?? 0;
-        const borders = scan.borders?.borders?.length ?? 0;
-        const gradients = scan.gradients?.gradients?.length ?? 0;
-        const total = tokens + shadows + borders + gradients;
-        const groups = scan.tokens?.groups
-          ? Object.keys(scan.tokens.groups).length
+      case 3: {
+        const tokens = tokenData?.tokens?.length ?? 0;
+        const shadows = shadowData?.shadows?.length ?? 0;
+        const total = tokens + shadows;
+        const groups = tokenData?.groups
+          ? Object.keys(tokenData.groups).length
           : 0;
-        return `→ ${total} token${total !== 1 ? "s" : ""} across ${groups} group${groups !== 1 ? "s" : ""} (colors, shadows, borders, gradients)`;
+        return `→ ${total} token${total !== 1 ? "s" : ""} across ${groups} group${groups !== 1 ? "s" : ""}`;
       }
-      case 5: {
-        const cssFiles = scan.styling?.cssFiles?.length ?? 0;
-        return `→ Babel transform · file:line:col on every JSX element · ${cssFiles} source file${cssFiles !== 1 ? "s" : ""}`;
-      }
-      case 6: {
-        const appDir = scan.framework?.appDir || "app";
-        return `→ mapped /${appDir} routes to source files`;
-      }
-      case 7:
-        return "all systems go";
+      case 4:
+        return `→ Babel transform · file:line:col mapped to JSX`;
       default:
         return "";
     }
@@ -99,7 +89,7 @@ function useBootSequence(scanData: ScanData | null) {
 
       if (t >= ticks) {
         clearInterval(iv);
-        const detail = getDetail(currentStep, scanData);
+        const detail = getDetail(currentStep);
         setCompletedSteps((prev) => [
           ...prev,
           { label: step.label, detail, elapsed: step.duration },
@@ -115,7 +105,7 @@ function useBootSequence(scanData: ScanData | null) {
     }, tick);
 
     return () => clearInterval(iv);
-  }, [currentStep, done, scanData]);
+  }, [currentStep, done, framework, styling, tokenData, shadowData, componentData]);
 
   const activeStep = !done && currentStep < steps.length ? steps[currentStep] : null;
 
@@ -146,22 +136,21 @@ function ProgressBar({ progress, width = 24 }: { progress: number; width?: numbe
   );
 }
 
-const ASCII_LOGO = `
- ┌─────────────────────────────────┐
- │   ╔═╗╔═╗╔╦╗╔═╗  ╔═╗╔═╗╔╗╔╦  ╦ │
- │   ║  ║ ║ ║║║╣   ║  ╠═╣║║║╚╗╔╝ │
- │   ╚═╝╚═╝═╩╝╚═╝  ╚═╝╩ ╩╝╚╝ ╚╝  │
- └─────────────────────────────────┘`;
+const ASCII_LOGO = [
+  "                _                                      ",
+  "   ___ ___   __| | ___    ___ __ _ _ ____   ____ _ ___ ",
+  "  / __/ _ \\ / _` |/ _ \\  / __/ _` | '_ \\ \\ / / _` / __|",
+  " | (_| (_) | (_| |  __/ | (_| (_| | | | \\ V / (_| \\__ \\",
+  "  \\___\\___/ \\__,_|\\___|  \\___\\__,_|_| |_|\\_/ \\__,_|___/",
+].join("\n");
 
 export function BootScreen({
-  scanData,
   onContinue,
 }: {
-  scanData: ScanData | null;
   onContinue: () => void;
 }) {
   const { completedSteps, activeStep, stepProgress, done, totalSteps } =
-    useBootSequence(scanData);
+    useBootSequence();
   const [showCursor, setShowCursor] = useState(true);
 
   useEffect(() => {
@@ -218,8 +207,10 @@ export function BootScreen({
           borderRadius: 8,
           background: "var(--studio-surface)",
           padding: "32px 40px",
-          maxWidth: 560,
-          width: "100%",
+          width: 560,
+          height: 500,
+          display: "flex",
+          flexDirection: "column" as const,
           boxShadow: "0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03)",
         }}
       >
@@ -247,7 +238,7 @@ export function BootScreen({
             marginBottom: 24,
           }}
         >
-          visual design tooling · v0.1.0
+          code-first design canvas · v0.1.0
         </div>
 
         {/* Separator */}
@@ -259,7 +250,7 @@ export function BootScreen({
         />
 
         {/* Completed steps */}
-        <div style={{ minHeight: 180 }}>
+        <div style={{ flex: 1, minHeight: 0 }}>
           {completedSteps.map((step, i) => (
             <div key={i}>
               <div
@@ -267,8 +258,6 @@ export function BootScreen({
                   display: "flex",
                   gap: 8,
                   alignItems: "baseline",
-                  opacity: i < completedSteps.length - 4 ? 0.4 : 1,
-                  transition: "opacity 0.3s",
                 }}
               >
                 <span style={{ color: "var(--studio-success)", flexShrink: 0 }}>✓</span>
@@ -291,8 +280,7 @@ export function BootScreen({
                     fontSize: 11,
                     paddingLeft: 22,
                     marginTop: -2,
-                    opacity: i < completedSteps.length - 4 ? 0.4 : 0.7,
-                    transition: "opacity 0.3s",
+                    opacity: 0.7,
                   }}
                 >
                   {step.detail}
@@ -317,7 +305,7 @@ export function BootScreen({
         <div
           style={{
             borderTop: "1px solid var(--studio-border-subtle)",
-            margin: "20px -40px 20px -40px",
+            margin: "20px -40px 30px -40px",
           }}
         />
 
@@ -346,7 +334,7 @@ export function BootScreen({
                 (e.currentTarget.style.background = "var(--studio-accent)")
               }
             >
-              Enter Editor{" "}
+              Open Editor{" "}
               <span style={{ opacity: 0.6, fontSize: 11 }}>↵</span>
             </button>
           ) : (
@@ -357,18 +345,7 @@ export function BootScreen({
           )}
         </div>
 
-        {/* Step counter */}
-        <div
-          style={{
-            textAlign: "center",
-            marginTop: 16,
-            fontSize: 10,
-            color: "var(--studio-text-dimmed)",
-            opacity: 0.5,
-          }}
-        >
-          {completedSteps.length}/{totalSteps} checks
-        </div>
+   
       </div>
     </div>
   );

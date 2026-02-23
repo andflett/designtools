@@ -355,3 +355,29 @@ Styling system adapters (Tailwind, Bootstrap, CSS variables, plain CSS) are orth
 4. **Tokens matter more than raw values.** A tool that converts `p-4` to `padding: 16px` and writes back `padding: 24px` has destroyed design system semantics. The protocol needs to carry token/class context so the write path can map values back to the design system's vocabulary.
 
 5. **Framework and styling system are orthogonal concerns.** "How do I find this element in source?" (framework) and "How do I write this CSS change in the native format?" (styling system) are independent problems. Conflating them leads to an explosion of special cases.
+
+---
+
+## Future Consideration: Persistent Scan Store (Decided Against, Feb 2026)
+
+### The question
+
+As registries grow (component usage tracking, larger codebases, on-demand queries like "find all usages of `<Button>`"), should scan results be persisted to disk instead of held in memory?
+
+### What persistence would give us
+- Instant startup (no initial scan wait)
+- Foundation for expensive on-demand queries — scan once, persist an index, query without re-scanning
+- Survives server restarts
+
+### Why we decided against it
+- **Staleness is the #1 risk.** Files change outside the tool (editor saves, git operations, branch switches). You'd need a file watcher (chokidar/fs.watch) to invalidate, and now you're building a mini language server.
+- **The initial scan is fast** (~500ms for typical projects). Persistence saves that 500ms on restart, which isn't worth the staleness risk.
+- **Component usage tracking is a grep/AST query**, not a registry lookup. Run it on-demand when the user opens a component panel, cache in memory, invalidate when component files change. No persistence needed.
+- **For larger codebases**, the bottleneck is scanning many CSS files. The fix is **incremental scanning** (only re-scan files that changed via mtime checks), not persistence.
+- **The persistent store path leads toward building a language server** (LSP, file watchers, incremental indexing) — a legitimate future direction but a fundamentally different architecture.
+
+### What we did instead
+- In-memory store with granular slice updates (patch one registry, not all)
+- Optimistic client-side updates after writes
+- Targeted server-side rescans (only re-scan the affected registry)
+- Keep the door open for persistence later if incremental scanning + in-memory proves insufficient
