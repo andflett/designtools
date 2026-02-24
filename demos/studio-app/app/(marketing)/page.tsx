@@ -40,11 +40,11 @@ const stats = [
 
 export default function HomePage() {
   return (
-    <div className="mx-auto max-w-5xl px-4 py-12">
+    <div className="mx-auto max-w-5xl px-4 py-12 bg-[image:var(--gradient-2)]">
       {/* Hero */}
       <section className="flex flex-col items-center gap-5 text-center">
         <Badge variant="secondary">Now in Beta</Badge>
-        <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
+        <h1 className="text-4xl font-bold tracking-tight sm:text-5xl p-7">
           Build better interfaces,
           <br />
           visually.
@@ -61,7 +61,6 @@ export default function HomePage() {
           </Button>
         </div>
       </section>
-
       {/* Stats */}
       <section className="mt-16 grid grid-cols-3 gap-8 text-center">
         {stats.map((stat) => (
@@ -71,7 +70,6 @@ export default function HomePage() {
           </div>
         ))}
       </section>
-
       {/* Feature Cards */}
       <section className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {features.map((feature) => (
@@ -89,7 +87,6 @@ export default function HomePage() {
           </Card>
         ))}
       </section>
-
       {/* CTA */}
       <section className="mt-16 rounded-lg border bg-card p-8 text-center">
         <h2 className="text-2xl font-semibold tracking-tight">

@@ -30,6 +30,7 @@
     "publish:core": "bash scripts/publish.sh patch core",
     "publish:studio": "bash scripts/publish.sh patch studio",
     "publish:shadows": "bash scripts/publish.sh patch shadows",
+    "publish:next-plugin": "bash scripts/publish.sh patch next-plugin",
     "studio": "cd demos/studio-app && npm run dev & cd demos/studio-app && npx tsx ../../packages/studio/src/cli.ts",
     "shadows": "cd demos/tailwind-shadows-app && npm run dev & cd demos/tailwind-shadows-app && npx tsx ../../packages/shadows/src/cli.ts",
     "shadows:bootstrap": "rm -rf packages/shadows/dist/client && cd demos/bootstrap-app && npm run dev & cd demos/bootstrap-app && npx tsx ../../packages/shadows/src/cli.ts",
