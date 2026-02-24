@@ -1,9 +1,9 @@
 /**
- * Webpack loader that auto-mounts <CodeCanvas /> in the root layout.
+ * Webpack loader that auto-mounts <CodeSurface /> in the root layout.
  * Only runs in development. Injects the import and component into the JSX.
  *
  * Strategy: Simple string injection — find the {children} pattern in the layout
- * and add <CodeCanvas /> alongside it.
+ * and add <CodeSurface /> alongside it.
  */
 
 interface LoaderContext {
@@ -12,7 +12,7 @@ interface LoaderContext {
   async(): (err: Error | null, content?: string) => void;
 }
 
-export default function codecanvasMountLoader(this: LoaderContext, source: string): void {
+export default function codesurfaceMountLoader(this: LoaderContext, source: string): void {
   const callback = this.async();
 
   // Only inject into root layout (not nested layouts)
@@ -22,15 +22,15 @@ export default function codecanvasMountLoader(this: LoaderContext, source: strin
     return;
   }
 
-  // Skip if already has CodeCanvas import
-  if (source.includes("CodeCanvas")) {
+  // Skip if already has CodeSurface import
+  if (source.includes("CodeSurface")) {
     callback(null, source);
     return;
   }
 
   // Add import at the top (after "use client" or first import)
-  // CodeCanvas is a "use client" component — importing it from an RSC is fine in Next.js
-  const importStatement = `import { CodeCanvas } from "@designtools/next-plugin/codecanvas";\n`;
+  // CodeSurface is a "use client" component — importing it from an RSC is fine in Next.js
+  const importStatement = `import { CodeSurface } from "@designtools/next-plugin/codesurface";\n`;
   let modified = source;
 
   // Find a good insertion point for the import
@@ -41,10 +41,10 @@ export default function codecanvasMountLoader(this: LoaderContext, source: strin
     modified = importStatement + source;
   }
 
-  // Add <CodeCanvas /> just before {children}
+  // Add <CodeSurface /> just before {children}
   modified = modified.replace(
     /(\{children\})/,
-    `<CodeCanvas />\n          $1`
+    `<CodeSurface />\n          $1`
   );
 
   callback(null, modified);

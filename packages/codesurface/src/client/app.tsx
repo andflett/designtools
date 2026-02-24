@@ -145,7 +145,7 @@ export function App() {
   return (
     <TooltipProvider>
       <ToolChrome
-        toolName="CodeCanvas"
+        toolName="CodeSurface"
         toolIcon={<Component1Icon />}
         selectionMode={selectionMode}
         onToggleSelectionMode={toggleSelectionMode}

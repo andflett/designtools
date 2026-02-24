@@ -1,6 +1,6 @@
 /**
  * Next.js config wrapper that adds the designtools source annotation loader
- * and auto-mounts the <CodeCanvas /> selection component in development.
+ * and auto-mounts the <CodeSurface /> selection component in development.
  *
  * Usage:
  *   import { withDesigntools } from "@designtools/next-plugin";
@@ -28,7 +28,7 @@ export function withDesigntools<T extends Record<string, any>>(nextConfig: T = {
           ],
         });
 
-        // Add a loader for root layout files that auto-mounts <CodeCanvas />
+        // Add a loader for root layout files that auto-mounts <CodeSurface />
         config.module.rules.push({
           test: /layout\.(tsx|jsx)$/,
           include: [
@@ -37,7 +37,7 @@ export function withDesigntools<T extends Record<string, any>>(nextConfig: T = {
           ],
           use: [
             {
-              loader: path.resolve(__dirname, "codecanvas-mount-loader.js"),
+              loader: path.resolve(__dirname, "codesurface-mount-loader.js"),
             },
           ],
         });

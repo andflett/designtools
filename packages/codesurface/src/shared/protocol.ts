@@ -1,5 +1,5 @@
 /**
- * Shared postMessage protocol types for CodeCanvas.
+ * Shared postMessage protocol types for CodeSurface.
  * Both server and client import from here.
  */
 

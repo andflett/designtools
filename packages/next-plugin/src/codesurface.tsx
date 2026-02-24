@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * <CodeCanvas /> — Selection overlay component for the target app.
+ * <CodeSurface /> — Selection overlay component for the target app.
  * Mounted automatically by withDesigntools() in development.
  * Communicates with the editor UI via postMessage.
  *
@@ -15,7 +15,7 @@ import { useEffect, useRef } from "react";
 // because they need to be fixed-position overlays that don't interfere
 // with the app's React tree.
 
-export function CodeCanvas() {
+export function CodeSurface() {
   const stateRef = useRef({
     selectionMode: false,
     hoveredElement: null as Element | null,

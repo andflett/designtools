@@ -1,5 +1,5 @@
 {
-  "name": "@designtools/codecanvas",
+  "name": "@designtools/codesurface",
   "version": "0.1.0",
   "description": "Visual editing CLI — hybrid architecture with selection overlays in the target app and editor UI served separately",
   "type": "module",
@@ -15,7 +15,7 @@
     "prepublishOnly": "npm run build"
   },
   "bin": {
-    "designtools-codecanvas": "dist/cli.js"
+    "codesurface": "dist/cli.js"
   },
   "files": [
     "dist"

@@ -6,25 +6,25 @@ Reference for AI assistants working on this codebase. Read this before making ch
 
 Visual editing CLI tools for web applications — edit styles, tokens, and components visually with changes written back to source files.
 
-The project is transitioning from a proxy-based architecture (studio/shadows) to a hybrid architecture (codecanvas). See `.claude/studio-hybrid-architecture-plan.md` for the full plan and `.claude/exploration-history.md` for how we got there.
+The project is transitioning from a proxy-based architecture (studio/shadows) to a hybrid architecture (codesurface). See `.claude/studio-hybrid-architecture-plan.md` for the full plan and `.claude/exploration-history.md` for how we got there.
 
 ## Active vs legacy packages
 
 | Package | Status | Notes |
 |---------|--------|-------|
-| `@designtools/codecanvas` | **Active development** | Hybrid architecture — selection in target app, editor UI separate |
+| `@designtools/codesurface` | **Active development** | Hybrid architecture — selection in target app, editor UI separate |
 | `@designtools/next-plugin` | **Active development** | Config wrapper for `data-source` attributes + `<Studio />` mount |
-| `@designtools/core` | Legacy | Shared utilities — cherry-pick into codecanvas as needed, don't add shared deps |
+| `@designtools/core` | Legacy | Shared utilities — cherry-pick into codesurface as needed, don't add shared deps |
 | `@designtools/studio` | Legacy | Proxy-based editor — keep buildable but don't extend |
 | `@designtools/shadows` | Legacy | Proxy-based shadow editor — keep buildable but don't extend |
 
-**Important**: codecanvas does NOT share code with legacy packages at the import level. When codecanvas needs something from core/studio, copy it into codecanvas's own source tree. This keeps codecanvas lean and avoids coupling to legacy code.
+**Important**: codesurface does NOT share code with legacy packages at the import level. When codesurface needs something from core/studio, copy it into codesurface's own source tree. This keeps codesurface lean and avoids coupling to legacy code.
 
 ## Monorepo layout
 
 ```
 packages/
-  codecanvas/   Hybrid visual editor (active development)
+  codesurface/   Hybrid visual editor (active development)
   next-plugin/  Next.js config wrapper + data-source Babel transform
   core/         Shared scanner, server, client, CLI (legacy)
   studio/       Main editing CLI — tokens, components, instances (legacy)
@@ -37,7 +37,7 @@ demos/
   tailwind-shadows-app/ Tailwind shadows demo
 ```
 
-- `packages/core`, `packages/next-plugin`, `packages/studio`, `packages/shadows`, `packages/codecanvas` are npm workspaces.
+- `packages/core`, `packages/next-plugin`, `packages/studio`, `packages/shadows`, `packages/codesurface` are npm workspaces.
 - `demos/*` are standalone Next.js apps (not workspaces).
 
 ## Key conventions
@@ -64,8 +64,8 @@ demos/
 
 | Kind | Convention | Example |
 |------|-----------|---------|
-| Package | `@designtools/<name>` | `@designtools/codecanvas` |
-| CLI binary | `designtools-<name>` | `designtools-codecanvas` |
+| Package | `@designtools/<name>` | `@designtools/codesurface` |
+| CLI binary | `designtools-<name>` | `codesurface` |
 | Scanner files | `scan-<noun>.ts` | `scan-tokens.ts` |
 | Detector files | `detect-<noun>.ts` | `detect-styling.ts` |
 | API routers | `write-<noun>.ts` | `write-element.ts` |
@@ -81,11 +81,11 @@ type: "tailwind-v4" | "tailwind-v3" | "bootstrap" | "css-variables" | "plain-css
 
 ### Color picker & popover conventions
 
-- **Always use the shared color picker** from `packages/codecanvas/src/client/components/color-picker.tsx` (`ColorPicker`, `ColorInputFields`, `ModeTabs`, `cssToRgba`, `rgbaToCss`). Never use native `<input type="color">` for color selection.
+- **Always use the shared color picker** from `packages/codesurface/src/client/components/color-picker.tsx` (`ColorPicker`, `ColorInputFields`, `ModeTabs`, `cssToRgba`, `rgbaToCss`). Never use native `<input type="color">` for color selection.
 - **All popovers must use `@radix-ui/react-popover`** — never use manual `createPortal` with hand-rolled positioning/dismiss logic. Radix handles focus trapping, Escape dismissal, click-outside, and collision-aware positioning.
 - Color token popovers are in `color-popover.tsx` (`ColorPopover`, `TokenPopover`). Gradient stop color pickers use `StopColorPicker` in `token-editor.tsx`. All use Radix Popover + react-colorful internally.
 
-## CodeCanvas architecture (active)
+## CodeSurface architecture (active)
 
 ### How it works
 
@@ -122,13 +122,13 @@ Styling system adapters translate CSS property/value changes into the native for
 
 Framework plugins and styling-system adapters are orthogonal. Framework = source mapping + selection. Styling system = how changes are written.
 
-### Key files (codecanvas)
+### Key files (codesurface)
 
 | File | Purpose |
 |------|---------|
-| `packages/codecanvas/src/cli.ts` | CLI entry point |
-| `packages/codecanvas/src/server/index.ts` | Express server + write API + Vite middleware |
-| `packages/codecanvas/src/client/` | Editor React SPA |
+| `packages/codesurface/src/cli.ts` | CLI entry point |
+| `packages/codesurface/src/server/index.ts` | Express server + write API + Vite middleware |
+| `packages/codesurface/src/client/` | Editor React SPA |
 
 ## Legacy architecture (studio/shadows)
 
@@ -164,21 +164,21 @@ CLI (bootstrap) -> Server (createToolServer) -> Express app
 | Service | Default port |
 |---------|-------------|
 | Demo apps | 3000 |
-| CodeCanvas editor | 4400 |
-| CodeCanvas Vite dev | 4401 |
+| CodeSurface editor | 4400 |
+| CodeSurface Vite dev | 4401 |
 | Legacy Studio | 4400 |
 | Legacy Shadows | 4410 |
 
 ## Process cleanup
 
-When running dev servers (codecanvas, demo apps), always kill them when done. Stale processes hold ports (especially Vite's HMR WebSocket on port 24679) and cause "Port is already in use" errors.
+When running dev servers (codesurface, demo apps), always kill them when done. Stale processes hold ports (especially Vite's HMR WebSocket on port 24679) and cause "Port is already in use" errors.
 
 ```bash
-# Kill stale codecanvas/node processes on known ports
+# Kill stale codesurface/node processes on known ports
 lsof -ti :4400 -ti :4401 -ti :24679 | xargs kill 2>/dev/null
 
 # Or kill all node processes started from this project
-pkill -f "designtools-codecanvas"
+pkill -f "codesurface"
 ```
 
 **Important**: If you start a dev server in a background task, make sure to stop it (via `TaskStop` or `kill`) before finishing. Do not leave orphan processes.
@@ -188,7 +188,7 @@ pkill -f "designtools-codecanvas"
 ### Type-check everything
 
 ```bash
-npx tsc --noEmit --project packages/codecanvas/tsconfig.json
+npx tsc --noEmit --project packages/codesurface/tsconfig.json
 npx tsc --noEmit --project packages/core/tsconfig.json
 npx tsc --noEmit --project packages/studio/tsconfig.json
 npx tsc --noEmit --project packages/shadows/tsconfig.json
@@ -200,14 +200,14 @@ npx tsc --noEmit --project packages/shadows/tsconfig.json
 npm run build
 ```
 
-### Run codecanvas in dev
+### Run codesurface in dev
 
 ```bash
 # Terminal 1: demo app
 cd demos/studio-app && npm run dev
 
-# Terminal 2: codecanvas
-npm run dev:codecanvas
+# Terminal 2: codesurface
+npm run dev:codesurface
 ```
 
 ### Run legacy tools
@@ -220,7 +220,7 @@ npm run dev:shadows
 ### Publish
 
 ```bash
-npm run publish:codecanvas    # publish codecanvas only
+npm run publish:codesurface    # publish codesurface only
 npm run publish               # publish all packages
 ```
 

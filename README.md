@@ -8,7 +8,7 @@ Visual editing CLI tools for web applications — edit styles, tokens, and compo
 
 | Package | Description | Status |
 |---------|-------------|--------|
-| [`@designtools/codecanvas`](packages/codecanvas) | Hybrid visual editor — selection overlays in the target app, editor UI in a separate Vite app | **Active development** |
+| [`@designtools/codesurface`](packages/codesurface) | Hybrid visual editor — selection overlays in the target app, editor UI in a separate Vite app | **Active development** |
 | [`@designtools/next-plugin`](packages/next-plugin) | Next.js config wrapper — injects `data-source` attributes and mounts `<Studio />` | **Active development** |
 | [`@designtools/studio`](packages/studio) | Visual editor for tokens, components, and instances (proxy-based) | Legacy |
 | [`@designtools/shadows`](packages/shadows) | Visual editor for box-shadow values (proxy-based) | Legacy |
@@ -16,7 +16,7 @@ Visual editing CLI tools for web applications — edit styles, tokens, and compo
 
 ## Architecture
 
-CodeCanvas uses a hybrid architecture where the **selection component** (`<Studio />`) lives inside the target app via the `withDesigntools()` config wrapper, while the **editor UI** remains a separate Vite-served React app. The iframe loads the target app directly (no proxy), and all communication happens via `postMessage`.
+CodeSurface uses a hybrid architecture where the **selection component** (`<Studio />`) lives inside the target app via the `withDesigntools()` config wrapper, while the **editor UI** remains a separate Vite-served React app. The iframe loads the target app directly (no proxy), and all communication happens via `postMessage`.
 
 ```
 Editor UI (Vite, 4400)
@@ -73,8 +73,8 @@ cd demos/studio-app && npm install && cd ../..
 # Terminal 1 — start a demo app
 cd demos/studio-app && npm run dev
 
-# Terminal 2 — start codecanvas
-npm run dev:codecanvas
+# Terminal 2 — start codesurface
+npm run dev:codesurface
 ```
 
 The editor opens at [http://localhost:4400](http://localhost:4400) with the target app loaded in an iframe.
@@ -91,7 +91,7 @@ The editor opens at [http://localhost:4400](http://localhost:4400) with the targ
 
 ## Legacy tools
 
-The original `@designtools/studio` and `@designtools/shadows` packages are still in the repo and buildable. They use a proxy-based architecture that is being replaced by CodeCanvas. See the [exploration history](.claude/exploration-history.md) for why.
+The original `@designtools/studio` and `@designtools/shadows` packages are still in the repo and buildable. They use a proxy-based architecture that is being replaced by CodeSurface. See the [exploration history](.claude/exploration-history.md) for why.
 
 ```bash
 # Legacy studio
@@ -106,7 +106,7 @@ npm run dev:shadows
 ```
 designtools/
 ├── packages/
-│   ├── codecanvas/    Hybrid visual editor (active)
+│   ├── codesurface/    Hybrid visual editor (active)
 │   ├── next-plugin/   Next.js config wrapper + data-source transform
 │   ├── core/          Shared scanner, server, and client utilities (legacy)
 │   ├── studio/        Proxy-based visual editor (legacy)

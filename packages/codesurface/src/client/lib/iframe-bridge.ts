@@ -1,5 +1,5 @@
 /**
- * Typed postMessage bridge for CodeCanvas.
+ * Typed postMessage bridge for CodeSurface.
  * Handles communication between editor and target app iframe.
  */
 

@@ -4,7 +4,7 @@
  * - Component tab (only for data-slot elements): variant dimensions + class editing
  * - Instance/Element tab: Figma-style property editing via ComputedPropertyPanel
  *
- * Adapted from studio/src/client/components/editor-panel.tsx for codecanvas:
+ * Adapted from studio/src/client/components/editor-panel.tsx for codesurface:
  * - Uses data-source coordinates instead of EID markers
  * - Calls POST /api/write-element with source coordinates
  * - Calls POST /api/component for component class changes

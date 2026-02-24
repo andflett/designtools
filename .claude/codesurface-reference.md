@@ -1,18 +1,18 @@
-# CodeCanvas Reference
+# CodeSurface Reference
 
-Technical reference for AI assistants working on the codecanvas package. Covers architecture, key decisions, and UI conventions established during development.
+Technical reference for AI assistants working on the codesurface package. Covers architecture, key decisions, and UI conventions established during development.
 
 ## Architecture
 
 ### Overview
 
-CodeCanvas is a hybrid visual editor. The editor UI runs in its own Vite-served React app (port 4400), while the target app runs unmodified at its own dev server (port 3000). The editor embeds the target app in an iframe and communicates via postMessage. There is no proxy layer.
+CodeSurface is a hybrid visual editor. The editor UI runs in its own Vite-served React app (port 4400), while the target app runs unmodified at its own dev server (port 3000). The editor embeds the target app in an iframe and communicates via postMessage. There is no proxy layer.
 
 ```
 Editor UI (Vite SPA, port 4400)
   ├── iframe src="http://localhost:3000"
-  │     └── Target app with <CodeCanvas /> component
-  │           injected by codecanvas-mount-loader
+  │     └── Target app with <CodeSurface /> component
+  │           injected by codesurface-mount-loader
   │           communicates via postMessage
   └── Write server (Express API routes on same port)
         ├── POST /api/write-element   ← element class changes
@@ -27,14 +27,14 @@ Two things are injected into the target app by `@designtools/next-plugin`:
 
 1. **Babel loader** (`loader.ts`): Adds `data-source="file:line:col"` to every JSX element at compile time. This gives exact source mapping without runtime markers.
 
-2. **Mount loader** (`codecanvas-mount-loader.ts`): Auto-injects `<CodeCanvas />` into the root layout (detected by `<html>` tag). Uses a plain import — `"use client"` on the component is sufficient for Next.js RSC compatibility. Do NOT use `next/dynamic` with `ssr: false` — that's forbidden in Server Components (Next.js 15+).
+2. **Mount loader** (`codesurface-mount-loader.ts`): Auto-injects `<CodeSurface />` into the root layout (detected by `<html>` tag). Uses a plain import — `"use client"` on the component is sufficient for Next.js RSC compatibility. Do NOT use `next/dynamic` with `ssr: false` — that's forbidden in Server Components (Next.js 15+).
 
 ### postMessage protocol
 
-Defined in `packages/codecanvas/src/shared/protocol.ts`.
+Defined in `packages/codesurface/src/shared/protocol.ts`.
 
 **Target app → Editor:**
-- `tool:injectedReady` — CodeCanvas component mounted
+- `tool:injectedReady` — CodeSurface component mounted
 - `tool:elementSelected` — user clicked an element, sends `SelectedElementData`
 - `tool:pathChanged` — iframe navigation
 
@@ -47,7 +47,7 @@ Defined in `packages/codecanvas/src/shared/protocol.ts`.
 
 ### Data normalization
 
-The `<CodeCanvas />` component sends flat fields (`sourceFile`, `sourceLine`, `sourceCol`, `instanceSourceFile`, etc.). The `iframe-bridge.ts` normalizes these into nested `SelectedElementData` format before the editor receives them.
+The `<CodeSurface />` component sends flat fields (`sourceFile`, `sourceLine`, `sourceCol`, `instanceSourceFile`, etc.). The `iframe-bridge.ts` normalizes these into nested `SelectedElementData` format before the editor receives them.
 
 ## Instance vs Component editing
 
@@ -59,7 +59,7 @@ When you click a `<CardTitle>` on the page, the rendered `<h3>` has `data-source
 
 ### The solution
 
-**Selection (`codecanvas.tsx`):** When clicking an element with `data-slot` (component instance), walks up the DOM to find the nearest ancestor whose `data-source` points to a **different file**. That ancestor is in the page file (the usage site). This becomes `instanceSource`. The component name is derived from the `data-slot` (e.g., `"card-title"` → `"CardTitle"`).
+**Selection (`codesurface.tsx`):** When clicking an element with `data-slot` (component instance), walks up the DOM to find the nearest ancestor whose `data-source` points to a **different file**. That ancestor is in the page file (the usage site). This becomes `instanceSource`. The component name is derived from the `data-slot` (e.g., `"card-title"` → `"CardTitle"`).
 
 **Write API:** Three write paths:
 
@@ -75,7 +75,7 @@ When you click a `<CardTitle>` on the page, the rendered `<h3>` has `data-source
 
 ### Why not EID markers
 
-The legacy studio used `data-studio-eid` attributes written into source files to track elements across edits. CodeCanvas avoids this — `data-source` coordinates plus component name + text hint is sufficient for element identification without mutating user files.
+The legacy studio used `data-studio-eid` attributes written into source files to track elements across edits. CodeSurface avoids this — `data-source` coordinates plus component name + text hint is sufficient for element identification without mutating user files.
 
 ## Editor UI
 
@@ -153,7 +153,7 @@ The `computedToTailwindClass` mapping in `tailwind-map.ts` converts CSS property
 ## File structure
 
 ```
-packages/codecanvas/
+packages/codesurface/
   src/
     cli.ts                          CLI entry point
     server/
@@ -197,14 +197,14 @@ packages/codecanvas/
 # Terminal 1: demo app
 cd demos/studio-app && npm run dev
 
-# Terminal 2: codecanvas
-npm run codecanvas
+# Terminal 2: codesurface
+npm run codesurface
 ```
 
 ## Common pitfalls
 
 - **`next/dynamic` with `ssr: false`** does NOT work in Server Components. Use plain imports — `"use client"` on the imported component is sufficient.
 - **Stale `.next` cache**: After changing the next-plugin, delete `demos/studio-app/.next` before restarting.
-- **Rebuild next-plugin**: After changing `codecanvas.tsx` or `loader.ts`, run `npm -w packages/next-plugin run build`.
+- **Rebuild next-plugin**: After changing `codesurface.tsx` or `loader.ts`, run `npm -w packages/next-plugin run build`.
 - **ESM imports**: All relative imports must use `.js` extensions, even for `.ts` source files.
-- **Don't share code with legacy packages at import level**: Copy what you need from `core`/`studio` into codecanvas's own source tree.
+- **Don't share code with legacy packages at import level**: Copy what you need from `core`/`studio` into codesurface's own source tree.

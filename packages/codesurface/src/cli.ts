@@ -79,7 +79,7 @@ async function main() {
   const projectRoot = process.cwd();
 
   console.log("");
-  console.log(`  ${bold("@designtools/codecanvas")}`);
+  console.log(`  ${bold("@designtools/codesurface")}`);
   console.log(`  ${dim(projectRoot)}`);
   console.log("");
 

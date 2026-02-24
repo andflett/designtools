@@ -1,4 +1,4 @@
-# @designtools/codecanvas
+# @designtools/codesurface
 
 A CLI-launched visual design layer for React applications. Select elements in your running app and edit styles, tokens, and component variants — changes write back to your source files.
 
@@ -12,7 +12,7 @@ A CLI-launched visual design layer for React applications. Select elements in yo
 ## Installation
 
 ```bash
-npm install -D @designtools/codecanvas @designtools/next-plugin
+npm install -D @designtools/codesurface @designtools/next-plugin
 ```
 
 ## Setup
@@ -33,13 +33,13 @@ export default withDesigntools(nextConfig);
 This does two things in development (at compile time only — your source files are not modified):
 
 - Injects `data-source` attributes into every JSX element at build time, mapping each element to its source file, line, and column. These only exist in the compiled output.
-- Auto-mounts the `<CodeCanvas />` selection overlay component in your root layout.
+- Auto-mounts the `<CodeSurface />` selection overlay component in your root layout.
 
 Neither is included in production builds.
 
 ### 2. Add `data-slot` to your components
 
-For CodeCanvas to recognize reusable components (and distinguish them from plain HTML elements), add a `data-slot` attribute to the root element of each component:
+For CodeSurface to recognize reusable components (and distinguish them from plain HTML elements), add a `data-slot` attribute to the root element of each component:
 
 ```tsx
 // components/ui/button.tsx
@@ -58,14 +58,14 @@ Components without `data-slot` can still be selected and edited at the element l
 
 ### 3. Run it
 
-Start your Next.js dev server, then start CodeCanvas from your project root:
+Start your Next.js dev server, then start CodeSurface from your project root:
 
 ```bash
 # Terminal 1
 npm run dev
 
 # Terminal 2
-npx designtools-codecanvas
+npx codesurface
 ```
 
 The editor opens at `http://localhost:4400`. Your app loads inside an iframe — no proxy, no middleware.
