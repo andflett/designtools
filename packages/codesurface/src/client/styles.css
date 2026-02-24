@@ -134,6 +134,9 @@ body {
   color: var(--studio-text);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
+.studio-segmented.wrap {
+  flex-wrap: wrap;
+}
 
 /* Tab explainer */
 .studio-tab-explainer {
@@ -325,7 +328,7 @@ body {
 .studio-swatch {
   width: 18px;
   height: 18px;
-  border-radius: 2px;
+  border-radius: 3px;
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-style: inset;
   flex-shrink: 0;

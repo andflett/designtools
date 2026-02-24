@@ -92,12 +92,63 @@ function replaceClassInComponent(
       );
     }
     if (count > 1 && !variantContext) {
-      throw new Error(
-        `Class "${oldClass}" found ${count} times. Provide variantContext to narrow.`
-      );
+      // Class appears multiple times — try to target the cva() base string.
+      // The base string is the first argument to cva(), before the variants object.
+      const cvaResult = replaceInCvaBase(source, oldClass, newClass);
+      if (cvaResult !== false) {
+        return cvaResult;
+      }
+      // If not in a cva base, replace only the first occurrence
+      source = source.replace(classRegex, `$1${newClass}$2`);
+    } else {
+      source = source.replace(classRegex, `$1${newClass}$2`);
     }
-    source = source.replace(classRegex, `$1${newClass}$2`);
   }
 
   return source;
+}
+
+/**
+ * Replace a class specifically within the cva() base string (first argument).
+ * Returns the modified source or false if not found.
+ */
+function replaceInCvaBase(
+  source: string,
+  oldClass: string,
+  newClass: string,
+): string | false {
+  // Find cva( and extract the first string argument (the base classes)
+  const cvaIndex = source.indexOf("cva(");
+  if (cvaIndex === -1) return false;
+
+  // Find the opening quote of the first argument
+  const afterCva = source.substring(cvaIndex + 4);
+  const quoteMatch = afterCva.match(/^\s*(["'`])/);
+  if (!quoteMatch) return false;
+
+  const quote = quoteMatch[1];
+  const quoteStart = cvaIndex + 4 + quoteMatch[0].length - 1; // position of opening quote
+
+  // Find the closing quote (handle simple case — no escapes in class strings)
+  const afterQuote = source.substring(quoteStart + 1);
+  const closeIndex = afterQuote.indexOf(quote);
+  if (closeIndex === -1) return false;
+
+  const baseString = source.substring(quoteStart + 1, quoteStart + 1 + closeIndex);
+
+  // Replace the class in the base string
+  const oldClassEscaped = oldClass.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(`(?<=^|\\s)${oldClassEscaped}(?=$|\\s)`, "g");
+  if (!regex.test(baseString)) return false;
+
+  const newBaseString = baseString.replace(
+    new RegExp(`(?<=^|\\s)${oldClassEscaped}(?=$|\\s)`, "g"),
+    newClass,
+  );
+
+  return (
+    source.substring(0, quoteStart + 1) +
+    newBaseString +
+    source.substring(quoteStart + 1 + closeIndex)
+  );
 }

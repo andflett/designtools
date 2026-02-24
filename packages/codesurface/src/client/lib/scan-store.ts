@@ -8,6 +8,7 @@ import type { ComponentRegistry, ComponentEntry } from "../../server/lib/scan-co
 import type { ShadowMap } from "../../server/lib/scan-shadows.js";
 import type { BorderMap } from "../../server/lib/scan-borders.js";
 import type { GradientMap } from "../../server/lib/scan-gradients.js";
+import type { ComponentUsageMap } from "../../server/lib/scan-usages.js";
 import type { StylingSystem } from "../../server/lib/detect-styling.js";
 import type { FrameworkInfo } from "../../server/lib/detect-framework.js";
 
@@ -35,6 +36,7 @@ export interface ScanState {
   borders: BorderMap | null;
   gradients: GradientMap | null;
   styling: StylingSystem | null;
+  usages: ComponentUsageMap | null;
 }
 
 export type ScanSliceKey = keyof ScanState;
@@ -71,6 +73,7 @@ export interface RawScanData {
   borders: BorderMap;
   gradients: GradientMap;
   styling: StylingSystem;
+  usages: ComponentUsageMap;
 }
 
 // ---------------------------------------------------------------------------
@@ -88,6 +91,7 @@ function createScanStore() {
     borders: null,
     gradients: null,
     styling: null,
+    usages: null,
   };
 
   const listeners = new Set<Listener>();
@@ -115,6 +119,7 @@ function createScanStore() {
       borders: data.borders,
       gradients: data.gradients,
       styling: data.styling,
+      usages: data.usages,
     };
     emit();
   }

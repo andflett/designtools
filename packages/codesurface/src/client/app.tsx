@@ -7,7 +7,8 @@ import { EditorPanel } from "./components/editor-panel.js";
 import { TooltipProvider } from "./components/tooltip.js";
 import { BootScreen } from "./components/boot-screen.js";
 import { scanStore, type RawScanData } from "./lib/scan-store.js";
-import { useScanReady } from "./lib/scan-hooks.js";
+import { useScanReady, useComponents } from "./lib/scan-hooks.js";
+import { UsagePanel } from "./components/usage-panel.js";
 
 /** Set to false to skip the boot screen (disable before publishing) */
 const SHOW_BOOT_SCREEN = true;
@@ -23,7 +24,9 @@ export function App() {
   const [iframePath, setIframePath] = useState("/");
   const [injectedReady, setInjectedReady] = useState(false);
   const [bootDone, setBootDone] = useState(!SHOW_BOOT_SCREEN);
+  const [usagePanelOpen, setUsagePanelOpen] = useState(false);
   const scanReady = useScanReady();
+  const componentData = useComponents();
 
   // Fetch config from server
   useEffect(() => {
@@ -107,6 +110,11 @@ export function App() {
 
   const handleCloseEditor = useCallback(() => {
     setSelectedElement(null);
+    setUsagePanelOpen(false);
+  }, []);
+
+  const handleNavigateToRoute = useCallback((route: string) => {
+    setIframePath(route);
   }, []);
 
   if (!targetUrl) {
@@ -126,6 +134,22 @@ export function App() {
     );
   }
 
+  // Derive component name from selected element for the usage panel
+  const dataSlot = selectedElement?.attributes?.["data-slot"] || null;
+  const selectedComponentEntry = dataSlot
+    ? componentData?.byDataSlot.get(dataSlot) ?? null
+    : null;
+  const selectedComponentName = selectedComponentEntry?.name || null;
+
+  const leftPanel = usagePanelOpen && selectedComponentName ? (
+    <UsagePanel
+      componentName={selectedComponentName}
+      currentPath={iframePath}
+      onNavigate={handleNavigateToRoute}
+      onClose={() => setUsagePanelOpen(false)}
+    />
+  ) : null;
+
   const editorPanel = (
     <EditorPanel
       element={selectedElement}
@@ -137,6 +161,8 @@ export function App() {
       onRevertInlineStyles={handleRevertInlineStyles}
       onClose={handleCloseEditor}
       onReselectElement={handleReselectElement}
+      onToggleUsagePanel={() => setUsagePanelOpen((v) => !v)}
+      usagePanelOpen={usagePanelOpen}
     />
   );
 
@@ -156,6 +182,7 @@ export function App() {
         targetUrl={targetUrl}
         iframeRef={iframeRef}
         editorPanel={editorPanel}
+        leftPanel={leftPanel}
       />
     </TooltipProvider>
   );

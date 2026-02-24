@@ -21,6 +21,7 @@ import {
   ChevronDownIcon,
   InfoCircledIcon,
   ResetIcon,
+  LayersIcon,
 } from "@radix-ui/react-icons";
 import type { SelectedElementData, SourceLocation } from "../../shared/protocol.js";
 import { TokenEditor } from "./token-editor.js";
@@ -42,6 +43,8 @@ interface EditorPanelProps {
   onRevertInlineStyles: () => void;
   onClose: () => void;
   onReselectElement: () => void;
+  onToggleUsagePanel?: () => void;
+  usagePanelOpen?: boolean;
 }
 
 /** Open a file in the user's editor via the local server. */
@@ -62,6 +65,8 @@ export function EditorPanel({
   onRevertInlineStyles,
   onClose,
   onReselectElement,
+  onToggleUsagePanel,
+  usagePanelOpen,
 }: EditorPanelProps) {
   const tokenData = useTokens();
   const componentData = useComponents();
@@ -84,7 +89,7 @@ export function EditorPanel({
     setActiveMode(isComponent ? "component" : "instance");
   }, [element?.source?.file, element?.source?.line, element?.source?.col]);
 
-  const [componentSubTab, setComponentSubTab] = useState<"styles" | "props">("styles");
+  const [componentSubTab, setComponentSubTab] = useState<"styles" | "props">("props");
   const [instanceSubTab, setInstanceSubTab] = useState<"props" | "styles">("props");
   const [saving, setSaving] = useState(false);
   // Serialize writes so only one goes at a time
@@ -267,7 +272,7 @@ export function EditorPanel({
           <>
             <div className="studio-tab-explainer">
               <InfoCircledIcon />
-              <div>
+              <div className="flex-1 min-w-0">
                 {componentSubTab === "styles"
                   ? "Edit the component's root element styles. Changes apply to all instances."
                   : "Edit variant definitions. Changes apply to all instances."}
@@ -284,24 +289,41 @@ export function EditorPanel({
                   </button>
                 )}
               </div>
+              {onToggleUsagePanel && (
+                <Tooltip content={usagePanelOpen ? "Hide page usage explorer" : "Show pages using this component"}>
+                  <button
+                    onClick={onToggleUsagePanel}
+                    className="studio-icon-btn shrink-0"
+                    style={{
+                      width: 22,
+                      height: 22,
+                      marginTop: 1,
+                      color: usagePanelOpen ? "var(--studio-accent)" : undefined,
+                      background: usagePanelOpen ? "var(--studio-accent-muted)" : undefined,
+                    }}
+                  >
+                    <LayersIcon style={{ width: 12, height: 12 }} />
+                  </button>
+                </Tooltip>
+              )}
             </div>
 
-            {/* Sub-tabs: Styles vs Props */}
+            {/* Sub-tabs: Props vs Styles */}
             <div className="px-4 pb-2">
               <div className="studio-segmented" style={{ width: "100%" }}>
-                <button
-                  onClick={() => setComponentSubTab("styles")}
-                  className={componentSubTab === "styles" ? "active" : ""}
-                  style={{ flex: 1 }}
-                >
-                  Styles
-                </button>
                 <button
                   onClick={() => setComponentSubTab("props")}
                   className={componentSubTab === "props" ? "active" : ""}
                   style={{ flex: 1 }}
                 >
                   Props
+                </button>
+                <button
+                  onClick={() => setComponentSubTab("styles")}
+                  className={componentSubTab === "styles" ? "active" : ""}
+                  style={{ flex: 1 }}
+                >
+                  Styles
                 </button>
               </div>
             </div>
@@ -317,16 +339,38 @@ export function EditorPanel({
                   onRevertInlineStyles={onRevertInlineStyles}
                   onCommitClass={(tailwindClass, oldClass) => {
                     if (oldClass && tailwindClass === oldClass) return;
-                    if (!element.source) return;
-                    const source = element.source;
-                    if (oldClass) {
-                      withSave(async () => {
-                        await handleWriteElement(source, "replaceClass", tailwindClass, oldClass);
-                      });
-                    } else {
-                      withSave(async () => {
-                        await handleWriteElement(source, "addClass", tailwindClass);
-                      });
+                    const isCva = componentEntry && componentEntry.variants.length > 0;
+                    if (isCva) {
+                      // CVA components: classes live in the cva() call, not on the
+                      // JSX element. Use the component/regex write API.
+                      if (oldClass) {
+                        withSave(async () => {
+                          await handleComponentClassChange(
+                            componentEntry.filePath,
+                            oldClass,
+                            tailwindClass,
+                          );
+                        });
+                      } else if (element.source) {
+                        // addClass: fall back to element write (appends to JSX className)
+                        const source = element.source;
+                        withSave(async () => {
+                          await handleWriteElement(source, "addClass", tailwindClass);
+                        });
+                      }
+                    } else if (element.source) {
+                      // Non-CVA components (cn("classes", className)) and plain elements:
+                      // classes are in the JSX className expression, AST approach works.
+                      const source = element.source;
+                      if (oldClass) {
+                        withSave(async () => {
+                          await handleWriteElement(source, "replaceClass", tailwindClass, oldClass);
+                        });
+                      } else {
+                        withSave(async () => {
+                          await handleWriteElement(source, "addClass", tailwindClass);
+                        });
+                      }
                     }
                   }}
                 />
@@ -650,7 +694,7 @@ function InstanceVariantSection({
   currentValue: string | null;
   onSelect: (value: string) => void;
 }) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
 
   return (
     <div style={{ borderTop: "1px solid var(--studio-border-subtle)" }}>
@@ -675,30 +719,22 @@ function InstanceVariantSection({
       </button>
 
       {!collapsed && (
-        <div className="px-4 pb-3 flex flex-wrap gap-1.5">
-          {dim.options.map((opt: string) => {
-            const isActive = currentValue === opt || (!currentValue && opt === dim.default);
-            return (
-              <button
-                key={opt}
-                onClick={() => onSelect(opt)}
-                className="studio-bp-btn"
-                style={{
-                  fontSize: 10,
-                  padding: "3px 8px",
-                  borderRadius: 4,
-                  border: "1px solid",
-                  borderColor: isActive ? "var(--studio-accent)" : "var(--studio-border)",
-                  background: isActive ? "var(--studio-accent-muted)" : "transparent",
-                  color: isActive ? "var(--studio-accent)" : "var(--studio-text-dimmed)",
-                  fontWeight: isActive ? 600 : 400,
-                  cursor: "pointer",
-                }}
-              >
-                {opt}
-              </button>
-            );
-          })}
+        <div className="px-4 pb-3">
+          <div className="studio-segmented wrap" style={{ width: "100%" }}>
+            {dim.options.map((opt: string) => {
+              const isActive = currentValue === opt || (!currentValue && opt === dim.default);
+              return (
+                <button
+                  key={opt}
+                  onClick={() => onSelect(opt)}
+                  className={isActive ? "active" : ""}
+                  style={{ flex: 1 }}
+                >
+                  {opt}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>

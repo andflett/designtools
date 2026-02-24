@@ -8,6 +8,7 @@ import { scanComponents, type ComponentRegistry } from "./scan-components.js";
 import { scanShadows, type ShadowMap } from "./scan-shadows.js";
 import { scanBorders, type BorderMap } from "./scan-borders.js";
 import { scanGradients, type GradientMap } from "./scan-gradients.js";
+import { scanUsages, type ComponentUsageMap } from "./scan-usages.js";
 
 export interface ScanResult {
   framework: FrameworkInfo;
@@ -17,6 +18,7 @@ export interface ScanResult {
   borders: BorderMap;
   gradients: GradientMap;
   styling: StylingSystem;
+  usages: ComponentUsageMap;
 }
 
 let cachedScan: ScanResult | null = null;
@@ -24,15 +26,16 @@ let cachedScan: ScanResult | null = null;
 async function runScan(projectRoot: string): Promise<ScanResult> {
   const framework = await detectFramework(projectRoot);
   const styling = await detectStylingSystem(projectRoot, framework);
-  const [tokens, components, shadows, borders, gradients] = await Promise.all([
+  const [tokens, components, shadows, borders, gradients, usages] = await Promise.all([
     scanTokens(projectRoot, framework),
     scanComponents(projectRoot),
     scanShadows(projectRoot, framework, styling),
     scanBorders(projectRoot, framework, styling),
     scanGradients(projectRoot, framework, styling),
+    scanUsages(projectRoot, framework),
   ]);
 
-  cachedScan = { framework, tokens, components, shadows, borders, gradients, styling };
+  cachedScan = { framework, tokens, components, shadows, borders, gradients, styling, usages };
   return cachedScan;
 }
 
@@ -138,6 +141,15 @@ export function createScanRouter(projectRoot: string) {
     try {
       const result = cachedScan || await runScan(projectRoot);
       res.json(result.shadows);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get("/usages", async (_req, res) => {
+    try {
+      const result = cachedScan || await runScan(projectRoot);
+      res.json(result.usages);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

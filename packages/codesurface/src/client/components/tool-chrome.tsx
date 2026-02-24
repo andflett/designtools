@@ -15,6 +15,8 @@ export interface ToolChromeProps {
   toolIcon: ReactNode;
   /** The tool's editor panel (right side) */
   editorPanel?: ReactNode;
+  /** Optional left panel (e.g. component usage explorer) */
+  leftPanel?: ReactNode;
   /** Whether to show the selection mode button (default true) */
   showSelectionMode?: boolean;
   /** Selection mode state */
@@ -39,6 +41,7 @@ export function ToolChrome({
   toolName,
   toolIcon,
   editorPanel,
+  leftPanel,
   showSelectionMode = true,
   selectionMode,
   onToggleSelectionMode,
@@ -180,6 +183,7 @@ export function ToolChrome({
 
       {/* Main area */}
       <div className="flex flex-1 overflow-hidden">
+        {leftPanel}
         <Viewport
           viewportWidth={viewportWidth}
           onViewportWidthChange={onViewportWidthChange}

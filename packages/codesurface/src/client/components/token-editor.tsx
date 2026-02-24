@@ -717,7 +717,7 @@ function BordersSection({
           <div className="px-4">
             <SectionLabel label="Color" />
           </div>
-          <div className="flex flex-col gap-0">
+          <div className="flex flex-col gap-0 mb-2">
             {borderColorTokens.map((token: any) => (
               <TokenRow
                 key={token.name}
