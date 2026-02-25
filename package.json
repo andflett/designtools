@@ -17,6 +17,7 @@
   ],
   "scripts": {
     "codesurface": "npm -w packages/next-plugin run build && cd demos/studio-app && npm run dev & sleep 3 && cd demos/studio-app && npx tsx ../../packages/codesurface/src/cli.ts",
+    "codesurface:design-system": "npm -w packages/next-plugin run build && cd demos/design-system && npm run dev & sleep 3 && cd demos/design-system && npx tsx ../../packages/codesurface/src/cli.ts",
     "build:codesurface": "npm -w packages/next-plugin run build && npm -w packages/codesurface run build",
     "publish:codesurface": "bash scripts/publish.sh patch codesurface",
     "dev:studio": "cd demos/studio-app && npx tsx ../../packages/studio/src/cli.ts",
