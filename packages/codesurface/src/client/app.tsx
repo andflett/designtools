@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Component1Icon } from "@radix-ui/react-icons";
-import type { SelectedElementData } from "../shared/protocol.js";
+import type { SelectedElementData, ComponentTreeNode } from "../shared/protocol.js";
 import { usePostMessage } from "./lib/use-postmessage.js";
 import { ToolChrome } from "./components/tool-chrome.js";
 import { EditorPanel } from "./components/editor-panel.js";
@@ -9,9 +9,35 @@ import { BootScreen } from "./components/boot-screen.js";
 import { scanStore, type RawScanData } from "./lib/scan-store.js";
 import { useScanReady, useComponents } from "./lib/scan-hooks.js";
 import { UsagePanel } from "./components/usage-panel.js";
+import { PageExplorer } from "./components/page-explorer.js";
 
 /** Set to false to skip the boot screen (disable before publishing) */
 const SHOW_BOOT_SCREEN = true;
+
+/**
+ * Find the tree node ID that corresponds to the currently selected element.
+ * Uses domPath matching — both the tree node IDs and SelectedElementData.domPath
+ * use the same nth-child CSS selector path format.
+ */
+function findTreeIdForElement(
+  tree: ComponentTreeNode[],
+  element: SelectedElementData
+): string | null {
+  if (!element.domPath) return null;
+  // The selected element's domPath may point to the exact element or a descendant.
+  // Walk the tree looking for an exact match or the closest ancestor match.
+  return findInTree(tree, element.domPath);
+}
+
+function findInTree(nodes: ComponentTreeNode[], domPath: string): string | null {
+  for (const node of nodes) {
+    if (node.id === domPath) return node.id;
+    // Check if domPath starts with this node's id (descendant)
+    const found = findInTree(node.children, domPath);
+    if (found) return found;
+  }
+  return null;
+}
 
 export function App() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -25,6 +51,8 @@ export function App() {
   const [injectedReady, setInjectedReady] = useState(false);
   const [bootDone, setBootDone] = useState(!SHOW_BOOT_SCREEN);
   const [usagePanelOpen, setUsagePanelOpen] = useState(false);
+  const [componentTree, setComponentTree] = useState<ComponentTreeNode[]>([]);
+  const [leftPanelTab, setLeftPanelTab] = useState<"elements" | "usages">("elements");
   const scanReady = useScanReady();
   const componentData = useComponents();
 
@@ -60,6 +88,10 @@ export function App() {
               { type: "tool:enterSelectionMode" },
               "*"
             );
+            iframeRef.current.contentWindow?.postMessage(
+              { type: "tool:requestComponentTree" },
+              "*"
+            );
             setSelectionMode(true);
           }
           break;
@@ -68,6 +100,16 @@ export function App() {
           break;
         case "tool:pathChanged":
           setIframePath(msg.path);
+          // Request updated component tree after navigation
+          if (iframeRef.current) {
+            iframeRef.current.contentWindow?.postMessage(
+              { type: "tool:requestComponentTree" },
+              "*"
+            );
+          }
+          break;
+        case "tool:componentTree":
+          setComponentTree(msg.tree);
           break;
       }
     },
@@ -117,6 +159,18 @@ export function App() {
     setIframePath(route);
   }, []);
 
+  const handleTreeSelect = useCallback((id: string) => {
+    send({ type: "tool:selectByTreeId", id });
+  }, [send]);
+
+  const handleTreeHover = useCallback((id: string) => {
+    send({ type: "tool:highlightByTreeId", id });
+  }, [send]);
+
+  const handleTreeHoverEnd = useCallback(() => {
+    send({ type: "tool:clearHighlight" });
+  }, [send]);
+
   if (!targetUrl) {
     return (
       <div
@@ -141,14 +195,88 @@ export function App() {
     : null;
   const selectedComponentName = selectedComponentEntry?.name || null;
 
-  const leftPanel = usagePanelOpen && selectedComponentName ? (
-    <UsagePanel
-      componentName={selectedComponentName}
-      currentPath={iframePath}
-      onNavigate={handleNavigateToRoute}
-      onClose={() => setUsagePanelOpen(false)}
-    />
-  ) : null;
+  // Derive selected element's domPath-based ID for tree highlighting.
+  // The tree uses getDomPath() as node IDs — we need to match against
+  // the selected element. Since domPath is sent in extractElementData,
+  // we read it from the raw postMessage data (stored as attributes won't have it).
+  // For now, we match by finding a tree node whose id we stored.
+  const selectedTreeId = selectedElement
+    ? findTreeIdForElement(componentTree, selectedElement)
+    : null;
+
+  const showUsages = leftPanelTab === "usages" && selectedComponentName;
+
+  const leftPanel = (
+    <div
+      className="flex flex-col border-r h-full"
+      style={{
+        width: 240,
+        minWidth: 240,
+        background: "var(--studio-surface)",
+        borderColor: "var(--studio-border)",
+      }}
+    >
+      {/* Tab bar */}
+      <div
+        className="flex items-center border-b shrink-0"
+        style={{ borderColor: "var(--studio-border)" }}
+      >
+        <button
+          onClick={() => setLeftPanelTab("elements")}
+          className="flex-1 text-[10px] font-semibold uppercase tracking-wide py-2 text-center"
+          style={{
+            color: leftPanelTab === "elements" ? "var(--studio-accent)" : "var(--studio-text-dimmed)",
+            borderBottom: leftPanelTab === "elements" ? "2px solid var(--studio-accent)" : "2px solid transparent",
+            background: "none",
+            cursor: "pointer",
+          }}
+        >
+          Elements
+        </button>
+        <button
+          onClick={() => setLeftPanelTab("usages")}
+          className="flex-1 text-[10px] font-semibold uppercase tracking-wide py-2 text-center"
+          style={{
+            color: leftPanelTab === "usages" ? "var(--studio-accent)" : "var(--studio-text-dimmed)",
+            borderBottom: leftPanelTab === "usages" ? "2px solid var(--studio-accent)" : "2px solid transparent",
+            background: "none",
+            cursor: "pointer",
+            opacity: selectedComponentName ? 1 : 0.4,
+          }}
+          disabled={!selectedComponentName}
+        >
+          Usages
+        </button>
+      </div>
+
+      {/* Tab content */}
+      <div className="flex-1 overflow-hidden">
+        {leftPanelTab === "elements" ? (
+          <PageExplorer
+            tree={componentTree}
+            selectedId={selectedTreeId}
+            onSelect={handleTreeSelect}
+            onHover={handleTreeHover}
+            onHoverEnd={handleTreeHoverEnd}
+          />
+        ) : showUsages ? (
+          <UsagePanel
+            componentName={selectedComponentName}
+            currentPath={iframePath}
+            onNavigate={handleNavigateToRoute}
+            onClose={() => setLeftPanelTab("elements")}
+          />
+        ) : (
+          <div
+            className="px-4 py-6 text-[11px] text-center"
+            style={{ color: "var(--studio-text-dimmed)" }}
+          >
+            Select a component to see usages.
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   const editorPanel = (
     <EditorPanel

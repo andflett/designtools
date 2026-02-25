@@ -18,6 +18,7 @@ interface RawElementData {
   boundingRect: DOMRect;
   textContent: string;
   attributes: Record<string, string>;
+  domPath?: string | null;
   sourceFile: string | null;
   sourceLine: number | null;
   sourceCol: number | null;
@@ -41,6 +42,7 @@ function normalizeElementData(data: RawElementData | SelectedElementData): Selec
     boundingRect: raw.boundingRect,
     textContent: raw.textContent,
     attributes: raw.attributes,
+    domPath: raw.domPath || null,
     source:
       raw.sourceFile != null
         ? { file: raw.sourceFile, line: raw.sourceLine!, col: raw.sourceCol! }

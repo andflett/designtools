@@ -16,12 +16,33 @@ export interface SelectedElementData {
   instanceSource: SourceLocation | null;
   /** For component instances: the component name (e.g. "CardTitle") */
   componentName: string | null;
+  /** Stable CSS selector path (nth-child based) — matches ComponentTreeNode.id */
+  domPath: string | null;
   className: string;
   computed: Record<string, string>;
   parentComputed: Record<string, string>;
   boundingRect: DOMRect;
   textContent: string;
   attributes: Record<string, string>;
+}
+
+export interface ComponentTreeNode {
+  /** Stable CSS selector path for selection/highlight */
+  id: string;
+  /** Display name: "Button", "HeroSection", "<header>" */
+  name: string;
+  /** Named component vs semantic HTML landmark */
+  type: "component" | "element";
+  /** data-slot value if present — marks design system components */
+  dataSlot: string | null;
+  /** data-source file:line:col if available */
+  source: string | null;
+  /** Routing scope — layout (persistent shell) vs page (route-specific content) */
+  scope: "layout" | "page" | null;
+  /** First ~40 chars of direct text content */
+  textContent: string;
+  /** Nested children */
+  children: ComponentTreeNode[];
 }
 
 export interface StyleChange {
@@ -36,7 +57,8 @@ export interface StyleChange {
 export type IframeToEditor =
   | { type: "tool:injectedReady" }
   | { type: "tool:elementSelected"; data: SelectedElementData }
-  | { type: "tool:pathChanged"; path: string };
+  | { type: "tool:pathChanged"; path: string }
+  | { type: "tool:componentTree"; tree: ComponentTreeNode[] };
 
 // Messages from editor -> target app iframe
 export type EditorToIframe =
@@ -47,4 +69,8 @@ export type EditorToIframe =
   | { type: "tool:revertTokenValues" }
   | { type: "tool:revertInlineStyles" }
   | { type: "tool:reselectElement" }
-  | { type: "tool:setTheme"; theme: "light" | "dark" };
+  | { type: "tool:setTheme"; theme: "light" | "dark" }
+  | { type: "tool:requestComponentTree" }
+  | { type: "tool:highlightByTreeId"; id: string }
+  | { type: "tool:clearHighlight" }
+  | { type: "tool:selectByTreeId"; id: string };

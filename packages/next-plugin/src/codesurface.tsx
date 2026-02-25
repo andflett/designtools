@@ -125,6 +125,421 @@ export function CodeSurface() {
       return target;
     }
 
+    // --- Component tree extraction (React Fiber) ---
+
+    // IDs of overlay elements to skip during tree building
+    const overlayIds = new Set(["tool-highlight", "tool-tooltip", "tool-selected", "codesurface-token-preview"]);
+
+    // Semantic HTML elements shown as structural landmarks
+    const semanticTags = new Set(["header", "main", "nav", "section", "article", "footer", "aside"]);
+
+    // Tags to skip even if authored — document-level elements and void
+    // elements that aren't meaningful to designers
+    const skipTags = new Set([
+      "html", "body", "head",                // document structure
+      "br", "hr", "wbr",                     // void/formatting
+      "template", "slot",                    // shadow DOM
+    ]);
+
+    // React and Next.js framework components to hide from the tree
+    const frameworkPatterns = [
+      /^Fragment$/, /^Suspense$/, /^ErrorBoundary$/,
+      /^Provider$/, /^Consumer$/, /Context$/,
+      /^ForwardRef$/, /^Memo$/, /^Lazy$/,
+      // Next.js routing internals
+      /^InnerLayoutRouter$/, /^OuterLayoutRouter$/, /^LayoutRouter$/,
+      /^RenderFromTemplateContext$/, /^TemplateContext$/,
+      /^RedirectBoundary$/, /^RedirectErrorBoundary$/,
+      /^NotFoundBoundary$/, /^LoadingBoundary$/,
+      /^HTTPAccessFallbackBoundary$/, /^HTTPAccessFallbackErrorBoundary$/,
+      /^ClientPageRoot$/, /^HotReload$/, /^ReactDevOverlay$/,
+      /^PathnameContextProviderAdapter$/,
+      // Next.js App Router internals (segment tree)
+      /^SegmentViewNode$/, /^SegmentTrieNode$/,
+      /^SegmentViewStateNode$/, /^SegmentBoundaryTriggerNode$/,
+      /^SegmentStateProvider$/,
+      /^ScrollAndFocusHandler$/, /^InnerScrollAndFocusHandler$/,
+      /^AppRouter$/, /^Router$/, /^Root$/, /^ServerRoot$/,
+      /^RootErrorBoundary$/, /^ErrorBoundaryHandler$/,
+      /^AppRouterAnnouncer$/, /^HistoryUpdater$/, /^RuntimeStyles$/,
+      /^DevRootHTTPAccessFallbackBoundary$/,
+      /^AppDevOverlayErrorBoundary$/, /^ReplaySsrOnlyErrors$/,
+      /^HeadManagerContext$/, /^Head$/,
+      /^MetadataOutlet$/, /^AsyncMetadataOutlet$/,
+      /^__next_/,  // All __next_ prefixed components
+    ];
+
+    function isFrameworkComponent(name: string): boolean {
+      return frameworkPatterns.some(p => p.test(name));
+    }
+
+    /**
+     * Get the React fiber for a DOM element.
+     * React attaches fibers via __reactFiber$<randomKey> in dev mode.
+     * Stable since React 17 through React 19.
+     */
+    function getFiber(el: Element): any | null {
+      const key = Object.keys(el).find(k => k.startsWith("__reactFiber$"));
+      return key ? (el as any)[key] : null;
+    }
+
+    /**
+     * Get direct text content of an element (not descendant text).
+     */
+    function getDirectText(el: Element): string {
+      let text = "";
+      for (const node of Array.from(el.childNodes)) {
+        if (node.nodeType === Node.TEXT_NODE) {
+          text += (node.textContent || "").trim();
+        }
+      }
+      return text.slice(0, 40);
+    }
+
+    interface TreeNode {
+      id: string;
+      name: string;
+      type: "component" | "element";
+      dataSlot: string | null;
+      source: string | null;
+      scope: "layout" | "page" | null;
+      textContent: string;
+      children: TreeNode[];
+    }
+
+    /**
+     * Infer routing scope from a data-source or data-instance-source path.
+     * Framework-specific: Next.js uses layout.tsx / page.tsx file naming.
+     */
+    function inferScope(sourcePath: string | null): "layout" | "page" | null {
+      if (!sourcePath) return null;
+      // data-source format is "file:line:col" — extract the file part
+      const colonIdx = sourcePath.indexOf(":");
+      const file = colonIdx > 0 ? sourcePath.slice(0, colonIdx) : sourcePath;
+      if (/\/layout\.[tjsx]+$/i.test(file) || /^layout\.[tjsx]+$/i.test(file)) return "layout";
+      if (/\/page\.[tjsx]+$/i.test(file) || /^page\.[tjsx]+$/i.test(file)) return "page";
+      return null;
+    }
+
+    /**
+     * Determine scope for a component by checking its instance-source
+     * (where it's used) or its own source (where it's defined).
+     * Instance source takes priority — a Button in layout.tsx has layout scope.
+     */
+    function getScopeForElement(el: Element | null, parentScope: "layout" | "page" | null): "layout" | "page" | null {
+      if (!el) return parentScope;
+      // Check instance-source first (where this component is used)
+      const instanceSource = el.getAttribute("data-instance-source");
+      const fromInstance = inferScope(instanceSource);
+      if (fromInstance) return fromInstance;
+      // Check own source (where this element is defined)
+      const source = el.getAttribute("data-source");
+      const fromSource = inferScope(source);
+      if (fromSource) return fromSource;
+      // Inherit from parent context
+      return parentScope;
+    }
+
+    /**
+     * Build a component tree by walking the React fiber tree.
+     * Filters to: user-defined components, data-slot components, semantic HTML.
+     */
+    function buildComponentTree(rootEl: Element): TreeNode[] {
+      const fiber = getFiber(rootEl);
+      if (!fiber) {
+        // Fallback: data-slot-only tree via DOM walk
+        return buildDataSlotTree(rootEl);
+      }
+
+      // Walk up to the fiber root
+      let fiberRoot = fiber;
+      while (fiberRoot.return) fiberRoot = fiberRoot.return;
+
+      const results: TreeNode[] = [];
+      walkFiber(fiberRoot.child, results, null);
+      return results;
+    }
+
+    function walkFiber(fiber: any | null, siblings: TreeNode[], parentScope: "layout" | "page" | null): void {
+      while (fiber) {
+        const node = processFiber(fiber, parentScope);
+        if (node) {
+          siblings.push(node);
+        } else {
+          // This fiber was filtered out — but still walk its children
+          // so nested visible components bubble up.
+          // Infer scope from this invisible fiber for its children.
+          if (fiber.child) {
+            let childScope = parentScope;
+            if (typeof fiber.type === "string" && fiber.stateNode instanceof Element) {
+              // Host element (div, html, body, etc.) — check its data-source
+              childScope = getScopeForElement(fiber.stateNode, parentScope);
+            } else if (typeof fiber.type === "function" || typeof fiber.type === "object") {
+              // Filtered-out component — check its root host element for scope.
+              // This catches cases like RootLayout -> <html data-source="app/layout.tsx:...">
+              // where the component itself is filtered but its root element carries scope.
+              const hostEl = findOwnHostElement(fiber);
+              if (hostEl) {
+                childScope = getScopeForElement(hostEl, parentScope);
+              }
+            }
+            walkFiber(fiber.child, siblings, childScope);
+          }
+        }
+        fiber = fiber.sibling;
+      }
+    }
+
+    function processFiber(fiber: any, parentScope: "layout" | "page" | null): TreeNode | null {
+      // Skip text nodes and fragments
+      if (typeof fiber.type === "string") {
+        // This is a host element (div, span, etc.)
+        return processHostFiber(fiber, parentScope);
+      }
+
+      if (typeof fiber.type === "function" || typeof fiber.type === "object") {
+        return processComponentFiber(fiber, parentScope);
+      }
+
+      // Other fiber types (portals, etc.) — walk children transparently
+      return null;
+    }
+
+    function processHostFiber(fiber: any, parentScope: "layout" | "page" | null): TreeNode | null {
+      const tag = fiber.type as string;
+      const el = fiber.stateNode as Element | null;
+
+      // Skip our overlay elements
+      if (el && el.id && overlayIds.has(el.id)) return null;
+
+      // Skip script, style, link, noscript
+      if (["script", "style", "link", "noscript"].includes(tag)) return null;
+
+      const scope = getScopeForElement(el, parentScope);
+
+      // Check for data-slot — this is a design system component root element
+      const dataSlot = el?.getAttribute("data-slot") || null;
+      if (dataSlot) {
+        const name = dataSlot.split("-").map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join("");
+        const children: TreeNode[] = [];
+        if (fiber.child) walkFiber(fiber.child, children, scope);
+        return {
+          id: el ? getDomPath(el) : "",
+          name,
+          type: "component",
+          dataSlot,
+          source: el?.getAttribute("data-source") || null,
+          scope,
+          textContent: el ? getDirectText(el) : "",
+          children,
+        };
+      }
+
+      // Show semantic HTML landmarks
+      if (semanticTags.has(tag)) {
+        const children: TreeNode[] = [];
+        if (fiber.child) walkFiber(fiber.child, children, scope);
+        const text = el ? getDirectText(el) : "";
+        if (children.length > 0 || text) {
+          return {
+            id: el ? getDomPath(el) : "",
+            name: `<${tag}>`,
+            type: "element",
+            dataSlot: null,
+            source: el?.getAttribute("data-source") || null,
+            scope,
+            textContent: text,
+            children,
+          };
+        }
+      }
+
+      // Show authored elements — data-source is added by our Babel transform
+      // to every JSX element, so its presence proves this was deliberately
+      // written in user code. Skip document/void tags that aren't meaningful.
+      if (el?.hasAttribute("data-source") && !skipTags.has(tag)) {
+        const children: TreeNode[] = [];
+        if (fiber.child) walkFiber(fiber.child, children, scope);
+        const text = el ? getDirectText(el) : "";
+        return {
+          id: getDomPath(el),
+          name: `<${tag}>`,
+          type: "element",
+          dataSlot: null,
+          source: el.getAttribute("data-source"),
+          scope,
+          textContent: text,
+          children,
+        };
+      }
+
+      // Generic containers and elements without data-source: skip this node,
+      // but walk children (children bubble up to parent's list via walkFiber)
+      return null;
+    }
+
+    function processComponentFiber(fiber: any, parentScope: "layout" | "page" | null): TreeNode | null {
+      // Get component name
+      const type = fiber.type;
+      const name = type?.displayName || type?.name || null;
+
+      // No name = anonymous component, skip
+      if (!name) return null;
+
+      // Skip framework internals
+      if (isFrameworkComponent(name)) return null;
+
+      // Skip the CodeSurface component itself
+      if (name === "CodeSurface") return null;
+
+      // Find this component's own root host element — only walk down through
+      // non-host fibers (other components, fragments, etc.) to find the first
+      // DOM element this component directly renders. Don't descend into child
+      // components, which would give us a different component's element.
+      const hostEl = findOwnHostElement(fiber);
+
+      // Check if this component comes from user code by looking for
+      // data-instance-source (set on component JSX by our Babel transform)
+      // on the host element. data-instance-source proves the component
+      // usage was in a user file processed by our loader.
+      // Also accept data-slot as proof of being a known component.
+      const hasInstanceSource = hostEl?.getAttribute("data-instance-source");
+      const hasDataSlot = hostEl?.getAttribute("data-slot");
+      if (!hasInstanceSource && !hasDataSlot) return null;
+
+      const scope = getScopeForElement(hostEl, parentScope);
+      const dataSlot = hasDataSlot || null;
+      const children: TreeNode[] = [];
+      if (fiber.child) walkFiber(fiber.child, children, scope);
+
+      // Collapse: if this component has exactly one child component and no
+      // direct text, skip this wrapper and promote the child
+      if (children.length === 1 && !dataSlot && !(hostEl && getDirectText(hostEl))) {
+        const child = children[0];
+        if (child.type === "component") {
+          return child;
+        }
+      }
+
+      return {
+        id: hostEl ? getDomPath(hostEl) : "",
+        name,
+        type: "component",
+        dataSlot,
+        source: hostEl?.getAttribute("data-source") || null,
+        scope,
+        textContent: hostEl ? getDirectText(hostEl) : "",
+        children,
+      };
+    }
+
+    /**
+     * Find a component fiber's own root host DOM element.
+     * Walks through transparent fibers (fragments, mode, profiler) but
+     * stops at component boundaries (function/class/forwardRef/memo) to
+     * avoid descending into child components.
+     */
+    function findOwnHostElement(fiber: any): Element | null {
+      let child = fiber.child;
+      while (child) {
+        // Found a DOM element — this is our root host element
+        if (child.stateNode instanceof Element) return child.stateNode;
+
+        // Check fiber tag to determine if this is a component boundary.
+        // React fiber tags: 0=FunctionComponent, 1=ClassComponent,
+        // 11=ForwardRef, 14=MemoComponent, 15=SimpleMemoComponent.
+        // These are component boundaries — don't descend.
+        const tag = child.tag;
+        const isComponentBoundary = tag === 0 || tag === 1 || tag === 11 || tag === 14 || tag === 15;
+
+        if (!isComponentBoundary && child.child) {
+          // Transparent fiber (fragment, mode, context, etc.) — walk through
+          const found = findOwnHostElement(child);
+          if (found) return found;
+        }
+
+        child = child.sibling;
+      }
+      return null;
+    }
+
+    /**
+     * Fallback: build tree from DOM using only data-slot elements.
+     * Used when React fiber access is unavailable.
+     */
+    function buildDataSlotTree(root: Element): TreeNode[] {
+      const results: TreeNode[] = [];
+      for (const child of Array.from(root.children)) {
+        walkDomForSlots(child, results, null);
+      }
+      return results;
+    }
+
+    function walkDomForSlots(el: Element, siblings: TreeNode[], parentScope: "layout" | "page" | null): void {
+      // Skip overlay elements
+      if (el.id && overlayIds.has(el.id)) return;
+
+      const dataSlot = el.getAttribute("data-slot");
+      const tag = el.tagName.toLowerCase();
+      const scope = getScopeForElement(el, parentScope);
+
+      if (dataSlot) {
+        const name = dataSlot.split("-").map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join("");
+        const children: TreeNode[] = [];
+        for (const child of Array.from(el.children)) {
+          walkDomForSlots(child, children, scope);
+        }
+        siblings.push({
+          id: getDomPath(el),
+          name,
+          type: "component",
+          dataSlot,
+          source: el.getAttribute("data-source") || null,
+          scope,
+          textContent: getDirectText(el),
+          children,
+        });
+      } else if (semanticTags.has(tag)) {
+        const children: TreeNode[] = [];
+        for (const child of Array.from(el.children)) {
+          walkDomForSlots(child, children, scope);
+        }
+        if (children.length > 0 || getDirectText(el)) {
+          siblings.push({
+            id: getDomPath(el),
+            name: `<${tag}>`,
+            type: "element",
+            dataSlot: null,
+            source: el.getAttribute("data-source") || null,
+            scope,
+            textContent: getDirectText(el),
+            children,
+          });
+        }
+      } else {
+        // Skip this element, but walk its children
+        for (const child of Array.from(el.children)) {
+          walkDomForSlots(child, siblings, scope);
+        }
+      }
+    }
+
+    function sendComponentTree() {
+      const tree = buildComponentTree(document.body);
+      window.parent.postMessage({ type: "tool:componentTree", tree }, "*");
+    }
+
+    // Debounce helper for MutationObserver
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    function debouncedSendTree() {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(sendComponentTree, 300);
+    }
+
+    // MutationObserver to send updated tree on DOM changes (HMR, dynamic content)
+    const treeObserver = new MutationObserver(debouncedSendTree);
+    treeObserver.observe(document.body, { childList: true, subtree: true });
+
     const relevantProps = [
       "display", "position", "top", "right", "bottom", "left",
       "z-index", "overflow", "overflow-x", "overflow-y",
@@ -412,6 +827,38 @@ export function CodeSurface() {
             document.documentElement.classList.remove("dark");
           }
           break;
+        case "tool:requestComponentTree":
+          sendComponentTree();
+          break;
+        case "tool:highlightByTreeId": {
+          const id = msg.id as string;
+          if (!id || !s.highlightOverlay || !s.tooltip) break;
+          const target = document.querySelector(id);
+          if (target) {
+            const rect = target.getBoundingClientRect();
+            positionOverlay(s.highlightOverlay, rect);
+            const name = getElementName(target);
+            s.tooltip.textContent = name;
+            s.tooltip.style.display = "block";
+            s.tooltip.style.left = `${rect.left}px`;
+            s.tooltip.style.top = `${Math.max(0, rect.top - 24)}px`;
+          }
+          break;
+        }
+        case "tool:clearHighlight":
+          if (s.highlightOverlay) s.highlightOverlay.style.display = "none";
+          if (s.tooltip) s.tooltip.style.display = "none";
+          break;
+        case "tool:selectByTreeId": {
+          const id = msg.id as string;
+          if (!id) break;
+          const target = document.querySelector(id);
+          if (target) {
+            const selectable = findSelectableElement(target);
+            selectElement(selectable);
+          }
+          break;
+        }
       }
     }
 
@@ -439,6 +886,8 @@ export function CodeSurface() {
       window.removeEventListener("message", onMessage);
       window.removeEventListener("popstate", notifyPathChanged);
 
+      treeObserver.disconnect();
+      if (debounceTimer) clearTimeout(debounceTimer);
       if (s.overlayRafId) cancelAnimationFrame(s.overlayRafId);
       s.tokenPreviewStyle?.remove();
       s.highlightOverlay?.remove();
