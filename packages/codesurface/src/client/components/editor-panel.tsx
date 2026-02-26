@@ -22,8 +22,10 @@ import {
   InfoCircledIcon,
   ResetIcon,
   LayersIcon,
+  DesktopIcon,
 } from "@radix-ui/react-icons";
 import type { SelectedElementData, SourceLocation } from "../../shared/protocol.js";
+import type { ComponentEntry } from "../../server/lib/scan-components.js";
 import { TokenEditor } from "./token-editor.js";
 import { PropertyPanel } from "./property-panel.js";
 import { ComputedPropertyPanel } from "./computed-property-panel.js";
@@ -45,6 +47,7 @@ interface EditorPanelProps {
   onReselectElement: () => void;
   onToggleUsagePanel?: () => void;
   usagePanelOpen?: boolean;
+  onIsolate?: (entry: ComponentEntry) => void;
 }
 
 /** Open a file in the user's editor via the local server. */
@@ -67,6 +70,7 @@ export function EditorPanel({
   onReselectElement,
   onToggleUsagePanel,
   usagePanelOpen,
+  onIsolate,
 }: EditorPanelProps) {
   const tokenData = useTokens();
   const componentData = useComponents();
@@ -303,6 +307,21 @@ export function EditorPanel({
                     }}
                   >
                     <LayersIcon style={{ width: 12, height: 12 }} />
+                  </button>
+                </Tooltip>
+              )}
+              {onIsolate && componentEntry && (
+                <Tooltip content="Isolate component — preview all variants">
+                  <button
+                    onClick={() => onIsolate(componentEntry)}
+                    className="studio-icon-btn shrink-0"
+                    style={{
+                      width: 22,
+                      height: 22,
+                      marginTop: 1,
+                    }}
+                  >
+                    <DesktopIcon style={{ width: 12, height: 12 }} />
                   </button>
                 </Tooltip>
               )}

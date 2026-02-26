@@ -45,6 +45,12 @@ export interface ComponentTreeNode {
   children: ComponentTreeNode[];
 }
 
+/** A single variant combination for the isolation preview grid. */
+export interface PreviewCombination {
+  label: string; // e.g. "variant: destructive"
+  props: Record<string, string>; // e.g. { variant: "destructive", size: "default" }
+}
+
 export interface StyleChange {
   property: string;
   value: string;
@@ -58,7 +64,8 @@ export type IframeToEditor =
   | { type: "tool:injectedReady" }
   | { type: "tool:elementSelected"; data: SelectedElementData }
   | { type: "tool:pathChanged"; path: string }
-  | { type: "tool:componentTree"; tree: ComponentTreeNode[] };
+  | { type: "tool:componentTree"; tree: ComponentTreeNode[] }
+  | { type: "tool:previewReady"; cellCount: number };
 
 // Messages from editor -> target app iframe
 export type EditorToIframe =
@@ -73,4 +80,6 @@ export type EditorToIframe =
   | { type: "tool:requestComponentTree" }
   | { type: "tool:highlightByTreeId"; id: string }
   | { type: "tool:clearHighlight" }
-  | { type: "tool:selectByTreeId"; id: string };
+  | { type: "tool:selectByTreeId"; id: string }
+  | { type: "tool:renderPreview"; dataSlot: string; componentPath: string; exportName: string;
+      combinations: PreviewCombination[]; defaultChildren: string };

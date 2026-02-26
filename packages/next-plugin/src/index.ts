@@ -8,6 +8,7 @@
  */
 
 import path from "path";
+import { generatePreviewRoute } from "./preview-route.js";
 
 export function withDesigntools<T extends Record<string, any>>(nextConfig: T = {} as T): T {
   return {
@@ -41,6 +42,16 @@ export function withDesigntools<T extends Record<string, any>>(nextConfig: T = {
             },
           ],
         });
+
+        // Generate the component isolation preview route
+        // This creates app/__designtools/preview/page.tsx which Next.js
+        // picks up as a route automatically via file-system routing.
+        const appDir = path.resolve(context.dir, "app");
+        try {
+          generatePreviewRoute(appDir);
+        } catch {
+          // Non-fatal — isolation feature just won't work
+        }
       }
 
       // Call the user's webpack config if provided

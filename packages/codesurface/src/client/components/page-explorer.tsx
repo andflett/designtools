@@ -134,7 +134,7 @@ export function PageExplorer({
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           placeholder="Filter components..."
-          className="flex-1 bg-transparent text-[11px] outline-none"
+          className="flex-1 bg-transparent placeholder-[var(--studio-text-dimmed)] text-[11px] outline-none"
           style={{
             color: "var(--studio-text)",
             caretColor: "var(--studio-accent)",
@@ -159,7 +159,6 @@ export function PageExplorer({
                 label="Layout"
                 expanded={layoutExpanded}
                 onToggle={() => setLayoutExpanded(!layoutExpanded)}
-                explainer="Shared across all pages using this layout. Changes here affect every route."
               >
                 {layoutNodes.map((node) => (
                   <TreeNodeItem

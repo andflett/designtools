@@ -75,6 +75,7 @@ export function Viewport({
         }}
       >
         <iframe
+          key={iframeSrc}
           ref={iframeRef}
           src={iframeSrc}
           className="w-full h-full border-0"

@@ -40,7 +40,7 @@ const stats = [
 
 export default function HomePage() {
   return (
-    <div className="mx-auto max-w-5xl px-4 py-12 bg-[image:var(--gradient-2)]">
+    <div className="mx-auto max-w-5xl px-4 py-12 bg-none opacity-100">
       {/* Hero */}
       <section className="flex flex-col items-center gap-5 text-center">
         <Badge variant="secondary">Now in Beta</Badge>

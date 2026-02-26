@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Component1Icon } from "@radix-ui/react-icons";
-import type { SelectedElementData, ComponentTreeNode } from "../shared/protocol.js";
+import type { SelectedElementData, ComponentTreeNode, PreviewCombination } from "../shared/protocol.js";
+import type { ComponentEntry } from "../server/lib/scan-components.js";
 import { usePostMessage } from "./lib/use-postmessage.js";
 import { ToolChrome } from "./components/tool-chrome.js";
 import { EditorPanel } from "./components/editor-panel.js";
@@ -10,9 +11,10 @@ import { scanStore, type RawScanData } from "./lib/scan-store.js";
 import { useScanReady, useComponents } from "./lib/scan-hooks.js";
 import { UsagePanel } from "./components/usage-panel.js";
 import { PageExplorer } from "./components/page-explorer.js";
+import { IsolationView, generateCombinations } from "./components/isolation-view.js";
 
 /** Set to false to skip the boot screen (disable before publishing) */
-const SHOW_BOOT_SCREEN = true;
+const SHOW_BOOT_SCREEN = false;
 
 /**
  * Find the tree node ID that corresponds to the currently selected element.
@@ -53,6 +55,8 @@ export function App() {
   const [usagePanelOpen, setUsagePanelOpen] = useState(false);
   const [componentTree, setComponentTree] = useState<ComponentTreeNode[]>([]);
   const [leftPanelTab, setLeftPanelTab] = useState<"elements" | "usages">("elements");
+  const [isolationComponent, setIsolationComponent] = useState<ComponentEntry | null>(null);
+  const [preIsolationPath, setPreIsolationPath] = useState("/");
   const scanReady = useScanReady();
   const componentData = useComponents();
 
@@ -171,6 +175,53 @@ export function App() {
     send({ type: "tool:clearHighlight" });
   }, [send]);
 
+  // Isolation mode: render a component in the preview route
+  const handleIsolate = useCallback((entry: ComponentEntry) => {
+    if (!targetUrl) return;
+    setPreIsolationPath(iframePath);
+    setIsolationComponent(entry);
+
+    // Navigate iframe to the preview route
+    setIframePath("/designtools-preview");
+
+    // Generate initial combinations and send after iframe loads
+    const combos = generateCombinations(entry.variants);
+    const componentPath = entry.filePath.replace(/\.(tsx|ts|jsx|js)$/, "");
+
+    // Wait a moment for iframe navigation, then send the render message
+    const sendPreview = () => {
+      send({
+        type: "tool:renderPreview",
+        dataSlot: entry.dataSlot,
+        componentPath,
+        exportName: entry.exportName,
+        combinations: combos,
+        defaultChildren: entry.name,
+      });
+    };
+
+    // Send after a short delay to let the preview page load
+    setTimeout(sendPreview, 1500);
+  }, [targetUrl, iframePath, send]);
+
+  const handleExitIsolation = useCallback(() => {
+    setIsolationComponent(null);
+    setIframePath(preIsolationPath);
+  }, [preIsolationPath]);
+
+  const handleIsolationCombinationsChange = useCallback((combos: PreviewCombination[]) => {
+    if (!isolationComponent) return;
+    const componentPath = isolationComponent.filePath.replace(/\.(tsx|ts|jsx|js)$/, "");
+    send({
+      type: "tool:renderPreview",
+      dataSlot: isolationComponent.dataSlot,
+      componentPath,
+      exportName: isolationComponent.exportName,
+      combinations: combos,
+      defaultChildren: isolationComponent.name,
+    });
+  }, [isolationComponent, send]);
+
   if (!targetUrl) {
     return (
       <div
@@ -206,7 +257,23 @@ export function App() {
 
   const showUsages = leftPanelTab === "usages" && selectedComponentName;
 
-  const leftPanel = (
+  const leftPanel = isolationComponent ? (
+    <div
+      className="flex flex-col border-r h-full"
+      style={{
+        width: 240,
+        minWidth: 240,
+        background: "var(--studio-surface)",
+        borderColor: "var(--studio-border)",
+      }}
+    >
+      <IsolationView
+        component={isolationComponent}
+        onBack={handleExitIsolation}
+        onCombinationsChange={handleIsolationCombinationsChange}
+      />
+    </div>
+  ) : (
     <div
       className="flex flex-col border-r h-full"
       style={{
@@ -245,7 +312,7 @@ export function App() {
           }}
           disabled={!selectedComponentName}
         >
-          Usages
+          Usage
         </button>
       </div>
 
@@ -291,6 +358,7 @@ export function App() {
       onReselectElement={handleReselectElement}
       onToggleUsagePanel={() => setUsagePanelOpen((v) => !v)}
       usagePanelOpen={usagePanelOpen}
+      onIsolate={handleIsolate}
     />
   );
 
