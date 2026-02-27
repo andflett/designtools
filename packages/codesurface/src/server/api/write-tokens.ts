@@ -67,7 +67,11 @@ function replaceTokenInBlock(
   );
 
   if (!tokenRegex.test(block)) {
-    throw new Error(`Token "${token}" not found in "${selector}" block`);
+    // Token doesn't exist in this block (e.g. dark mode override not yet defined).
+    // Append it to the block so dark mode can override the light value.
+    const indent = block.match(/\n(\s+)--/)?.[1] ?? "  ";
+    block = block.trimEnd() + `\n${indent}${token}: ${newValue};\n`;
+    return css.slice(0, openBrace + 1) + block + css.slice(blockEnd - 1);
   }
 
   block = block.replace(tokenRegex, `$1${newValue}$3`);

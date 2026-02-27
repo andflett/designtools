@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Component1Icon, DoubleArrowLeftIcon, DoubleArrowRightIcon } from "@radix-ui/react-icons";
+import { Component1Icon } from "@radix-ui/react-icons";
+import { PanelLeft } from "lucide-react";
 import type { SelectedElementData, ComponentTreeNode, PreviewCombination } from "../shared/protocol.js";
 import type { ComponentEntry } from "../server/lib/scan-components.js";
 import { usePostMessage } from "./lib/use-postmessage.js";
@@ -45,6 +46,7 @@ export function App() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [targetUrl, setTargetUrl] = useState("");
   const [stylingType, setStylingType] = useState("");
+  const [projectName, setProjectName] = useState("");
   const [selectedElement, setSelectedElement] = useState<SelectedElementData | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
@@ -68,6 +70,9 @@ export function App() {
       .then((config) => {
         setTargetUrl(config.targetUrl);
         setStylingType(config.stylingType || "");
+        if (config.projectRoot) {
+          setProjectName(config.projectRoot.split("/").filter(Boolean).pop() ?? "");
+        }
       })
       .catch(console.error);
   }, []);
@@ -149,6 +154,10 @@ export function App() {
 
   const handlePreviewToken = useCallback((token: string, value: string) => {
     send({ type: "tool:previewTokenValue", property: token, value });
+  }, [send]);
+
+  const handleClearTokenPreview = useCallback(() => {
+    send({ type: "tool:revertTokenValues" });
   }, [send]);
 
   const handlePreviewShadow = useCallback((variableName: string, value: string, _shadowName?: string) => {
@@ -262,8 +271,8 @@ export function App() {
     <div
       className="flex flex-col border-r h-full"
       style={{
-        width: 240,
-        minWidth: 240,
+        width: 250,
+        minWidth: 250,
         background: "var(--studio-surface)",
         borderColor: "var(--studio-border)",
       }}
@@ -289,15 +298,15 @@ export function App() {
         style={{ width: 36, height: 36 }}
         title="Expand panel"
       >
-        <DoubleArrowRightIcon />
+        <PanelLeft strokeWidth={1.5} size={16} />
       </button>
     </div>
   ) : (
     <div
       className="flex flex-col border-r h-full"
       style={{
-        width: 240,
-        minWidth: 240,
+        width: 250,
+        minWidth: 250,
         background: "var(--studio-surface)",
         borderColor: "var(--studio-border)",
       }}
@@ -305,14 +314,14 @@ export function App() {
       {/* Collapse button + Elements explorer */}
       <div className="flex-1 overflow-hidden flex flex-col">
         <div
-          className="flex items-center px-2 py-1 shrink-0"
-          style={{ borderBottom: "1px solid var(--studio-border)" }}
+          className="flex items-center pl-2 pr-2.5 py-1.5 shrink-0"
+          style={{ borderBottom: "1px solid var(--studio-border-subtle)" }}
         >
           <span
             className="flex-1 text-[10px] font-semibold uppercase tracking-wide pl-1"
             style={{ color: "var(--studio-text-muted)" }}
           >
-            Explorer
+            {projectName || "Explorer"}
           </span>
           <button
             onClick={() => setLeftPanelCollapsed(true)}
@@ -320,7 +329,7 @@ export function App() {
             style={{ width: 24, height: 24 }}
             title="Collapse panel"
           >
-            <DoubleArrowLeftIcon style={{ width: 12, height: 12 }} />
+            <PanelLeft strokeWidth={1.5} size={14} />
           </button>
         </div>
         {/* Usage panel (above explorer, when open) */}
@@ -354,6 +363,7 @@ export function App() {
       theme={theme}
       iframePath={iframePath}
       onPreviewToken={handlePreviewToken}
+      onClearTokenPreview={handleClearTokenPreview}
       onPreviewShadow={handlePreviewShadow}
       onPreviewInlineStyle={handlePreviewInlineStyle}
       onRevertInlineStyles={handleRevertInlineStyles}

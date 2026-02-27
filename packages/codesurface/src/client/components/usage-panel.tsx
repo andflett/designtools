@@ -105,7 +105,7 @@ function PanelHeader({
     >
       <span
         className="text-[10px] font-semibold uppercase tracking-wide flex-1 truncate"
-        style={{ color: "var(--studio-text-dimmed)" }}
+        style={{ color: "var(--studio-text-muted)" }}
       >
         Pages using {componentName}
       </span>

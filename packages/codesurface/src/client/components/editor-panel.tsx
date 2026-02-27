@@ -41,6 +41,7 @@ interface EditorPanelProps {
   theme: "light" | "dark";
   iframePath: string;
   onPreviewToken: (token: string, value: string) => void;
+  onClearTokenPreview: () => void;
   onPreviewShadow: (variableName: string, value: string, shadowName?: string) => void;
   onPreviewInlineStyle: (property: string, value: string) => void;
   onRevertInlineStyles: () => void;
@@ -63,6 +64,7 @@ export function EditorPanel({
   theme,
   iframePath,
   onPreviewToken,
+  onClearTokenPreview,
   onPreviewShadow,
   onPreviewInlineStyle,
   onRevertInlineStyles,
@@ -159,8 +161,8 @@ export function EditorPanel({
     <div
       className="flex flex-col border-l studio-scrollbar overflow-y-auto"
       style={{
-        width: 300,
-        minWidth: 300,
+        width: 350,
+        minWidth: 350,
         background: "var(--studio-surface)",
         borderColor: "var(--studio-border)",
       }}
@@ -299,49 +301,68 @@ export function EditorPanel({
         </div>
       )}
 
-      {/* Mode switcher */}
-      <div
-        className="px-4 py-2.5 shrink-0"
-        style={{ borderColor: "var(--studio-border)" }}
-      >
-        <div className="studio-segmented" style={{ width: "100%" }}>
-          {availableModes.map((mode) => {
-            const cfg = modeConfig[mode];
-            return (
-              <button
-                key={mode}
-                onClick={() => setActiveMode(mode)}
-                className={activeMode === mode ? "active" : ""}
-                style={{ flex: 1 }}
-              >
-                <cfg.icon style={{ width: 12, height: 12 }} />
-                {cfg.label}
-              </button>
-            );
-          })}
+      {!element && <SelectionPlaceholder />}
+
+      {element && (
+        /* Mode switcher */
+        <div
+          className="px-4 py-2.5 shrink-0"
+          style={{ borderColor: "var(--studio-border)" }}
+        >
+          <div className="studio-segmented" style={{ width: "100%" }}>
+            {availableModes.map((mode) => {
+              const cfg = modeConfig[mode];
+              return (
+                <button
+                  key={mode}
+                  onClick={() => setActiveMode(mode)}
+                  className={activeMode === mode ? "active" : ""}
+                  style={{ flex: 1 }}
+                >
+                  <cfg.icon style={{ width: 12, height: 12 }} />
+                  {cfg.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Mode content */}
       <div className="flex-1 overflow-y-auto studio-scrollbar">
-        {activeMode === "token" && (
-          <>
+        {!element && (
+          <div>
+            <div
+              className="px-4 pt-3 pb-3"
+            >
+              <div
+                className="text-[10px] font-semibold uppercase tracking-wide mb-1"
+                style={{ color: "var(--studio-text-muted)" }}
+              >
+                Design Tokens
+              </div>
+              <p className="text-[11px]" style={{ color: "var(--studio-text-dimmed)" }}>
+                Global design tokens defined in your project. Edit values here to update every usage at once.
+              </p>
+            </div>
             <TokenEditor
               tokenRefs={tokenRefs}
               theme={theme}
               onPreviewToken={onPreviewToken}
+              onClearTokenPreview={onClearTokenPreview}
               onPreviewShadow={onPreviewShadow}
             />
-          </>
+          </div>
         )}
 
-        {activeMode === "component" && !element && (
-          <div
-            className="px-4 py-8 text-[11px] text-center"
-            style={{ color: "var(--studio-text-dimmed)" }}
-          >
-            Select a component in the preview to edit its variants.
-          </div>
+        {activeMode === "token" && element && (
+          <TokenEditor
+            tokenRefs={tokenRefs}
+            theme={theme}
+            onPreviewToken={onPreviewToken}
+            onClearTokenPreview={onClearTokenPreview}
+            onPreviewShadow={onPreviewShadow}
+          />
         )}
 
         {activeMode === "component" && element && isComponent && (
@@ -454,20 +475,6 @@ export function EditorPanel({
                     />
                   ))}
 
-                  {componentEntry.baseClasses && (
-                    <ComponentBaseSection
-                      componentEntry={componentEntry}
-                      onClassChange={(oldClass, newClass) => {
-                        withSave(async () => {
-                          await handleComponentClassChange(
-                            componentEntry.filePath,
-                            oldClass,
-                            newClass,
-                          );
-                        });
-                      }}
-                    />
-                  )}
                 </div>
               )}
 
@@ -698,40 +705,82 @@ function ComponentVariantSection({
   );
 }
 
-function ComponentBaseSection({
-  componentEntry,
-  onClassChange,
-}: {
-  componentEntry: any;
-  onClassChange: (oldClass: string, newClass: string) => void;
-}) {
-  const tokenData = useTokens();
-  const [collapsed, setCollapsed] = useState(true);
+// --- No-selection placeholder ---
+
+function SelectionPlaceholder() {
+  const color = "var(--studio-accent)";
+  const handleSize = 8;
+  const h = handleSize / 2.5;
+
+  const Handle = ({ style }: { style: React.CSSProperties }) => (
+    <div
+      className="absolute"
+      style={{
+        width: handleSize,
+        height: handleSize,
+        background: color,
+        border: `1.5px solid ${color}`,
+        borderRadius: 1,
+        opacity: 0.8,
+        ...style,
+      }}
+    />
+  );
 
   return (
-    <div style={{ borderTop: "1px solid var(--studio-border-subtle)" }}>
-      <button
-        onClick={() => setCollapsed(!collapsed)}
-        className="studio-section-hdr"
-      >
-        {collapsed ? <ChevronRightIcon /> : <ChevronDownIcon />}
-        Base
-      </button>
-      {!collapsed && (
-        <div className="studio-tree-content">
-          <PropertyPanel
-            classes={componentEntry.baseClasses}
-            onClassChange={onClassChange}
-            tokenGroups={tokenData?.groups || {}}
-            flat
-          />
+    <div
+      className="flex flex-col items-center justify-center px-6 py-8"
+      style={{ borderBottom: "1px solid var(--studio-border)" }}
+    >
+      {/* Selection box */}
+      <div className="relative" style={{ width: 190, height: 88 }}>
+        {/* Border */}
+        <div
+          className="absolute inset-0"
+          style={{ border: `1.5px solid ${color}`, background: "color-mix(in srgb, var(--studio-accent) 10%, transparent)" }}
+        />
+        {/* Text inside */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span
+            className="text-[12px] text-center select-none leading-snug"
+            style={{ color: "var(--studio-text-muted)", opacity: 1 }}
+          >
+            Select an element to edit
+          </span>
         </div>
-      )}
+        {/* Corner handles */}
+        <Handle style={{ top: -h, left: -h }} />
+        <Handle style={{ top: -h, right: -h }} />
+        <Handle style={{ bottom: -h, left: -h }} />
+        <Handle style={{ bottom: -h, right: -h }} />
+        {/* Animated cursor */}
+        <div
+          className="absolute"
+          style={{
+            bottom: 10,
+            right: 10,
+            color,
+            opacity: 0.8,
+            animation: "cursor-drift 3s ease-in-out infinite",
+          }}
+        >
+          <svg width="22" height="22" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M2 2L2 10.5L4.5 8L6.5 12L8 11.5L6 7.5L9.5 7L2 2Z" fill="currentColor" />
+          </svg>
+        </div>
+      </div>
+      <style>{`
+        @keyframes cursor-drift {
+          0%, 100% { transform: translate(0, 0); }
+          40% { transform: translate(4px, 3px); }
+          70% { transform: translate(-2px, 4px); }
+        }
+      `}</style>
     </div>
   );
 }
 
-// --- Instance variant section (pill buttons for switching props) ---
+// --- Instance variant section (flat label + segmented buttons) ---
 
 function InstanceVariantSection({
   dim,
@@ -742,49 +791,29 @@ function InstanceVariantSection({
   currentValue: string | null;
   onSelect: (value: string) => void;
 }) {
-  const [collapsed, setCollapsed] = useState(true);
-
   return (
-    <div style={{ borderTop: "1px solid var(--studio-border-subtle)" }}>
-      <button
-        onClick={() => setCollapsed(!collapsed)}
-        className="studio-section-hdr"
+    <div className="px-4 py-2" style={{ borderTop: "1px solid var(--studio-border-subtle)" }}>
+      <div
+        className="text-[10px] font-semibold uppercase tracking-wide mb-2"
+        style={{ color: "var(--studio-text-muted)" }}
       >
-        {collapsed ? <ChevronRightIcon /> : <ChevronDownIcon />}
-        <span style={{ color: "var(--studio-text-dimmed)" }}>{dim.name}</span>
-        {currentValue && (
-          <span
-            className="text-[10px] font-medium px-1.5 py-0.5 rounded"
-            style={{
-              color: "var(--studio-accent)",
-              background: "var(--studio-accent-muted)",
-            }}
-          >
-            {currentValue}
-          </span>
-        )}
-        <span className="count">{dim.options.length}</span>
-      </button>
-
-      {!collapsed && (
-        <div className="px-4 pb-3">
-          <div className="studio-segmented wrap" style={{ width: "100%" }}>
-            {dim.options.map((opt: string) => {
-              const isActive = currentValue === opt || (!currentValue && opt === dim.default);
-              return (
-                <button
-                  key={opt}
-                  onClick={() => onSelect(opt)}
-                  className={isActive ? "active" : ""}
-                  style={{ flex: 1 }}
-                >
-                  {opt}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
+        {dim.name}
+      </div>
+      <div className="studio-segmented wrap" style={{ width: "100%" }}>
+        {dim.options.map((opt: string) => {
+          const isActive = currentValue === opt || (!currentValue && opt === dim.default);
+          return (
+            <button
+              key={opt}
+              onClick={() => onSelect(opt)}
+              className={isActive ? "active" : ""}
+              style={{ flex: 1 }}
+            >
+              {opt}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -31,6 +31,7 @@ interface TokenEditorProps {
   tokenRefs: string[];
   theme: "light" | "dark";
   onPreviewToken: (token: string, value: string) => void;
+  onClearTokenPreview: () => void;
   onPreviewShadow: (variableName: string, value: string, shadowName?: string) => void;
 }
 
@@ -38,6 +39,7 @@ export function TokenEditor({
   tokenRefs,
   theme,
   onPreviewToken,
+  onClearTokenPreview,
   onPreviewShadow,
 }: TokenEditorProps) {
   const tokenData = useTokens();
@@ -87,6 +89,7 @@ export function TokenEditor({
               token={token}
               theme={theme}
               onPreview={onPreviewToken}
+              onClearPreview={onClearTokenPreview}
               cssFilePath={cssFilePath}
               allTokens={tokens}
             />
@@ -108,6 +111,7 @@ export function TokenEditor({
                       token={token}
                       theme={theme}
                       onPreview={onPreviewToken}
+                      onClearPreview={onClearTokenPreview}
                       cssFilePath={cssFilePath}
                       allTokens={tokens}
                     />
@@ -157,6 +161,7 @@ export function TokenEditor({
           stylingType={borderData?.stylingType || stylingType}
           allTokens={tokens}
           onPreviewToken={onPreviewToken}
+          onClearPreview={onClearTokenPreview}
         />
       </Section>
 
@@ -263,12 +268,14 @@ function TokenRow({
   token,
   theme,
   onPreview,
+  onClearPreview,
   cssFilePath,
   allTokens,
 }: {
   token: any;
   theme: "light" | "dark";
   onPreview: (token: string, value: string) => void;
+  onClearPreview: () => void;
   cssFilePath: string;
   allTokens: any[];
 }) {
@@ -329,6 +336,7 @@ function TokenRow({
               : null
           }
           onPreview={onPreview}
+          onClearPreview={onClearPreview}
           onClose={() => setShowPopover(false)}
         />
       )}
@@ -355,6 +363,7 @@ function getStep(unit: string): number {
 
 function TokenScrubRow({
   token,
+  theme,
   icon: Icon,
   onSave,
   step: stepOverride,
@@ -362,13 +371,14 @@ function TokenScrubRow({
   maxDecimals,
 }: {
   token: any;
+  theme?: "light" | "dark";
   icon?: React.ComponentType<{ style?: React.CSSProperties }>;
   onSave: (value: string) => void;
   step?: number;
   min?: number;
   maxDecimals?: number;
 }) {
-  const displayVal = token.value ?? token.lightValue ?? "";
+  const displayVal = token.value ?? (theme === "dark" && token.darkValue ? token.darkValue : token.lightValue) ?? "";
   const [value, setValue] = useState(displayVal);
   const [focused, setFocused] = useState(false);
   const [scrubbing, setScrubbing] = useState(false);
@@ -500,6 +510,7 @@ function SpacingScale({
         <div className="px-4 mb-2">
           <TokenScrubRow
             token={baseToken}
+            theme={theme}
             icon={SpaceBetweenHorizontallyIcon}
             onSave={(value) => saveToken(cssFilePath, baseToken.name, value, theme === "dark" ? ".dark" : ":root")}
           />
@@ -513,6 +524,7 @@ function SpacingScale({
             <TokenScrubRow
               key={token.name}
               token={token}
+              theme={theme}
               icon={SpaceBetweenHorizontallyIcon}
               onSave={(value) => saveToken(cssFilePath, token.name, value, theme === "dark" ? ".dark" : ":root")}
             />
@@ -640,6 +652,7 @@ function BordersSection({
   stylingType,
   allTokens,
   onPreviewToken,
+  onClearPreview,
 }: {
   borders: any[];
   borderColorTokens: any[];
@@ -648,6 +661,7 @@ function BordersSection({
   stylingType: string;
   allTokens: any[];
   onPreviewToken: (token: string, value: string) => void;
+  onClearPreview: () => void;
 }) {
   const radiusBorders = borders.filter((b: any) => b.kind === "radius");
   const widthBorders = borders.filter((b: any) => b.kind === "width");
@@ -682,6 +696,7 @@ function BordersSection({
               <TokenScrubRow
                 key={border.name}
                 token={border}
+                theme={theme}
                 icon={CornersIcon}
                 onSave={(v) => handleSave(border, v)}
                 step={0.025}
@@ -702,6 +717,7 @@ function BordersSection({
               <TokenScrubRow
                 key={border.name}
                 token={border}
+                theme={theme}
                 icon={BorderWidthIcon}
                 onSave={(v) => handleSave(border, v)}
                 min={0}
@@ -724,6 +740,7 @@ function BordersSection({
                 token={token}
                 theme={theme}
                 onPreview={onPreviewToken}
+                onClearPreview={onClearPreview}
                 cssFilePath={cssFilePath}
                 allTokens={allTokens}
               />

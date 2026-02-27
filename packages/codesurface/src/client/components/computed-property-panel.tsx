@@ -248,7 +248,7 @@ function UnifiedSection({
       </button>
 
       {!collapsed && (
-        <div className="flex flex-col gap-1.5 pb-4 px-4">
+        <div className="flex flex-col gap-4 pb-4 px-4">
           {category === "layout" ? (
             <LayoutSection
               properties={properties}
@@ -2324,7 +2324,7 @@ function getPropertyIcon(cssProp: string): React.ComponentType<{ style?: React.C
 function PropLabel({ label, inherited }: { label: string; inherited?: boolean }) {
   return (
     <div
-      className="text-[11px] font-medium mb-1"
+      className="text-[10px] font-medium mb-1.5"
       style={{
         color: "var(--studio-text-dimmed)",
         letterSpacing: "0.03em",

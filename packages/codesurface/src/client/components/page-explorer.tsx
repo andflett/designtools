@@ -19,6 +19,7 @@ import {
   InfoCircledIcon,
 } from "@radix-ui/react-icons";
 import type { ComponentTreeNode } from "../../shared/protocol.js";
+import { ChevronsDownUp, ChevronsUpDown, ListChevronsDownUp, ListChevronsUpDown } from "lucide-react";
 
 interface PageExplorerProps {
   tree: ComponentTreeNode[];
@@ -116,7 +117,7 @@ export function PageExplorer({
       style={{ background: "var(--studio-surface)" }}
     >
       {/* Tree */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden studio-scrollbar">
+      <div className="flex-1 overflow-hidden flex flex-col">
         {isEmpty ? (
           <div
             className="px-4 py-6 text-[11px] text-center"
@@ -150,6 +151,7 @@ export function PageExplorer({
                 label="Page"
                 expanded={pageExpanded}
                 onToggle={() => setPageExpanded(!pageExpanded)}
+                flex
               >
                 {pageNodes.map((node) => (
                   <TreeNodeItem
@@ -164,7 +166,7 @@ export function PageExplorer({
           </>
         ) : (
           /* No scope data — render flat tree */
-          <div className="py-1">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden studio-scrollbar py-1">
             {allNodes.map((node) => (
               <TreeNodeItem
                 key={node.id}
@@ -189,6 +191,7 @@ function ScopeSection({
   onToggle,
   alwaysExpanded,
   explainer,
+  flex,
   children,
 }: {
   label: string;
@@ -196,49 +199,66 @@ function ScopeSection({
   onToggle?: () => void;
   alwaysExpanded?: boolean;
   explainer?: string;
+  /** If true, section grows to fill remaining space (use for the last/main section) */
+  flex?: boolean;
   children: React.ReactNode;
 }) {
   const isExpanded = alwaysExpanded || expanded;
 
   return (
-    <div>
-      {/* Section header */}
+    <div
+      className="flex flex-col"
+      style={{
+        borderBottom: "1px solid var(--studio-border)",
+        flex: flex && isExpanded ? "1 1 0" : "0 0 auto",
+        minHeight: 0,
+      }}
+    >
+      {/* Section header — stays pinned, never scrolls */}
       <div
-        className="flex items-center gap-1.5 px-3 py-1.5 select-none"
+        className="flex justify-between items-center gap-1.5 px-3 py-3 select-none shrink-0"
         style={{
           cursor: alwaysExpanded ? "default" : "pointer",
-          borderBottom: "1px solid var(--studio-border)",
-          marginTop: label !== "Layout" ? 0 : undefined,
+          borderBottom: !isExpanded
+            ? ""
+            : "1px solid var(--studio-border-subtle)",
         }}
         onClick={alwaysExpanded ? undefined : onToggle}
       >
-        {!alwaysExpanded && (
-          <span style={{ display: "inline-flex", flexShrink: 0 }}>
-            {isExpanded ? (
-              <ChevronDownIcon style={{ width: 10, height: 10, color: "var(--studio-text-dimmed)" }} />
-            ) : (
-              <ChevronRightIcon style={{ width: 10, height: 10, color: "var(--studio-text-dimmed)" }} />
-            )}
-          </span>
-        )}
         <span
           className="text-[10px] font-semibold uppercase tracking-wide"
-          style={{ color: "var(--studio-text-dimmed)" }}
+          style={{ color: "var(--studio-text-muted)" }}
         >
           {label}
         </span>
+        {!alwaysExpanded && (
+          <button className="studio-icon-btn" style={{ width: 20, height: 20, borderRadius: 3 }}>
+            {isExpanded ? (
+              <ChevronsDownUp style={{ width: 13, height: 13 }} />
+            ) : (
+              <ChevronsUpDown style={{ width: 13, height: 13 }} />
+            )}
+          </button>
+        )}
       </div>
 
       {/* Explainer (only shown when section is expanded) */}
       {isExpanded && explainer && (
-        <div className="studio-tab-explainer" style={{ margin: "6px 8px", padding: "8px 10px" }}>
+        <div
+          className="studio-tab-explainer shrink-0"
+          style={{ margin: "6px 8px", padding: "8px 10px" }}
+        >
           <InfoCircledIcon />
           <span>{explainer}</span>
         </div>
       )}
 
-      {/* Children */}
-      {isExpanded && <div className="py-1">{children}</div>}
+      {/* Children — scrollable, header stays pinned */}
+      {isExpanded && (
+        <div className="overflow-y-auto overflow-x-hidden studio-scrollbar py-2" style={{ flex: 1, minHeight: 0 }}>
+          {children}
+        </div>
+      )}
     </div>
   );
 }
@@ -284,8 +304,8 @@ function TreeNodeItem({
               ? "var(--studio-text)"
               : "var(--studio-text-muted)",
           background: isSelected ? "var(--studio-accent-muted)" : "transparent",
-          borderRadius: 4,
-          margin: "0 4px",
+          borderRadius: 0,
+         
           cursor: "pointer",
           transition: "background 0.1s",
         }}
@@ -301,26 +321,22 @@ function TreeNodeItem({
       >
         {/* Expand/collapse toggle */}
         {hasChildren ? (
-          <span
+          <button
             onClick={(e) => {
               e.stopPropagation();
               onToggle(node.id);
             }}
-            style={{
-              display: "inline-flex",
-              flexShrink: 0,
-              width: 14,
-              justifyContent: "center",
-            }}
+            className="studio-icon-btn"
+            style={{ width: 16, height: 16, borderRadius: 3 }}
           >
             {isExpanded ? (
               <ChevronDownIcon style={{ width: 10, height: 10 }} />
             ) : (
               <ChevronRightIcon style={{ width: 10, height: 10 }} />
             )}
-          </span>
+          </button>
         ) : (
-          <span style={{ width: 14, flexShrink: 0 }} />
+          <span style={{ width: 16, flexShrink: 0 }} />
         )}
 
         {/* Icon */}

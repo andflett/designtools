@@ -347,6 +347,146 @@ body {
   box-shadow: 0 0 0 1px var(--studio-accent);
 }
 
+/* Address bar (combined URL + breakpoint) */
+.studio-address-bar {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  min-width: 300px;
+  max-width: 480px;
+  border: 1px solid var(--studio-border-subtle);
+  border-radius: 6px;
+  background: var(--studio-input-bg);
+  overflow: hidden;
+  transition: border-color 0.1s;
+}
+/* Toolbar button group — same style as address bar */
+.studio-toolbar-group {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  border: 1px solid var(--studio-border-subtle);
+  border-radius: 6px;
+  background: var(--studio-input-bg);
+  overflow: hidden;
+}
+.studio-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: var(--studio-text-muted);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+  flex-shrink: 0;
+}
+.studio-toolbar-btn:hover {
+  background: var(--studio-surface-hover);
+  color: var(--studio-text);
+}
+.studio-toolbar-btn.active {
+  background: var(--studio-accent);
+  color: white;
+}
+
+.studio-address-bar:focus-within {
+  border-color: var(--studio-accent);
+}
+.studio-address-icon {
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  color: var(--studio-text-dimmed);
+  flex-shrink: 0;
+}
+.studio-address-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: var(--studio-text);
+  font-size: 11px;
+  outline: none;
+  padding: 0;
+}
+.studio-address-input::placeholder {
+  color: var(--studio-text-dimmed);
+}
+.studio-address-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--studio-border);
+  flex-shrink: 0;
+  margin: 0 8px;
+}
+.studio-bp-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 100%;
+  padding: 0 10px 0 4px;
+  border: none;
+  background: transparent;
+  color: var(--studio-text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 0.1s;
+}
+.studio-bp-trigger:hover {
+  color: var(--studio-text);
+}
+
+/* Dark Figma-style dropdown */
+.studio-bp-dropdown {
+  background: #1c1c1c;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 4px;
+  min-width: 110px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  animation: studio-dropdown-in 0.1s ease;
+}
+@keyframes studio-dropdown-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.studio-bp-option {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 5px 8px;
+  border: none;
+  background: transparent;
+  color: #b0b0b0;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.08s, color 0.08s;
+}
+.studio-bp-option:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+.studio-bp-option.active {
+  color: #fff;
+}
+.studio-bp-option-check {
+  display: inline-flex;
+  width: 14px;
+  margin-right: 4px;
+  color: #fff;
+  flex-shrink: 0;
+}
+
 /* Breakpoint pill */
 .studio-bp-btn {
   display: inline-flex;

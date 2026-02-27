@@ -3,8 +3,11 @@ import {
   CursorArrowIcon,
   SunIcon,
   MoonIcon,
-  WidthIcon,
+  GlobeIcon,
+  CheckIcon,
 } from "@radix-ui/react-icons";
+import * as Popover from "@radix-ui/react-popover";
+import { Monitor, ChevronDown } from "lucide-react";
 import { Viewport } from "./viewport.js";
 import { Tooltip } from "./tooltip.js";
 
@@ -37,6 +40,14 @@ export interface ToolChromeProps {
   iframeRef: RefObject<HTMLIFrameElement | null>;
 }
 
+const BREAKPOINTS: Array<{ label: string; value: number | "fill" }> = [
+  { label: "375px", value: 375 },
+  { label: "768px", value: 768 },
+  { label: "1024px", value: 1024 },
+  { label: "1280px", value: 1280 },
+  { label: "Fill", value: "fill" },
+];
+
 export function ToolChrome({
   toolName,
   toolIcon,
@@ -54,7 +65,6 @@ export function ToolChrome({
   targetUrl,
   iframeRef,
 }: ToolChromeProps) {
-  const breakpoints = [375, 768, 1024, 1280];
   const [urlInput, setUrlInput] = useState(iframePath);
 
   // Sync URL bar when iframePath changes (e.g. from iframe navigation)
@@ -96,84 +106,45 @@ export function ToolChrome({
           </span>
         </div>
 
-        {/* Separator */}
-        <div
-          className="w-px h-4"
-          style={{ background: "var(--studio-border)" }}
-        />
-
-        {/* URL bar */}
-        <form onSubmit={handleUrlSubmit} className="flex-0">
-          <input
-            type="text"
-            value={urlInput}
-            onChange={(e) => setUrlInput(e.target.value)}
-            className="studio-input-sm"
-            style={{ width: 180 }}
-            placeholder="/"
-          />
-        </form>
-
-        {/* Separator */}
-        <div
-          className="w-px h-4"
-          style={{ background: "var(--studio-border)" }}
-        />
-
-        {/* Center: breakpoints + width */}
-        <div className="flex items-center gap-1 flex-1 justify-center">
-          {breakpoints.map((w) => (
-            <button
-              key={w}
-              onClick={() => onViewportWidthChange(w)}
-              className={`studio-bp-btn ${viewportWidth === w ? "active" : ""}`}
-            >
-              {w}
-            </button>
-          ))}
-          <Tooltip content="Fill width" side="bottom">
-            <button
-              onClick={() => onViewportWidthChange("fill")}
-              className={`studio-icon-btn ${viewportWidth === "fill" ? "active" : ""}`}
-              style={{ width: 28, height: 28 }}
-            >
-              <WidthIcon />
-            </button>
-          </Tooltip>
-
-          <input
-            type="text"
-            value={viewportWidth === "fill" ? "100%" : `${viewportWidth}`}
-            onChange={(e) => {
-              const val = parseInt(e.target.value, 10);
-              if (!isNaN(val) && val >= 320) onViewportWidthChange(val);
-            }}
-            className="studio-input-sm w-14 text-center"
-          />
+        {/* Center: combined URL + breakpoint bar */}
+        <div className="flex-1 flex justify-center">
+          <form onSubmit={handleUrlSubmit} className="studio-address-bar">
+            <span className="studio-address-icon">
+              <GlobeIcon />
+            </span>
+            <input
+              type="text"
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
+              className="studio-address-input"
+              placeholder="/"
+            />
+            <div className="studio-address-sep" />
+            <BreakpointSelect
+              value={viewportWidth}
+              options={BREAKPOINTS}
+              onChange={onViewportWidthChange}
+            />
+          </form>
         </div>
 
-        {/* Separator */}
-        <div
-          className="w-px h-4"
-          style={{ background: "var(--studio-border)" }}
-        />
-
         {/* Right: tools */}
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="studio-toolbar-group shrink-0">
           {showSelectionMode && (
             <Tooltip content={selectionMode ? "Selection mode on" : "Selection mode off"} side="bottom">
               <button
                 onClick={onToggleSelectionMode}
-                className={`studio-icon-btn ${selectionMode ? "active" : ""}`}
+                className={`studio-toolbar-btn ${selectionMode ? "active" : ""}`}
               >
                 <CursorArrowIcon />
               </button>
             </Tooltip>
           )}
+
           <Tooltip content={`Switch to ${theme === "light" ? "dark" : "light"} mode`} side="bottom">
             <button
               onClick={onToggleTheme}
-              className="studio-icon-btn"
+              className="studio-toolbar-btn"
             >
               {theme === "light" ? <SunIcon /> : <MoonIcon />}
             </button>
@@ -195,5 +166,66 @@ export function ToolChrome({
         {editorPanel}
       </div>
     </div>
+  );
+}
+
+function BreakpointSelect({
+  value,
+  options,
+  onChange,
+}: {
+  value: number | "fill";
+  options: Array<{ label: string; value: number | "fill" }>;
+  onChange: (v: number | "fill") => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const current = options.find((o) => o.value === value);
+  const label = current?.label ?? `${value}px`;
+
+  return (
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger asChild>
+        <button className="studio-bp-trigger" type="button">
+          <Monitor size={12} strokeWidth={1.5} />
+          <span>{label}</span>
+          <ChevronDown size={10} strokeWidth={2} style={{ opacity: 0.5 }} />
+        </button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          className="studio-bp-dropdown"
+          align="end"
+          sideOffset={8}
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
+          {options.map((opt) => {
+            const isActive = opt.value === value;
+            return (
+              <button
+                key={String(opt.value)}
+                className={`studio-bp-option ${isActive ? "active" : ""}`}
+                onClick={() => { onChange(opt.value); setOpen(false); }}
+                type="button"
+              >
+                <span className="studio-bp-option-check">
+                  {isActive && <CheckIcon />}
+                </span>
+                {opt.label}
+              </button>
+            );
+          })}
+          {typeof value === "number" && !options.some((o) => o.value === value) && (
+            <button
+              className="studio-bp-option active"
+              onClick={() => setOpen(false)}
+              type="button"
+            >
+              <span className="studio-bp-option-check"><CheckIcon /></span>
+              {value}px
+            </button>
+          )}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }

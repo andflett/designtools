@@ -160,6 +160,7 @@ interface TokenPopoverProps {
   cssFilePath: string;
   contrastToken?: { name: string; resolvedValue: string } | null;
   onPreview: (token: string, value: string) => void;
+  onClearPreview: () => void;
   onClose: () => void;
 }
 
@@ -170,6 +171,7 @@ export function TokenPopover({
   cssFilePath,
   contrastToken,
   onPreview,
+  onClearPreview,
   onClose,
 }: TokenPopoverProps) {
   const [color, setColor] = useState<OklchColor>(() =>
@@ -240,16 +242,18 @@ export function TokenPopover({
     savedRef.current = true;
     const selector = theme === "dark" ? ".dark" : ":root";
     await saveToken(cssFilePath, token.name, formatOklch(color), selector);
+    // Clear the !important preview style so the CSS cascade takes over
+    onClearPreview();
     onClose();
   };
 
-  // Revert preview on close without save
+  // Clear preview on close — let CSS cascade show the correct value for the current mode
   const handleClose = useCallback(() => {
     if (!savedRef.current) {
-      onPreview(token.name, token.resolvedValue);
+      onClearPreview();
     }
     onClose();
-  }, [onClose, onPreview, token.name, token.resolvedValue]);
+  }, [onClose, onClearPreview]);
 
   const contrastRatio = contrastToken
     ? getContrastRatio(contrastToken.resolvedValue, formatOklch(color))
