@@ -8,6 +8,7 @@ import type { TokenMap } from "../../server/lib/scan-tokens.js";
 import type { ShadowMap } from "../../server/lib/scan-shadows.js";
 import type { BorderMap } from "../../server/lib/scan-borders.js";
 import type { GradientMap } from "../../server/lib/scan-gradients.js";
+import type { SpacingMap } from "../../server/lib/scan-spacing.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -113,6 +114,45 @@ export async function saveGradient(
     try {
       const gradients = await fetchSlice<GradientMap>("gradients");
       scanStore.patch("gradients", gradients);
+    } catch { /* best effort */ }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Spacing actions
+// ---------------------------------------------------------------------------
+
+export async function saveSpacing(
+  cssFilePath: string,
+  variableName: string,
+  value: string,
+  selector: string,
+): Promise<void> {
+  try {
+    // Spacing writes use the same token/gradients create endpoint
+    const data = await postJson<{ ok: boolean; error?: string }>(
+      "/api/tokens",
+      { filePath: cssFilePath, token: variableName, value, selector },
+    );
+    if (!data.ok) {
+      console.error("Spacing save failed:", data.error);
+      return;
+    }
+    // Re-fetch spacing slice to pick up changes
+    try {
+      const spacing = await fetchSlice<SpacingMap>("spacing");
+      scanStore.patch("spacing", spacing);
+    } catch { /* best effort */ }
+    // Also refresh tokens since spacing vars are tokens too
+    try {
+      const tokens = await fetchSlice<TokenMap>("tokens");
+      scanStore.patch("tokens", tokens);
+    } catch { /* best effort */ }
+  } catch (err) {
+    console.error("Spacing save error:", err);
+    try {
+      const spacing = await fetchSlice<SpacingMap>("spacing");
+      scanStore.patch("spacing", spacing);
     } catch { /* best effort */ }
   }
 }

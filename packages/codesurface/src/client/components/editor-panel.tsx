@@ -37,7 +37,7 @@ import { PropertyPanel } from "./property-panel.js";
 import { ComputedPropertyPanel } from "./computed-property-panel.js";
 import { Tooltip, ExplainerNote } from "./tooltip.js";
 import { ControlsGallery } from "./controls/controls-gallery.js";
-import { StudioSelect } from "./controls/index.js";
+import { StudioSelect, ToggleControl } from "./controls/index.js";
 import {
   Maximize,
   Palette,
@@ -46,6 +46,12 @@ import {
   Circle,
   ToggleLeft,
   Type,
+  Bold,
+  ArrowRightToLine,
+  Activity,
+  Layers,
+  PanelTop,
+  Sparkles,
 } from "lucide-react";
 import { useTokens, useComponents } from "../lib/scan-hooks.js";
 import type { IndexedTokenMap } from "../lib/scan-store.js";
@@ -818,7 +824,18 @@ const PROP_ICON_MAP: Record<string, React.ComponentType<{ style?: React.CSSPrope
   type: Type,
   disabled: ToggleLeft,
   state: ToggleLeft,
+  weight: Bold,
+  fullwidth: ArrowRightToLine,
+  status: Activity,
+  elevation: Layers,
+  border: PanelTop,
+  animation: Sparkles,
 };
+
+function isBooleanDim(dim: any): boolean {
+  const opts = dim.options.map((o: string) => o.toLowerCase());
+  return opts.length === 2 && opts.includes("true") && opts.includes("false");
+}
 
 function InstanceVariantSection({
   dim,
@@ -832,6 +849,7 @@ function InstanceVariantSection({
   const effectiveValue = currentValue ?? dim.default ?? dim.options[0] ?? "";
   const propKey = dim.name.toLowerCase();
   const icon = PROP_ICON_MAP[propKey];
+  const isBoolean = isBooleanDim(dim);
 
   return (
     <div className="px-4 py-2" style={{ borderTop: "1px solid var(--studio-border-subtle)" }}>
@@ -841,13 +859,23 @@ function InstanceVariantSection({
       >
         {dim.name}
       </div>
-      <StudioSelect
-        value={effectiveValue}
-        onChange={onSelect}
-        options={dim.options.map((opt: string) => ({ value: opt, label: opt }))}
-        icon={icon}
-        tooltip={dim.name}
-      />
+      {isBoolean ? (
+        <ToggleControl
+          value={effectiveValue === "true"}
+          onChange={(checked) => onSelect(String(checked))}
+          label={effectiveValue === "true" ? "On" : "Off"}
+          icon={icon}
+          tooltip={dim.name}
+        />
+      ) : (
+        <StudioSelect
+          value={effectiveValue}
+          onChange={onSelect}
+          options={dim.options.map((opt: string) => ({ value: opt, label: opt }))}
+          icon={icon}
+          tooltip={dim.name}
+        />
+      )}
     </div>
   );
 }

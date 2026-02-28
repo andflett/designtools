@@ -8,6 +8,7 @@ import { scanComponents, type ComponentRegistry } from "./scan-components.js";
 import { scanShadows, type ShadowMap } from "./scan-shadows.js";
 import { scanBorders, type BorderMap } from "./scan-borders.js";
 import { scanGradients, type GradientMap } from "./scan-gradients.js";
+import { scanSpacing, type SpacingMap } from "./scan-spacing.js";
 import { scanUsages, type ComponentUsageMap } from "./scan-usages.js";
 
 export interface ScanResult {
@@ -17,6 +18,7 @@ export interface ScanResult {
   shadows: ShadowMap;
   borders: BorderMap;
   gradients: GradientMap;
+  spacing: SpacingMap;
   styling: StylingSystem;
   usages: ComponentUsageMap;
 }
@@ -26,16 +28,17 @@ let cachedScan: ScanResult | null = null;
 async function runScan(projectRoot: string): Promise<ScanResult> {
   const framework = await detectFramework(projectRoot);
   const styling = await detectStylingSystem(projectRoot, framework);
-  const [tokens, components, shadows, borders, gradients, usages] = await Promise.all([
+  const [tokens, components, shadows, borders, gradients, spacing, usages] = await Promise.all([
     scanTokens(projectRoot, framework),
     scanComponents(projectRoot),
     scanShadows(projectRoot, framework, styling),
     scanBorders(projectRoot, framework, styling),
     scanGradients(projectRoot, framework, styling),
+    scanSpacing(projectRoot, framework, styling),
     scanUsages(projectRoot, framework),
   ]);
 
-  cachedScan = { framework, tokens, components, shadows, borders, gradients, styling, usages };
+  cachedScan = { framework, tokens, components, shadows, borders, gradients, spacing, styling, usages };
   return cachedScan;
 }
 
@@ -69,6 +72,13 @@ export async function rescanBorders(projectRoot: string): Promise<BorderMap> {
   const borders = await scanBorders(projectRoot, scan.framework, scan.styling);
   patchCachedScan("borders", borders);
   return borders;
+}
+
+export async function rescanSpacing(projectRoot: string): Promise<SpacingMap> {
+  const scan = cachedScan || await runScan(projectRoot);
+  const spacing = await scanSpacing(projectRoot, scan.framework, scan.styling);
+  patchCachedScan("spacing", spacing);
+  return spacing;
 }
 
 export async function rescanGradients(projectRoot: string): Promise<GradientMap> {
@@ -137,6 +147,15 @@ export function createScanRouter(projectRoot: string) {
     }
   });
 
+  router.get("/spacing", async (_req, res) => {
+    try {
+      const result = cachedScan || await runScan(projectRoot);
+      res.json(result.spacing);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   router.get("/shadows", async (_req, res) => {
     try {
       const result = cachedScan || await runScan(projectRoot);
@@ -188,6 +207,15 @@ export function createScanRouter(projectRoot: string) {
     try {
       const borders = await rescanBorders(projectRoot);
       res.json(borders);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.post("/rescan/spacing", async (_req, res) => {
+    try {
+      const spacing = await rescanSpacing(projectRoot);
+      res.json(spacing);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

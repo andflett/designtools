@@ -22,4 +22,5 @@ export { ScaleInput } from "./scale-input.js";
 export { OpacitySlider } from "./opacity-slider.js";
 export { BoxSpacingControl } from "./box-spacing.js";
 export { BoxRadiusControl } from "./box-radius.js";
+export { ToggleControl } from "./toggle-control.js";
 export { CSS_PROP_TO_TW_PREFIX, CSS_PROP_TO_TW_SCALE } from "./tailwind-maps.js";

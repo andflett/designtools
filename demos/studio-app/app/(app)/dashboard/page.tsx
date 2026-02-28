@@ -34,9 +34,9 @@ const recentItems = [
 ];
 
 const topContributors = [
-  { name: "Alice Chen", email: "alice@example.com", role: "47 commits", status: "active" as const },
-  { name: "Bob Martinez", email: "bob@example.com", role: "32 commits", status: "active" as const },
-  { name: "Carol Wu", email: "carol@example.com", role: "18 commits", status: "active" as const },
+  { name: "Andrew Flett", email: "andrew@flett.cc", role: "47 commits", status: "active" as const },
+  { name: "Andrew Flett", email: "andrew@flett.cc", role: "32 commits", status: "active" as const },
+  { name: "Andrew Flett", email: "andrew@flett.cc", role: "18 commits", status: "active" as const },
 ];
 
 const recentActivity = [

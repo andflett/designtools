@@ -8,6 +8,7 @@ import type { ComponentRegistry, ComponentEntry } from "../../server/lib/scan-co
 import type { ShadowMap } from "../../server/lib/scan-shadows.js";
 import type { BorderMap } from "../../server/lib/scan-borders.js";
 import type { GradientMap } from "../../server/lib/scan-gradients.js";
+import type { SpacingMap } from "../../server/lib/scan-spacing.js";
 import type { ComponentUsageMap } from "../../server/lib/scan-usages.js";
 import type { StylingSystem } from "../../server/lib/detect-styling.js";
 import type { FrameworkInfo } from "../../server/lib/detect-framework.js";
@@ -35,6 +36,7 @@ export interface ScanState {
   shadows: ShadowMap | null;
   borders: BorderMap | null;
   gradients: GradientMap | null;
+  spacing: SpacingMap | null;
   styling: StylingSystem | null;
   usages: ComponentUsageMap | null;
 }
@@ -72,6 +74,7 @@ export interface RawScanData {
   shadows: ShadowMap;
   borders: BorderMap;
   gradients: GradientMap;
+  spacing: SpacingMap;
   styling: StylingSystem;
   usages: ComponentUsageMap;
 }
@@ -90,6 +93,7 @@ function createScanStore() {
     shadows: null,
     borders: null,
     gradients: null,
+    spacing: null,
     styling: null,
     usages: null,
   };
@@ -118,6 +122,7 @@ function createScanStore() {
       shadows: data.shadows,
       borders: data.borders,
       gradients: data.gradients,
+      spacing: data.spacing,
       styling: data.styling,
       usages: data.usages,
     };

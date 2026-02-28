@@ -1,23 +1,69 @@
 import * as React from "react";
+import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
+
+const avatarVariants = cva(
+  "relative flex shrink-0 overflow-hidden bg-muted",
+  {
+    variants: {
+      size: {
+        xs: "h-6 w-6 text-[10px]",
+        sm: "h-8 w-8 text-xs",
+        default: "h-10 w-10 text-sm",
+        lg: "h-14 w-14 text-lg",
+        xl: "h-20 w-20 text-xl",
+      },
+      shape: {
+        circle: "rounded-full",
+        square: "rounded-md",
+      },
+      status: {
+        none: "",
+        online: "",
+        away: "",
+        offline: "",
+      },
+    },
+    defaultVariants: {
+      size: "default",
+      shape: "circle",
+      status: "none",
+    },
+  }
+);
+
+const statusColors = {
+  none: "",
+  online: "bg-green-500",
+  away: "bg-yellow-500",
+  offline: "bg-muted-foreground",
+} as const;
 
 const Avatar = React.forwardRef<
   HTMLSpanElement,
-  React.HTMLAttributes<HTMLSpanElement> & { size?: "sm" | "default" | "lg" }
->(({ className, size = "default", ...props }, ref) => (
+  React.HTMLAttributes<HTMLSpanElement> & VariantProps<typeof avatarVariants>
+>(({ className, size, shape, status, children, ...props }, ref) => (
   <span
     ref={ref}
     data-slot="avatar"
-    data-size={size}
-    className={cn(
-      "relative flex shrink-0 overflow-hidden rounded-full bg-muted",
-      size === "sm" && "h-8 w-8",
-      size === "default" && "h-10 w-10",
-      size === "lg" && "h-14 w-14",
-      className
-    )}
+    data-size={size || "default"}
+    data-shape={shape || "circle"}
+    data-status={status || "none"}
+    className={cn(avatarVariants({ size, shape, status }), "relative", className)}
     {...props}
-  />
+  >
+    {children}
+    {status && status !== "none" && (
+      <span
+        data-slot="avatar-status"
+        className={cn(
+          "absolute bottom-0 right-0 block rounded-full border-2 border-background",
+          size === "xs" || size === "sm" ? "h-2 w-2" : "h-3 w-3",
+          statusColors[status]
+        )}
+      />
+    )}
+  </span>
 ));
 Avatar.displayName = "Avatar";
 

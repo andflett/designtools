@@ -14,8 +14,8 @@ import {
 } from "@radix-ui/react-icons";
 import { ShadowList } from "./shadow-list.js";
 import { ColorInput, ColorInputSwatch } from "./controls/color-input.js";
-import { useTokens, useShadows, useBorders, useGradients, useStyling } from "../lib/scan-hooks.js";
-import { saveToken, saveGradient, saveBorder } from "../lib/scan-actions.js";
+import { useTokens, useShadows, useBorders, useGradients, useSpacing, useStyling } from "../lib/scan-hooks.js";
+import { saveToken, saveGradient, saveBorder, saveSpacing } from "../lib/scan-actions.js";
 import { SPACING_SCALE } from "../../shared/tailwind-parser.js";
 
 interface TokenEditorProps {
@@ -37,6 +37,7 @@ export function TokenEditor({
   const shadowData = useShadows();
   const borderData = useBorders();
   const gradientData = useGradients();
+  const spacingData = useSpacing();
   const styling = useStyling();
 
   if (!tokenData) {
@@ -60,7 +61,7 @@ export function TokenEditor({
     .filter(([_, tokens]) => tokens.some((t) => t.category === "color"))
     .slice(0, 8);
 
-  const spacingTokens = tokens.filter((t) => t.category === "spacing");
+  const spacingDefs = spacingData?.spacing || [];
 
   const borderColorTokens = tokens.filter((t) =>
     t.category === "color" && ["--border", "--input", "--ring"].includes(t.name)
@@ -76,7 +77,7 @@ export function TokenEditor({
     <div className="">
       {/* Used by element — only show when relevant */}
       {referencedTokens.length > 0 && (
-        <Section title="Used by selected" count={referencedTokens.length} defaultCollapsed>
+        <Section title="Used by selected element" count={referencedTokens.length} defaultCollapsed>
           <div className="flex flex-col gap-1.5 px-4 pb-2">
             {referencedTokens.map((token: any) => {
               const value = theme === "dark" && token.darkValue ? token.darkValue : token.lightValue;
@@ -151,11 +152,12 @@ export function TokenEditor({
       </Section>
 
       {/* Spacing — always visible */}
-      <Section title="Spacing" count={spacingTokens.length} defaultCollapsed>
-        {spacingTokens.length > 0 ? (
+      <Section title="Spacing" count={spacingDefs.length} defaultCollapsed>
+        {spacingDefs.length > 0 ? (
           <SpacingScale
-            spacingTokens={spacingTokens}
-            cssFilePath={cssFilePath}
+            spacingDefs={spacingDefs}
+            cssFilePath={spacingData?.cssFilePath || cssFilePath}
+            stylingType={spacingData?.stylingType || stylingType}
             theme={theme}
           />
         ) : (
@@ -356,21 +358,22 @@ function parseSpacingBase(value: string): { num: number; unit: string } | null {
 }
 
 function SpacingScale({
-  spacingTokens,
+  spacingDefs,
   cssFilePath,
+  stylingType,
   theme,
 }: {
-  spacingTokens: any[];
+  spacingDefs: any[];
   cssFilePath: string;
+  stylingType: string;
   theme: "light" | "dark";
 }) {
   // Find the base --spacing token (Tailwind v4 pattern)
-  const baseToken = spacingTokens.find((t: any) => t.name === "--spacing");
-  const otherTokens = spacingTokens.filter((t: any) => t.name !== "--spacing");
-  const baseVal = baseToken
-    ? (theme === "dark" && baseToken.darkValue ? baseToken.darkValue : baseToken.lightValue)
-    : null;
+  const baseToken = spacingDefs.find((s: any) => s.isBase);
+  const otherTokens = spacingDefs.filter((s: any) => !s.isBase);
+  const baseVal = baseToken?.value || null;
   const parsed = baseVal ? parseSpacingBase(baseVal) : null;
+  const selector = stylingType === "tailwind-v4" ? "@theme" : (theme === "dark" ? ".dark" : ":root");
 
   // Show a subset of the scale that's useful (skip the very large ones to keep it compact)
   const visibleSteps = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 72, 80, 96];
@@ -385,7 +388,7 @@ function SpacingScale({
             token={baseToken}
             theme={theme}
             icon={SpaceBetweenHorizontallyIcon}
-            onSave={(value) => saveToken(cssFilePath, baseToken.name, value, theme === "dark" ? ".dark" : ":root")}
+            onSave={(value) => saveSpacing(cssFilePath, baseToken.cssVariable, value, selector)}
           />
         </div>
       )}
@@ -395,12 +398,11 @@ function SpacingScale({
         <div className="px-4 mb-2 grid grid-cols-2 gap-1.5">
           {otherTokens.map((token: any) => (
             <TokenScrubRow
-              
               key={token.name}
               token={token}
               theme={theme}
               icon={SpaceBetweenHorizontallyIcon}
-              onSave={(value) => saveToken(cssFilePath, token.name, value, theme === "dark" ? ".dark" : ":root")}
+              onSave={(value) => saveSpacing(cssFilePath, token.cssVariable, value, selector)}
             />
           ))}
         </div>

@@ -3,19 +3,30 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const alertVariants = cva(
-  "relative w-full rounded-lg border px-4 py-3 text-sm",
+  "relative w-full rounded-lg border text-sm",
   {
     variants: {
       variant: {
-        default: "bg-background text-foreground",
-        destructive:
-          "border-destructive/50 text-destructive [&>svg]:text-destructive",
-        success:
-          "mx-auto border-primary/50 bg-primary/5 text-foreground [&>svg]:text-primary shadow-[0_4px_4px_rgba(0,0,0,0.25)]",
+        default: "bg-background text-foreground border-border",
+        destructive: "border-destructive/50 text-destructive bg-destructive/5 [&>svg]:text-destructive",
+        success: "border-primary/50 bg-primary/5 text-foreground [&>svg]:text-primary",
+        warning: "border-yellow-500/50 bg-yellow-500/5 text-yellow-700 [&>svg]:text-yellow-600",
+      },
+      size: {
+        sm: "px-3 py-2 text-xs",
+        default: "px-4 py-3",
+        lg: "px-5 py-4",
+      },
+      border: {
+        default: "border",
+        thick: "border-2",
+        left: "border-l-4 border-y-0 border-r-0",
       },
     },
     defaultVariants: {
       variant: "default",
+      size: "default",
+      border: "default",
     },
   }
 );
@@ -23,13 +34,15 @@ const alertVariants = cva(
 const Alert = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement> & VariantProps<typeof alertVariants>
->(({ className, variant, ...props }, ref) => (
+>(({ className, variant, size, border, ...props }, ref) => (
   <div
     ref={ref}
     role="alert"
     data-slot="alert"
     data-variant={variant || "default"}
-    className={cn(alertVariants({ variant }), className)}
+    data-size={size || "default"}
+    data-border={border || "default"}
+    className={cn(alertVariants({ variant, size, border }), className)}
     {...props}
   />
 ));
