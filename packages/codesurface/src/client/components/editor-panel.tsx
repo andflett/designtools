@@ -30,7 +30,7 @@ import type { ComponentEntry } from "../../server/lib/scan-components.js";
 import { TokenEditor } from "./token-editor.js";
 import { PropertyPanel } from "./property-panel.js";
 import { ComputedPropertyPanel } from "./computed-property-panel.js";
-import { Tooltip } from "./tooltip.js";
+import { Tooltip, ExplainerNote } from "./tooltip.js";
 import { useTokens, useComponents } from "../lib/scan-hooks.js";
 import type { IndexedTokenMap } from "../lib/scan-store.js";
 
@@ -480,12 +480,10 @@ export function EditorPanel({
 
             {componentSubTab === "props" &&
               (!componentEntry || componentEntry.variants.length === 0) && (
-                <div
-                  className="px-4 py-3 text-[11px]"
-                  style={{ color: "var(--studio-text-dimmed)" }}
-                >
-                  This component doesn't use variant definitions (CVA). Edit its
-                  styles in the Styles sub-tab or switch to the Instance tab.
+                <div className="px-4 py-3">
+                  <ExplainerNote>
+                    This component has no predefined style props. Edit its styles directly in the "Styles" tab.
+                  </ExplainerNote>
                 </div>
               )}
           </>

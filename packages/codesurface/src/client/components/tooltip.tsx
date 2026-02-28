@@ -1,8 +1,8 @@
 /**
- * Styled Radix tooltip matching the editor's dark theme.
- * Wraps children with a tooltip that shows on hover with minimal delay.
+ * Shared UI primitives: Tooltip, ExplainerNote.
  */
 import * as RadixTooltip from "@radix-ui/react-tooltip";
+import { InfoCircledIcon } from "@radix-ui/react-icons";
 import type { ReactNode } from "react";
 
 interface TooltipProps {
@@ -12,6 +12,30 @@ interface TooltipProps {
   align?: "start" | "center" | "end";
   delayDuration?: number;
 }
+
+// ---------------------------------------------------------------------------
+// ExplainerNote — styled callout for contextual help text
+// ---------------------------------------------------------------------------
+
+export function ExplainerNote({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`studio-tab-explainer ${className}`}>
+      <span className="text-[12px]" style={{ color: "var(--studio-text-dimmed)", lineHeight: 1.5 }}>
+        {children}
+      </span>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Tooltip
+// ---------------------------------------------------------------------------
 
 export function TooltipProvider({ children }: { children: ReactNode }) {
   return (

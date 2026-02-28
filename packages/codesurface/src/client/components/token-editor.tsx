@@ -75,6 +75,9 @@ export function TokenEditor({
     t.category === "color" && ["--border", "--input", "--ring"].includes(t.name)
   );
 
+  const radiusBorders = borderData?.borders?.filter((b: any) => b.kind === "radius") || [];
+  const widthBorders = borderData?.borders?.filter((b: any) => b.kind === "width") || [];
+
   const stylingType = styling?.type || "";
   const selector = stylingType === "tailwind-v4" ? "@theme" : (theme === "dark" ? ".dark" : ":root");
 
@@ -83,17 +86,19 @@ export function TokenEditor({
       {/* Used by element — only show when relevant */}
       {referencedTokens.length > 0 && (
         <Section title="Used by element" count={referencedTokens.length} defaultCollapsed>
-          {referencedTokens.map((token: any) => (
-            <TokenRow
-              key={token.name}
-              token={token}
-              theme={theme}
-              onPreview={onPreviewToken}
-              onClearPreview={onClearTokenPreview}
-              cssFilePath={cssFilePath}
-              allTokens={tokens}
-            />
-          ))}
+          <div className="flex flex-col gap-1.5 px-4 pb-2">
+            {referencedTokens.map((token: any) => (
+              <TokenRow
+                key={token.name}
+                token={token}
+                theme={theme}
+                onPreview={onPreviewToken}
+                onClearPreview={onClearTokenPreview}
+                cssFilePath={cssFilePath}
+                allTokens={tokens}
+              />
+            ))}
+          </div>
         </Section>
       )}
 
@@ -103,19 +108,21 @@ export function TokenEditor({
           <div className="studio-tree">
             {colorTokenGroups.map(([groupName, groupTokens]) => (
               <SubSection key={groupName} title={groupName} count={(groupTokens as any[]).filter(t => t.category === "color").length}>
-                {(groupTokens as any[])
-                  .filter((t) => t.category === "color")
-                  .map((token: any) => (
-                    <TokenRow
-                      key={token.name}
-                      token={token}
-                      theme={theme}
-                      onPreview={onPreviewToken}
-                      onClearPreview={onClearTokenPreview}
-                      cssFilePath={cssFilePath}
-                      allTokens={tokens}
-                    />
-                  ))}
+                <div className="flex flex-col gap-1.5 pb-1">
+                  {(groupTokens as any[])
+                    .filter((t) => t.category === "color")
+                    .map((token: any) => (
+                      <TokenRow
+                        key={token.name}
+                        token={token}
+                        theme={theme}
+                        onPreview={onPreviewToken}
+                        onClearPreview={onClearTokenPreview}
+                        cssFilePath={cssFilePath}
+                        allTokens={tokens}
+                      />
+                    ))}
+                </div>
               </SubSection>
             ))}
           </div>
@@ -151,10 +158,20 @@ export function TokenEditor({
         )}
       </Section>
 
-      {/* Borders — uses scan-borders data */}
-      <Section title="Borders" count={(borderData?.borders?.length || 0) + borderColorTokens.length} defaultCollapsed>
+      {/* Radii */}
+      <Section title="Radii" count={radiusBorders.length} defaultCollapsed>
+        <RadiiSection
+          borders={radiusBorders}
+          theme={theme}
+          cssFilePath={borderData?.cssFilePath || cssFilePath}
+          stylingType={borderData?.stylingType || stylingType}
+        />
+      </Section>
+
+      {/* Borders — widths + colors */}
+      <Section title="Borders" count={widthBorders.length + borderColorTokens.length} defaultCollapsed>
         <BordersSection
-          borders={borderData?.borders || []}
+          widthBorders={widthBorders}
           borderColorTokens={borderColorTokens}
           theme={theme}
           cssFilePath={borderData?.cssFilePath || cssFilePath}
@@ -280,6 +297,7 @@ function TokenRow({
   allTokens: any[];
 }) {
   const [showPopover, setShowPopover] = useState(false);
+  const [hovered, setHovered] = useState(false);
   const rowRef = useRef<HTMLButtonElement>(null);
   const value = theme === "dark" && token.darkValue ? token.darkValue : token.lightValue;
   const resolvedValue = value;
@@ -297,24 +315,33 @@ function TokenRow({
       <button
         ref={rowRef}
         onClick={() => setShowPopover(!showPopover)}
-        className="studio-prop-row w-full text-left"
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        className="studio-scrub-input w-full"
         style={{
-          background: showPopover ? "var(--studio-surface-hover)" : "transparent",
           cursor: "pointer",
-          border: "none",
+          overflow: "hidden",
+          background: hovered || showPopover ? "var(--studio-surface-hover)" : undefined,
+          borderColor: showPopover ? "var(--studio-accent)" : hovered ? "var(--studio-border-hover, var(--studio-border))" : undefined,
         }}
       >
+        {/* Full-height swatch, no rounding — clipped by container overflow:hidden */}
         <div
-          className="studio-swatch"
           style={{
-            "--swatch-color": value,
-            width: 20,
-            height: 20,
-          } as React.CSSProperties}
+            width: 28,
+            alignSelf: "stretch",
+            flexShrink: 0,
+            background: value || "transparent",
+            backgroundImage: value
+              ? `linear-gradient(${value}, ${value}), linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)`
+              : undefined,
+            backgroundSize: value ? "cover, 6px 6px, 6px 6px, 6px 6px, 6px 6px" : undefined,
+            backgroundPosition: value ? "0 0, 0 0, 0 3px, 3px -3px, -3px 0" : undefined,
+          }}
         />
         <span
-          className="flex-1 text-[11px] font-mono truncate"
-          style={{ color: "var(--studio-text)" }}
+          className="studio-scrub-value"
+          style={{ color: "var(--studio-text)", userSelect: "none", textAlign: "left" }}
         >
           {token.name.replace(/^--/, "")}
         </span>
@@ -522,6 +549,7 @@ function SpacingScale({
         <div className="px-4 mb-2 grid grid-cols-2 gap-1.5">
           {otherTokens.map((token: any) => (
             <TokenScrubRow
+              
               key={token.name}
               token={token}
               theme={theme}
@@ -535,12 +563,7 @@ function SpacingScale({
       {/* Derived scale table */}
       {parsed && (
         <div className="px-4">
-          <div
-            className="text-[10px] font-semibold uppercase tracking-wider mb-1.5"
-            style={{ color: "var(--studio-text-dimmed)" }}
-          >
-            Scale
-          </div>
+         
           <div
             className="rounded-md overflow-hidden"
             style={{
@@ -641,11 +664,59 @@ function SpacingScale({
 }
 
 // ---------------------------------------------------------------------------
-// Borders Section — uses scan-borders data with framework defaults
+// Radii Section
+// ---------------------------------------------------------------------------
+
+function RadiiSection({
+  borders,
+  theme,
+  cssFilePath,
+  stylingType,
+}: {
+  borders: any[];
+  theme: "light" | "dark";
+  cssFilePath: string;
+  stylingType: string;
+}) {
+  if (borders.length === 0) {
+    return <EmptyState message="No radius tokens found." />;
+  }
+
+  const selector = stylingType === "tailwind-v4" ? "@theme" : (theme === "dark" ? ".dark" : ":root");
+
+  const handleSave = async (border: any, newValue: string) => {
+    const variableName = border.cssVariable || `--${border.name}`;
+    const isNew = border.source === "framework-preset" && !border.isOverridden;
+    const endpoint = isNew ? "/api/gradients/create" : "/api/gradients";
+    await saveBorder(endpoint, { filePath: cssFilePath, variableName, value: newValue, selector });
+  };
+
+  return (
+    <div className="px-4 pb-2">
+      <div className="grid grid-cols-2 gap-1.5">
+        {borders.map((border: any) => (
+          <TokenScrubRow
+            key={border.name}
+            token={border}
+            theme={theme}
+            icon={CornersIcon}
+            onSave={(v) => handleSave(border, v)}
+            step={0.025}
+            min={0}
+            maxDecimals={3}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Borders Section — widths + colors
 // ---------------------------------------------------------------------------
 
 function BordersSection({
-  borders,
+  widthBorders,
   borderColorTokens,
   theme,
   cssFilePath,
@@ -654,7 +725,7 @@ function BordersSection({
   onPreviewToken,
   onClearPreview,
 }: {
-  borders: any[];
+  widthBorders: any[];
   borderColorTokens: any[];
   theme: "light" | "dark";
   cssFilePath: string;
@@ -663,9 +734,7 @@ function BordersSection({
   onPreviewToken: (token: string, value: string) => void;
   onClearPreview: () => void;
 }) {
-  const radiusBorders = borders.filter((b: any) => b.kind === "radius");
-  const widthBorders = borders.filter((b: any) => b.kind === "width");
-  const hasContent = radiusBorders.length > 0 || widthBorders.length > 0 || borderColorTokens.length > 0;
+  const hasContent = widthBorders.length > 0 || borderColorTokens.length > 0;
 
   if (!hasContent) {
     return <EmptyState message="No border tokens found." />;
@@ -677,41 +746,14 @@ function BordersSection({
     const variableName = border.cssVariable || `--${border.name}`;
     const isNew = border.source === "framework-preset" && !border.isOverridden;
     const endpoint = isNew ? "/api/gradients/create" : "/api/gradients";
-    await saveBorder(endpoint, {
-      filePath: cssFilePath,
-      variableName,
-      value: newValue,
-      selector,
-    });
+    await saveBorder(endpoint, { filePath: cssFilePath, variableName, value: newValue, selector });
   };
 
   return (
     <div className="flex flex-col gap-3 pb-2">
-      {/* Radius subsection */}
-      {radiusBorders.length > 0 && (
-        <div className="px-4">
-          <SectionLabel label="Radius" />
-          <div className="grid grid-cols-2 gap-1.5">
-            {radiusBorders.map((border: any) => (
-              <TokenScrubRow
-                key={border.name}
-                token={border}
-                theme={theme}
-                icon={CornersIcon}
-                onSave={(v) => handleSave(border, v)}
-                step={0.025}
-                min={0}
-                maxDecimals={3}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Border Width subsection */}
       {widthBorders.length > 0 && (
         <div className="px-4">
-          <SectionLabel label="Width" />
           <div className="grid grid-cols-2 gap-1.5">
             {widthBorders.map((border: any) => (
               <TokenScrubRow
@@ -729,11 +771,9 @@ function BordersSection({
 
       {/* Border Color subsection */}
       {borderColorTokens.length > 0 && (
-        <div>
-          <div className="px-4">
-            <SectionLabel label="Color" />
-          </div>
-          <div className="flex flex-col gap-0 mb-2">
+        <div className="px-4">
+          <SectionLabel label="Color" />
+          <div className="flex flex-col gap-1.5">
             {borderColorTokens.map((token: any) => (
               <TokenRow
                 key={token.name}

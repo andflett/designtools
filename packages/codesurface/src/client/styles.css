@@ -144,7 +144,6 @@ body {
   align-items: flex-start;
   gap: 8px;
   padding: 10px 14px;
-  margin: 8px 10px;
   font-size: 11px;
   line-height: 1.45;
   color: var(--studio-text-dimmed);
@@ -204,9 +203,10 @@ body {
 /* Tree structure for nested collapsibles */
 .studio-tree {
   position: relative;
-  margin-left: 16px;
+  margin-left: 20px;
   border-left: 1px solid var(--studio-border-subtle);
   margin-bottom: 6px;
+  margin-top: -6px;
 }
 .studio-tree-node {
   position: relative;
@@ -236,9 +236,10 @@ body {
   padding: 5px 16px 5px 14px;
 }
 .studio-tree-content {
-  padding-left: 14px;
-  padding-right: 8px;
-  padding-bottom: 6px;
+  padding-left: 20px;
+  padding-right: 16px;
+  padding-bottom: 8px;
+  padding-top: 5px;
 }
 
 /* Property row */
@@ -315,6 +316,82 @@ body {
 }
 .studio-select:focus {
   border-color: var(--studio-accent);
+}
+
+/* Prop select (Radix) — used in isolation view */
+.studio-prop-select-trigger {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  background: var(--studio-input-bg);
+  border: 1px solid var(--studio-border-subtle);
+  border-radius: 5px;
+  padding: 0 6px 0 8px;
+  height: 26px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  font-size: 10px;
+  color: var(--studio-text);
+}
+.studio-prop-select-trigger:hover {
+  border-color: var(--studio-border);
+  background: var(--studio-surface-hover);
+}
+.studio-prop-select-trigger[data-state="open"] {
+  border-color: var(--studio-accent);
+}
+.studio-prop-select-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+.studio-prop-select-content {
+  background: var(--studio-surface);
+  border: 1px solid var(--studio-border);
+  border-radius: 7px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.25);
+  padding: 4px;
+  min-width: var(--radix-select-trigger-width);
+  z-index: 10000;
+}
+.studio-prop-select-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  font-size: 10px;
+  color: var(--studio-text);
+  cursor: pointer;
+  outline: none;
+  user-select: none;
+}
+.studio-prop-select-item[data-highlighted] {
+  background: var(--studio-accent-muted);
+  color: var(--studio-accent);
+}
+.studio-prop-select-item[data-state="checked"] {
+  color: var(--studio-accent);
+}
+.studio-prop-select-check {
+  display: flex;
+  align-items: center;
+  color: var(--studio-accent);
+  flex-shrink: 0;
+}
+.studio-prop-select-separator {
+  height: 1px;
+  background: var(--studio-border-subtle);
+  margin: 3px 0;
 }
 
 /* Two column grid */
