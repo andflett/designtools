@@ -364,29 +364,30 @@ export function CodeSurface() {
         };
       }
 
-      // Show semantic HTML landmarks
+      // Show semantic HTML landmarks — always show these as structural markers
       if (semanticTags.has(tag)) {
         const children: TreeNode[] = [];
         if (fiber.child) walkFiber(fiber.child, children, scope);
         const text = el ? getDirectText(el) : "";
-        if (children.length > 0 || text) {
-          return {
-            id: el ? getDomPath(el) : "",
-            name: `<${tag}>`,
-            type: "element",
-            dataSlot: null,
-            source: el?.getAttribute("data-source") || null,
-            scope,
-            textContent: text,
-            children,
-          };
-        }
+        return {
+          id: el ? getDomPath(el) : "",
+          name: `<${tag}>`,
+          type: "element",
+          dataSlot: null,
+          source: el?.getAttribute("data-source") || null,
+          scope,
+          textContent: text,
+          children,
+        };
       }
 
       // Show authored elements — data-source is added by our Babel transform
       // to every JSX element, so its presence proves this was deliberately
       // written in user code. Skip document/void tags that aren't meaningful.
-      if (el?.hasAttribute("data-source") && !skipTags.has(tag)) {
+      // In "components" mode, skip generic elements to reduce noise (only
+      // data-slot components and semantic landmarks show). In "dom" mode,
+      // show all authored elements.
+      if (currentTreeMode === "dom" && el?.hasAttribute("data-source") && !skipTags.has(tag)) {
         const children: TreeNode[] = [];
         if (fiber.child) walkFiber(fiber.child, children, scope);
         const text = el ? getDirectText(el) : "";
@@ -580,7 +581,11 @@ export function CodeSurface() {
       }
     }
 
-    function sendComponentTree() {
+    // Current tree mode — stored so MutationObserver re-sends use the same mode
+    let currentTreeMode: "components" | "dom" = "components";
+
+    function sendComponentTree(mode?: "components" | "dom") {
+      if (mode) currentTreeMode = mode;
       const tree = buildComponentTree(document.body);
       window.parent.postMessage({ type: "tool:componentTree", tree }, "*");
     }
@@ -589,7 +594,7 @@ export function CodeSurface() {
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     function debouncedSendTree() {
       if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(sendComponentTree, 300);
+      debounceTimer = setTimeout(() => sendComponentTree(), 300);
     }
 
     // MutationObserver to send updated tree on DOM changes (HMR, dynamic content)
@@ -955,7 +960,7 @@ export function CodeSurface() {
           }
           break;
         case "tool:requestComponentTree":
-          sendComponentTree();
+          sendComponentTree((msg as any).mode || "components");
           break;
         case "tool:highlightByTreeId": {
           const id = msg.id as string;

@@ -1,0 +1,227 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", "Fira Code", monospace;
+
+  --color-page: #ffffff;
+  --color-raised: #f8f8f9;
+  --color-muted: #f0f0f2;
+  --color-surface: #ffffff;
+  --color-edge: #e4e4e7;
+  --color-edge-subtle: #ebebee;
+  --color-ink: #09090b;
+  --color-ink2: #71717a;
+  --color-ink3: #a1a1aa;
+  --color-btn: #18181b;
+  --color-sel: #3b82f6;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--color-page);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─────────────────────────────────────────────────
+   GRID BACKGROUNDS
+   ───────────────────────────────────────────────── */
+
+/* Inspector-style graph paper — fine 24px grid + bold 96px grid */
+.graph-grid {
+  position: relative;
+}
+.graph-grid::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(0, 0, 0, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.06) 1px, transparent 1px),
+    linear-gradient(rgba(0, 0, 0, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.12) 1px, transparent 1px);
+  background-size: 24px 24px, 24px 24px, 96px 96px, 96px 96px;
+}
+
+/* Graph grid with bottom fade */
+.graph-grid-fade {
+  position: relative;
+}
+.graph-grid-fade::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(0, 0, 0, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.06) 1px, transparent 1px),
+    linear-gradient(rgba(0, 0, 0, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.12) 1px, transparent 1px);
+  background-size: 24px 24px, 24px 24px, 96px 96px, 96px 96px;
+  mask-image: linear-gradient(to bottom, black 20%, transparent 85%);
+  -webkit-mask-image: linear-gradient(to bottom, black 20%, transparent 85%);
+}
+
+/* Dot matrix — 16px spacing */
+.dot-grid::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle, rgba(0, 0, 0, 0.12) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
+/* ─────────────────────────────────────────────────
+   BAYER DITHER — ordered 8×8 pattern
+   The real deal: a proper Bayer matrix dither
+   that dissolves from solid to transparent.
+   ───────────────────────────────────────────────── */
+
+/* Bayer 8x8 dither gradient — bottom edge dissolve */
+.bayer-bottom {
+  position: relative;
+}
+.bayer-bottom::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 64px;
+  pointer-events: none;
+  background-color: var(--color-page);
+  mask-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAMklEQVQoU2NkYPj/nwEPYMQmwYRNAl0SqwQ2SZwS2FRhk8CqCpsEVlXYJHBKYFOFTQIAjKQJCUVGOEoAAAAASUVORK5CYII=");
+  mask-size: 8px 8px;
+  mask-repeat: repeat;
+  -webkit-mask-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAMklEQVQoU2NkYPj/nwEPYMQmwYRNAl0SqwQ2SZwS2FRhk8CqCpsEVlXYJHBKYFOFTQIAjKQJCUVGOEoAAAAASUVORK5CYII=");
+  -webkit-mask-size: 8px 8px;
+  -webkit-mask-repeat: repeat;
+  /* Use a gradient on the element itself to create the dissolve */
+  mask-composite: intersect;
+  -webkit-mask-composite: source-in;
+}
+
+/* Full section dither overlay — used as section transition */
+.dither-section-top {
+  height: 48px;
+  background: var(--color-raised);
+  mask-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAMklEQVQoU2NkYPj/nwEPYMQmwYRNAl0SqwQ2SZwS2FRhk8CqCpsEVlXYJHBKYFOFTQIAjKQJCUVGOEoAAAAASUVORK5CYII=");
+  mask-size: 8px 8px;
+  -webkit-mask-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAMklEQVQoU2NkYPj/nwEPYMQmwYRNAl0SqwQ2SZwS2FRhk8CqCpsEVlXYJHBKYFOFTQIAjKQJCUVGOEoAAAAASUVORK5CYII=");
+  -webkit-mask-size: 8px 8px;
+  mask-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAMklEQVQoU2NkYPj/nwEPYMQmwYRNAl0SqwQ2SZwS2FRhk8CqCpsEVlXYJHBKYFOFTQIAjKQJCUVGOEoAAAAASUVORK5CYII="), linear-gradient(to top, black 0%, transparent 100%);
+  mask-composite: intersect;
+  -webkit-mask-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAMklEQVQoU2NkYPj/nwEPYMQmwYRNAl0SqwQ2SZwS2FRhk8CqCpsEVlXYJHBKYFOFTQIAjKQJCUVGOEoAAAAASUVORK5CYII="), linear-gradient(to top, black 0%, transparent 100%);
+  -webkit-mask-composite: source-in;
+}
+
+/* Dither band — a full-width decorative strip */
+.dither-band {
+  height: 32px;
+  background: var(--color-ink);
+  mask-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAMklEQVQoU2NkYPj/nwEPYMQmwYRNAl0SqwQ2SZwS2FRhk8CqCpsEVlXYJHBKYFOFTQIAjKQJCUVGOEoAAAAASUVORK5CYII=");
+  mask-size: 4px 4px;
+  -webkit-mask-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAMklEQVQoU2NkYPj/nwEPYMQmwYRNAl0SqwQ2SZwS2FRhk8CqCpsEVlXYJHBKYFOFTQIAjKQJCUVGOEoAAAAASUVORK5CYII=");
+  -webkit-mask-size: 4px 4px;
+  opacity: 0.15;
+}
+
+/* Checkerboard dither — larger scale, visible pattern */
+.checker-dither {
+  background-image: url("data:image/svg+xml,%3Csvg width='8' height='8' viewBox='0 0 8 8' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='4' height='4' fill='%2309090b' fill-opacity='0.025'/%3E%3Crect x='4' y='4' width='4' height='4' fill='%2309090b' fill-opacity='0.025'/%3E%3C/svg%3E");
+  background-size: 8px 8px;
+}
+
+/* ─────────────────────────────────────────────────
+   SCANLINES & TERMINAL
+   ───────────────────────────────────────────────── */
+
+.scanlines {
+  position: relative;
+}
+.scanlines::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 3px,
+    rgba(0, 0, 0, 0.02) 3px,
+    rgba(0, 0, 0, 0.02) 4px
+  );
+  border-radius: inherit;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.cursor-blink {
+  animation: blink 1.2s step-end infinite;
+}
+
+
+/* ─────────────────────────────────────────────────
+   NPX COMMAND — pixelated dither shadow
+   ───────────────────────────────────────────────── */
+
+.npx-command::before {
+  content: "";
+  position: absolute;
+  inset: -6px -10px;
+  z-index: -1;
+  background: rgba(0, 0, 0, 0.08);
+  mask-image:
+    url("data:image/svg+xml,%3Csvg width='4' height='4' viewBox='0 0 4 4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='2' height='2' fill='white'/%3E%3Crect x='2' y='2' width='2' height='2' fill='white'/%3E%3C/svg%3E"),
+    radial-gradient(ellipse at center, black 30%, transparent 75%);
+  mask-size: 4px 4px, 100% 100%;
+  mask-composite: intersect;
+  -webkit-mask-image:
+    url("data:image/svg+xml,%3Csvg width='4' height='4' viewBox='0 0 4 4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='2' height='2' fill='white'/%3E%3Crect x='2' y='2' width='2' height='2' fill='white'/%3E%3C/svg%3E"),
+    radial-gradient(ellipse at center, black 30%, transparent 75%);
+  -webkit-mask-size: 4px 4px, 100% 100%;
+  -webkit-mask-composite: source-in;
+  image-rendering: pixelated;
+}
+
+/* ─────────────────────────────────────────────────
+   SELECTION / DEMO
+   ───────────────────────────────────────────────── */
+
+@keyframes select-breathe {
+  0%, 100% { box-shadow: 0 0 0 2px var(--color-sel); }
+  50% { box-shadow: 0 0 0 2px var(--color-sel), 0 0 0 5px rgba(59, 130, 246, 0.1); }
+}
+
+.select-breathe {
+  animation: select-breathe 3s ease-in-out infinite;
+}
+
+/* ─────────────────────────────────────────────────
+   SCREENSHOT PLACEHOLDERS
+   ───────────────────────────────────────────────── */
+
+.screenshot-slot {
+  background-color: var(--color-muted);
+  background-image:
+    linear-gradient(rgba(0, 0, 0, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-ink3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}

@@ -10,16 +10,18 @@
  * The layout section is collapsed by default since designers typically work
  * on page content rather than the persistent shell.
  */
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   ChevronRightIcon,
   ChevronDownIcon,
   Component1Icon,
   BoxIcon,
   InfoCircledIcon,
+  LayersIcon,
 } from "@radix-ui/react-icons";
 import type { ComponentTreeNode } from "../../shared/protocol.js";
-import { ChevronsDownUp, ChevronsUpDown, ListChevronsDownUp, ListChevronsUpDown } from "lucide-react";
+import { ChevronsDownUp, ChevronsUpDown, ListTree } from "lucide-react";
+import { Tooltip } from "./tooltip.js";
 
 interface PageExplorerProps {
   tree: ComponentTreeNode[];
@@ -27,6 +29,8 @@ interface PageExplorerProps {
   onSelect: (id: string) => void;
   onHover: (id: string) => void;
   onHoverEnd: () => void;
+  treeMode: "components" | "dom";
+  onTreeModeChange: (mode: "components" | "dom") => void;
 }
 
 export function PageExplorer({
@@ -35,11 +39,14 @@ export function PageExplorer({
   onSelect,
   onHover,
   onHoverEnd,
+  treeMode,
+  onTreeModeChange,
 }: PageExplorerProps) {
   const [filter, setFilter] = useState("");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [layoutExpanded, setLayoutExpanded] = useState(false);
   const [pageExpanded, setPageExpanded] = useState(true);
+  const [collapsedChainIds, setCollapsedChainIds] = useState<Set<string>>(new Set());
   const selectedRef = useRef<HTMLDivElement>(null);
 
   // Split tree into layout and page sections
@@ -67,6 +74,51 @@ export function PageExplorer({
     }
   }, [selectedId, tree]);
 
+  // Detect collapsible chains — only reset when treeMode changes.
+  // Tree updates from MutationObserver should NOT reset user's expand/collapse choices.
+  const prevTreeModeRef = useRef(treeMode);
+  useEffect(() => {
+    if (tree.length === 0) return;
+    const modeChanged = prevTreeModeRef.current !== treeMode;
+    prevTreeModeRef.current = treeMode;
+
+    if (modeChanged) {
+      // Mode changed — re-detect and reset collapsed state
+      const chainIds = new Set<string>();
+      if (treeMode === "components") {
+        collectChainRootIds(tree, chainIds);
+      }
+      setCollapsedChainIds(chainIds);
+    } else if (collapsedChainIds.size === 0 && treeMode === "components") {
+      // First tree load in components mode — auto-collapse chains
+      const chainIds = new Set<string>();
+      collectChainRootIds(tree, chainIds);
+      if (chainIds.size > 0) setCollapsedChainIds(chainIds);
+    }
+  }, [tree, treeMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-expand chains containing the selected node
+  useEffect(() => {
+    if (!selectedId || collapsedChainIds.size === 0) return;
+    // Check if selectedId is inside any collapsed chain — expand it
+    setCollapsedChainIds((prev) => {
+      const next = new Set(prev);
+      let changed = false;
+      for (const rootId of prev) {
+        // Find the chain root node and check if selectedId is within it
+        const chainRoot = findNodeById(tree, rootId);
+        if (chainRoot) {
+          const chain = detectChain(chainRoot);
+          if (chain && chain.nodes.some((n) => n.id === selectedId)) {
+            next.delete(rootId);
+            changed = true;
+          }
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Scroll selected node into view
   useEffect(() => {
     if (selectedRef.current) {
@@ -79,6 +131,15 @@ export function PageExplorer({
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleChainCollapsed = useCallback((rootId: string) => {
+    setCollapsedChainIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(rootId)) next.delete(rootId);
+      else next.add(rootId);
       return next;
     });
   }, []);
@@ -107,9 +168,16 @@ export function PageExplorer({
     onSelect,
     onHover,
     onHoverEnd,
+    collapsedChainIds,
+    onToggleChain: toggleChainCollapsed,
   };
 
   const isEmpty = tree.length === 0 || (filter && layoutNodes.length === 0 && pageNodes.length === 0 && allNodes.length === 0);
+
+  const isDomMode = treeMode === "dom";
+  const toggleDomMode = useCallback(() => {
+    onTreeModeChange(isDomMode ? "components" : "dom");
+  }, [isDomMode, onTreeModeChange]);
 
   return (
     <div
@@ -133,6 +201,8 @@ export function PageExplorer({
                 label="Layout"
                 expanded={layoutExpanded}
                 onToggle={() => setLayoutExpanded(!layoutExpanded)}
+                isDomMode={isDomMode}
+                onToggleDomMode={toggleDomMode}
               >
                 {layoutNodes.map((node) => (
                   <TreeNodeItem
@@ -151,6 +221,8 @@ export function PageExplorer({
                 label="Page"
                 expanded={pageExpanded}
                 onToggle={() => setPageExpanded(!pageExpanded)}
+                isDomMode={isDomMode}
+                onToggleDomMode={toggleDomMode}
                 flex
               >
                 {pageNodes.map((node) => (
@@ -192,6 +264,8 @@ function ScopeSection({
   alwaysExpanded,
   explainer,
   flex,
+  isDomMode,
+  onToggleDomMode,
   children,
 }: {
   label: string;
@@ -201,6 +275,10 @@ function ScopeSection({
   explainer?: string;
   /** If true, section grows to fill remaining space (use for the last/main section) */
   flex?: boolean;
+  /** Whether DOM view is active */
+  isDomMode?: boolean;
+  /** Toggle DOM view on/off */
+  onToggleDomMode?: () => void;
   children: React.ReactNode;
 }) {
   const isExpanded = alwaysExpanded || expanded;
@@ -231,15 +309,44 @@ function ScopeSection({
         >
           {label}
         </span>
-        {!alwaysExpanded && (
-          <button className="studio-icon-btn" style={{ width: 20, height: 20, borderRadius: 3 }}>
-            {isExpanded ? (
-              <ChevronsDownUp style={{ width: 13, height: 13 }} />
-            ) : (
-              <ChevronsUpDown style={{ width: 13, height: 13 }} />
-            )}
-          </button>
-        )}
+        <div className="flex items-center gap-0.5">
+          {onToggleDomMode && (
+            <Tooltip
+              content={isDomMode ? "Show components only" : "Show all elements"}
+              side="bottom"
+            >
+              <button
+                className="studio-icon-btn"
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 3,
+                  color: isDomMode ? "var(--studio-accent)" : undefined,
+                  opacity: isDomMode ? 1 : 0.5,
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleDomMode();
+                }}
+              >
+                {isDomMode ? (
+                  <ListTree style={{ width: 13, height: 13 }} strokeWidth={1.5} />
+                ) : (
+                  <LayersIcon style={{ width: 13, height: 13 }} />
+                )}
+              </button>
+            </Tooltip>
+          )}
+          {!alwaysExpanded && (
+            <button className="studio-icon-btn" style={{ width: 20, height: 20, borderRadius: 3 }}>
+              {isExpanded ? (
+                <ChevronsDownUp style={{ width: 13, height: 13 }} />
+              ) : (
+                <ChevronsUpDown style={{ width: 13, height: 13 }} />
+              )}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Explainer (only shown when section is expanded) */}
@@ -273,6 +380,8 @@ function TreeNodeItem({
   onSelect,
   onHover,
   onHoverEnd,
+  collapsedChainIds,
+  onToggleChain,
 }: {
   node: ComponentTreeNode;
   depth: number;
@@ -283,11 +392,23 @@ function TreeNodeItem({
   onSelect: (id: string) => void;
   onHover: (id: string) => void;
   onHoverEnd: () => void;
+  collapsedChainIds: Set<string>;
+  onToggleChain: (rootId: string) => void;
 }) {
   const isSelected = selectedId === node.id;
   const isExpanded = expandedIds.has(node.id);
   const hasChildren = node.children.length > 0;
   const isDesignSystem = node.dataSlot !== null;
+
+  // Check for collapsible chain starting at this node
+  const chain = useMemo(() => detectChain(node), [node]);
+  const isChainRoot = chain !== null;
+  const isChainCollapsed = isChainRoot && collapsedChainIds.has(node.id);
+
+  // When this node is a collapsed chain root, show summary line
+  const chainCount = chain ? chain.nodes.length - 1 : 0; // additional nested nodes
+  const effectiveChildren = isChainCollapsed ? chain!.innerChildren : node.children;
+  const effectiveHasChildren = isChainCollapsed ? effectiveChildren.length > 0 : hasChildren;
 
   return (
     <div>
@@ -305,7 +426,7 @@ function TreeNodeItem({
               : "var(--studio-text-muted)",
           background: isSelected ? "var(--studio-accent-muted)" : "transparent",
           borderRadius: 0,
-         
+
           cursor: "pointer",
           transition: "background 0.1s",
         }}
@@ -320,7 +441,7 @@ function TreeNodeItem({
         }}
       >
         {/* Expand/collapse toggle */}
-        {hasChildren ? (
+        {effectiveHasChildren ? (
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -364,6 +485,31 @@ function TreeNodeItem({
         {/* Name */}
         <span className="truncate">{node.name}</span>
 
+        {/* Chain badge — show +N count for collapsed chains */}
+        {isChainRoot && chainCount > 0 && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleChain(node.id);
+            }}
+            className="shrink-0 inline-flex items-center justify-center"
+            style={{
+              fontSize: 9,
+              fontWeight: 600,
+              color: "var(--studio-text-dimmed)",
+              background: "var(--studio-surface-hover)",
+              borderRadius: 3,
+              padding: "0 4px",
+              height: 15,
+              lineHeight: "15px",
+              cursor: "pointer",
+            }}
+            title={isChainCollapsed ? "Expand nested elements" : "Collapse nested elements"}
+          >
+            {isChainCollapsed ? `+${chainCount}` : `−${chainCount}`}
+          </button>
+        )}
+
         {/* Text preview — only direct text, truncated */}
         {node.textContent && (
           <span
@@ -379,9 +525,26 @@ function TreeNodeItem({
         )}
       </div>
 
-      {/* Children */}
-      {isExpanded &&
-        hasChildren &&
+      {/* Children — when chain is collapsed, show innerChildren at depth+1 */}
+      {isExpanded && isChainCollapsed && effectiveChildren.map((child) => (
+        <TreeNodeItem
+          key={child.id}
+          node={child}
+          depth={depth + 1}
+          selectedId={selectedId}
+          selectedRef={selectedRef}
+          expandedIds={expandedIds}
+          onToggle={onToggle}
+          onSelect={onSelect}
+          onHover={onHover}
+          onHoverEnd={onHoverEnd}
+          collapsedChainIds={collapsedChainIds}
+          onToggleChain={onToggleChain}
+        />
+      ))}
+
+      {/* Children — normal rendering when not collapsed */}
+      {isExpanded && !isChainCollapsed && hasChildren &&
         node.children.map((child) => (
           <TreeNodeItem
             key={child.id}
@@ -394,6 +557,8 @@ function TreeNodeItem({
             onSelect={onSelect}
             onHover={onHover}
             onHoverEnd={onHoverEnd}
+            collapsedChainIds={collapsedChainIds}
+            onToggleChain={onToggleChain}
           />
         ))}
     </div>
@@ -554,4 +719,91 @@ function collectAllIds(nodes: ComponentTreeNode[], ids: Set<string>): void {
     ids.add(node.id);
     if (node.children.length > 0) collectAllIds(node.children, ids);
   }
+}
+
+// --- Chain detection for collapsing nested div chains ---
+
+/** Block-level layout tags that form collapsible chains */
+const blockLayoutTags = new Set([
+  "div", "section", "article", "aside", "main",
+  "header", "footer", "nav", "form", "fieldset",
+  "figure", "details",
+]);
+
+/** Check if a node is a block-level element (not a component) */
+function isBlockElement(node: ComponentTreeNode): boolean {
+  if (node.type !== "element") return false;
+  // node.name is like "<div>", extract the tag
+  const tag = node.name.replace(/[<>]/g, "");
+  return blockLayoutTags.has(tag);
+}
+
+interface CollapsedChain {
+  /** The nodes in the chain, outermost first */
+  nodes: ComponentTreeNode[];
+  /** Children of the deepest node — what appears below the collapsed summary */
+  innerChildren: ComponentTreeNode[];
+}
+
+/**
+ * Detect a collapsible chain starting from the given node.
+ * A chain is a sequence of 2+ block-level element nodes where each has
+ * exactly one child that is also a block-level element.
+ * Returns null if node doesn't start a chain (< 2 deep).
+ */
+function detectChain(node: ComponentTreeNode): CollapsedChain | null {
+  if (!isBlockElement(node)) return null;
+
+  const chain: ComponentTreeNode[] = [node];
+  let current = node;
+
+  while (true) {
+    // Check if current has exactly one child that is a block element
+    const blockChildren = current.children.filter(isBlockElement);
+    if (blockChildren.length !== 1) break;
+    // Also check there are no non-block children (components, text elements, etc.)
+    // that would make collapsing confusing
+    if (current.children.length !== 1) break;
+
+    chain.push(blockChildren[0]);
+    current = blockChildren[0];
+  }
+
+  // Need at least 2 nodes for a chain to be worth collapsing
+  if (chain.length < 2) return null;
+
+  return {
+    nodes: chain,
+    innerChildren: current.children,
+  };
+}
+
+/**
+ * Walk the tree and collect IDs of nodes that are chain roots.
+ */
+function collectChainRootIds(nodes: ComponentTreeNode[], ids: Set<string>): void {
+  for (const node of nodes) {
+    const chain = detectChain(node);
+    if (chain) {
+      ids.add(node.id);
+      // Skip chain nodes — start collecting from innerChildren
+      collectChainRootIds(chain.innerChildren, ids);
+    } else {
+      if (node.children.length > 0) collectChainRootIds(node.children, ids);
+    }
+  }
+}
+
+/**
+ * Find a node by ID in the tree.
+ */
+function findNodeById(nodes: ComponentTreeNode[], id: string): ComponentTreeNode | null {
+  for (const node of nodes) {
+    if (node.id === id) return node;
+    if (node.children.length > 0) {
+      const found = findNodeById(node.children, id);
+      if (found) return found;
+    }
+  }
+  return null;
 }

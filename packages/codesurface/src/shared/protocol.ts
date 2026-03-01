@@ -80,7 +80,7 @@ export type EditorToIframe =
   | { type: "tool:revertInlineStyles" }
   | { type: "tool:reselectElement" }
   | { type: "tool:setTheme"; theme: "light" | "dark" }
-  | { type: "tool:requestComponentTree" }
+  | { type: "tool:requestComponentTree"; mode?: "components" | "dom" }
   | { type: "tool:highlightByTreeId"; id: string }
   | { type: "tool:clearHighlight" }
   | { type: "tool:selectByTreeId"; id: string }

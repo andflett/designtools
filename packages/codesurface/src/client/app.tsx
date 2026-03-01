@@ -44,6 +44,7 @@ function findInTree(nodes: ComponentTreeNode[], domPath: string): string | null 
 
 export function App() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const treeModeRef = useRef<"components" | "dom">("components");
   const [targetUrl, setTargetUrl] = useState("");
   const [stylingType, setStylingType] = useState("");
   const [projectName, setProjectName] = useState("");
@@ -57,6 +58,11 @@ export function App() {
   const [bootDone, setBootDone] = useState(!SHOW_BOOT_SCREEN);
 
   const [componentTree, setComponentTree] = useState<ComponentTreeNode[]>([]);
+  const [treeMode, setTreeMode] = useState<"components" | "dom">(() => {
+    const stored = localStorage.getItem("codesurface:treeMode");
+    return stored === "dom" ? "dom" : "components";
+  });
+  treeModeRef.current = treeMode;
   const [usagePanelOpen, setUsagePanelOpen] = useState(false);
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
   const [leftPanelWidth, setLeftPanelWidth] = useState(250);
@@ -100,7 +106,7 @@ export function App() {
               "*"
             );
             iframeRef.current.contentWindow?.postMessage(
-              { type: "tool:requestComponentTree" },
+              { type: "tool:requestComponentTree", mode: treeModeRef.current },
               "*"
             );
             setSelectionMode(true);
@@ -114,7 +120,7 @@ export function App() {
           // Request updated component tree after navigation
           if (iframeRef.current) {
             iframeRef.current.contentWindow?.postMessage(
-              { type: "tool:requestComponentTree" },
+              { type: "tool:requestComponentTree", mode: treeModeRef.current },
               "*"
             );
           }
@@ -182,6 +188,13 @@ export function App() {
     setIframePath(route);
   }, []);
 
+  const handleTreeModeChange = useCallback((mode: "components" | "dom") => {
+    setTreeMode(mode);
+    treeModeRef.current = mode;
+    localStorage.setItem("codesurface:treeMode", mode);
+    send({ type: "tool:requestComponentTree", mode });
+  }, [send]);
+
   const handleTreeSelect = useCallback((id: string) => {
     send({ type: "tool:selectByTreeId", id });
   }, [send]);
@@ -227,6 +240,26 @@ export function App() {
     });
   }, [isolationComponent, send]);
 
+  const handleLeftPanelDragStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = leftPanelWidth;
+    const onMouseMove = (ev: MouseEvent) => {
+      const newWidth = Math.max(180, Math.min(500, startWidth + ev.clientX - startX));
+      setLeftPanelWidth(newWidth);
+    };
+    const onMouseUp = () => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    document.body.style.cursor = "ew-resize";
+    document.body.style.userSelect = "none";
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  }, [leftPanelWidth]);
+
   if (!targetUrl) {
     return (
       <div
@@ -261,26 +294,6 @@ export function App() {
     : null;
 
   const showUsages = usagePanelOpen && selectedComponentName;
-
-  const handleLeftPanelDragStart = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    const startX = e.clientX;
-    const startWidth = leftPanelWidth;
-    const onMouseMove = (ev: MouseEvent) => {
-      const newWidth = Math.max(180, Math.min(500, startWidth + ev.clientX - startX));
-      setLeftPanelWidth(newWidth);
-    };
-    const onMouseUp = () => {
-      document.removeEventListener("mousemove", onMouseMove);
-      document.removeEventListener("mouseup", onMouseUp);
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-    };
-    document.body.style.cursor = "ew-resize";
-    document.body.style.userSelect = "none";
-    document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseup", onMouseUp);
-  }, [leftPanelWidth]);
 
   const leftPanelDragHandle = (
     <div
@@ -376,6 +389,8 @@ export function App() {
           onSelect={handleTreeSelect}
           onHover={handleTreeHover}
           onHoverEnd={handleTreeHoverEnd}
+          treeMode={treeMode}
+          onTreeModeChange={handleTreeModeChange}
         />
       </div>
       {leftPanelDragHandle}

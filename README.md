@@ -31,8 +31,6 @@ Key design decisions:
 - CSS property/value pairs as the universal editing primitive, with styling-system hints to preserve tokens
 - Framework plugins (Next.js, Vite, etc.) and styling-system adapters (Tailwind, CSS variables, etc.) are orthogonal
 
-See [architecture plan](.claude/studio-hybrid-architecture-plan.md) and [exploration history](.claude/exploration-history.md) for full context.
-
 ## Demo apps
 
 | Demo | Styling | Port |
