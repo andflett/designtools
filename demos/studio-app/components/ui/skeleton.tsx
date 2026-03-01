@@ -32,8 +32,6 @@ function Skeleton({
   return (
     <div
       data-slot="skeleton"
-      data-animation={animation || "pulse"}
-      data-shape={shape || "rect"}
       className={cn(skeletonVariants({ animation, shape }), className)}
       {...props}
     />

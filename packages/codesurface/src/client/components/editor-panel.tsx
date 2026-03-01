@@ -521,14 +521,7 @@ export function EditorPanel({
           </>
         )}
 
-        {activeMode === "instance" && !element && (
-          <div
-            className="px-4 py-8 text-[11px] text-center"
-            style={{ color: "var(--studio-text-dimmed)" }}
-          >
-            Select an element in the preview to edit its styles.
-          </div>
-        )}
+      
 
         {activeMode === "instance" && element && (
           <>
@@ -566,7 +559,10 @@ export function EditorPanel({
                         key={dim.name}
                         dim={dim}
                         currentValue={
-                          instanceProps?.[dim.name] ?? dim.default ?? null
+                          (element?.fiberProps?.[dim.name] != null ? String(element.fiberProps[dim.name]) : null)
+                            ?? instanceProps?.[dim.name]
+                            ?? dim.default
+                            ?? null
                         }
                         onSelect={(value) => {
                           if (!element.instanceSource || !element.componentName)

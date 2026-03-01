@@ -46,6 +46,7 @@ import {
   BoxIcon,
   LayoutIcon,
 } from "@radix-ui/react-icons";
+import { Crosshair, Pin } from "lucide-react";
 import {
   buildUnifiedProperties,
   getUniformBoxValue,
@@ -324,6 +325,41 @@ const JUSTIFY_OPTIONS = [
   { value: "space-between", icon: SpaceBetweenHorizontallyIcon, label: "Between", tooltip: "Between — equal space between items" },
 ];
 
+// Position icon wrappers (match { style?: React.CSSProperties } interface)
+const StaticIcon = ({ style }: { style?: React.CSSProperties }) => (
+  <svg width={style?.width ?? 14} height={style?.height ?? 14} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+    <rect x="2" y="3" width="10" height="8" rx="1" />
+    <line x1="4" y1="6" x2="10" y2="6" />
+    <line x1="4" y1="8.5" x2="8" y2="8.5" />
+  </svg>
+);
+const RelativeIcon = ({ style }: { style?: React.CSSProperties }) => (
+  <svg width={style?.width ?? 14} height={style?.height ?? 14} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+    <rect x="1.5" y="3" width="8" height="8" rx="1" strokeDasharray="2 2" />
+    <rect x="4.5" y="1.5" width="8" height="8" rx="1" />
+  </svg>
+);
+const CrosshairIcon = ({ style }: { style?: React.CSSProperties }) => (
+  <Crosshair size={style?.width ?? 14} style={style} />
+);
+const PinIcon = ({ style }: { style?: React.CSSProperties }) => (
+  <Pin size={style?.width ?? 14} style={style} />
+);
+const StickyIcon = ({ style }: { style?: React.CSSProperties }) => (
+  <svg width={style?.width ?? 14} height={style?.height ?? 14} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+    <rect x="2" y="1.5" width="10" height="3" rx="0.75" />
+    <rect x="2" y="6" width="10" height="6.5" rx="1" strokeDasharray="2 2" />
+  </svg>
+);
+
+const POSITION_OPTIONS = [
+  { value: "static", icon: StaticIcon, label: "Static", tooltip: "Static — default document flow" },
+  { value: "relative", icon: RelativeIcon, label: "Relative", tooltip: "Relative — offset from normal position" },
+  { value: "absolute", icon: CrosshairIcon, label: "Absolute", tooltip: "Absolute — positioned relative to ancestor" },
+  { value: "fixed", icon: PinIcon, label: "Fixed", tooltip: "Fixed — positioned relative to viewport" },
+  { value: "sticky", icon: StickyIcon, label: "Sticky", tooltip: "Sticky — toggles between relative and fixed" },
+];
+
 function LayoutSection({
   properties,
   displayValue,
@@ -340,16 +376,17 @@ function LayoutSection({
   onCommitClass: (c: string, oldClass?: string) => void;
 }) {
   const displayProp = properties.find((p) => p.cssProperty === "display");
+  const positionProp = properties.find((p) => p.cssProperty === "position");
   const alignProp = properties.find((p) => p.cssProperty === "align-items");
   const justifyProp = properties.find((p) => p.cssProperty === "justify-content");
   const otherProps = properties.filter(
-    (p) => !["display", "align-items", "justify-content"].includes(p.cssProperty) && p.hasValue && !p.flexGridOnly
+    (p) => !["display", "position", "align-items", "justify-content"].includes(p.cssProperty) && p.hasValue && !p.flexGridOnly
   );
   const flexGridActiveProps = properties.filter(
-    (p) => !["display", "align-items", "justify-content"].includes(p.cssProperty) && p.hasValue && p.flexGridOnly
+    (p) => !["display", "position", "align-items", "justify-content"].includes(p.cssProperty) && p.hasValue && p.flexGridOnly
   );
   const flexGridAddableProps = properties.filter(
-    (p) => !["display", "align-items", "justify-content"].includes(p.cssProperty) && !p.hasValue && p.flexGridOnly
+    (p) => !["display", "position", "align-items", "justify-content"].includes(p.cssProperty) && !p.hasValue && p.flexGridOnly
   );
 
   const isFlexGrid = displayValue.includes("flex") || displayValue.includes("grid");
@@ -373,6 +410,16 @@ function LayoutSection({
             options={DISPLAY_OPTIONS}
             value={displayProp.computedValue}
             onChange={(v) => handleSegmentedChange("display", v)}
+          />
+        </div>
+      )}
+      {positionProp && (
+        <div>
+          <PropLabel label="Position" inherited={positionProp.inherited} />
+          <SegmentedIcons
+            options={POSITION_OPTIONS}
+            value={positionProp.computedValue}
+            onChange={(v) => handleSegmentedChange("position", v)}
           />
         </div>
       )}

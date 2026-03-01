@@ -24,6 +24,8 @@ export interface SelectedElementData {
   boundingRect: DOMRect;
   textContent: string;
   attributes: Record<string, string>;
+  /** Runtime props read from React fiber's memoizedProps (string/number/boolean only) */
+  fiberProps: Record<string, string | number | boolean> | null;
 }
 
 export interface ComponentTreeNode {
@@ -82,4 +84,5 @@ export type EditorToIframe =
   | { type: "tool:clearHighlight" }
   | { type: "tool:selectByTreeId"; id: string }
   | { type: "tool:renderPreview"; dataSlot: string; componentPath: string; exportName: string;
-      combinations: PreviewCombination[]; defaultChildren: string };
+      combinations: PreviewCombination[]; defaultChildren: string }
+  | { type: "tool:exitPreview" };

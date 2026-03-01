@@ -60,7 +60,6 @@ export function App() {
   const [usagePanelOpen, setUsagePanelOpen] = useState(false);
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
   const [isolationComponent, setIsolationComponent] = useState<ComponentEntry | null>(null);
-  const [preIsolationPath, setPreIsolationPath] = useState("/");
   const scanReady = useScanReady();
   const componentData = useComponents();
 
@@ -186,39 +185,25 @@ export function App() {
     send({ type: "tool:clearHighlight" });
   }, [send]);
 
-  // Isolation mode: render a component in the preview route
+  // Isolation mode: render component in overlay portal (no route change)
   const handleIsolate = useCallback((entry: ComponentEntry) => {
-    if (!targetUrl) return;
-    setPreIsolationPath(iframePath);
     setIsolationComponent(entry);
-
-    // Navigate iframe to the preview route
-    setIframePath("/designtools-preview");
-
-    // Generate initial combinations and send after iframe loads
     const combos = generateCombinations(entry.variants);
     const componentPath = entry.filePath.replace(/\.(tsx|ts|jsx|js)$/, "");
-
-    // Wait a moment for iframe navigation, then send the render message
-    const sendPreview = () => {
-      send({
-        type: "tool:renderPreview",
-        dataSlot: entry.dataSlot,
-        componentPath,
-        exportName: entry.exportName,
-        combinations: combos,
-        defaultChildren: entry.name,
-      });
-    };
-
-    // Send after a short delay to let the preview page load
-    setTimeout(sendPreview, 1500);
-  }, [targetUrl, iframePath, send]);
+    send({
+      type: "tool:renderPreview",
+      dataSlot: entry.dataSlot,
+      componentPath,
+      exportName: entry.exportName,
+      combinations: combos,
+      defaultChildren: entry.name,
+    });
+  }, [send]);
 
   const handleExitIsolation = useCallback(() => {
     setIsolationComponent(null);
-    setIframePath(preIsolationPath);
-  }, [preIsolationPath]);
+    send({ type: "tool:exitPreview" });
+  }, [send]);
 
   const handleIsolationCombinationsChange = useCallback((combos: PreviewCombination[]) => {
     if (!isolationComponent) return;

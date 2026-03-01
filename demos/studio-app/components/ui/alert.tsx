@@ -39,9 +39,6 @@ const Alert = React.forwardRef<
     ref={ref}
     role="alert"
     data-slot="alert"
-    data-variant={variant || "default"}
-    data-size={size || "default"}
-    data-border={border || "default"}
     className={cn(alertVariants({ variant, size, border }), className)}
     {...props}
   />

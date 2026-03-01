@@ -23,7 +23,7 @@ export function UserCard({
 
   return (
     <figure data-slot="user-card" data-status={status} data-size={size} className="flex items-center gap-3">
-      <Avatar size={size} shape={shape}>
+      <Avatar size={size} shape="circle">
         <AvatarFallback>{initials}</AvatarFallback>
       </Avatar>
       <figcaption>

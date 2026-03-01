@@ -9,11 +9,17 @@
  * with proper lifecycle management.
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, createElement } from "react";
+import { createPortal } from "react-dom";
 
 // Overlay elements are created imperatively (not React-rendered)
 // because they need to be fixed-position overlays that don't interfere
 // with the app's React tree.
+
+interface PreviewCombination {
+  label: string;
+  props: Record<string, string>;
+}
 
 export function CodeSurface() {
   const stateRef = useRef({
@@ -30,6 +36,29 @@ export function CodeSurface() {
     tooltip: null as HTMLDivElement | null,
     selectedOverlay: null as HTMLDivElement | null,
   });
+
+  // Preview overlay state
+  const [previewComponent, setPreviewComponent] = useState<React.ComponentType<any> | null>(null);
+  const [previewCombinations, setPreviewCombinations] = useState<PreviewCombination[]>([]);
+  const [previewDefaultChildren, setPreviewDefaultChildren] = useState("");
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+
+  // Ref so the imperative useEffect can trigger state updates
+  const setPreviewRef = useRef({
+    setPreviewComponent,
+    setPreviewCombinations,
+    setPreviewDefaultChildren,
+    setPreviewError,
+    setShowPreview,
+  });
+  setPreviewRef.current = {
+    setPreviewComponent,
+    setPreviewCombinations,
+    setPreviewDefaultChildren,
+    setPreviewError,
+    setShowPreview,
+  };
 
   useEffect(() => {
     const s = stateRef.current;
@@ -593,6 +622,49 @@ export function CodeSurface() {
       "letter-spacing", "text-align", "text-transform", "white-space",
     ];
 
+    /**
+     * Walk UP the fiber tree from a DOM element's fiber to find the
+     * component that renders this element as its root host element.
+     * Checks tags 0 (Function), 1 (Class), 11 (ForwardRef),
+     * 14 (Memo), 15 (SimpleMemo) as component boundaries.
+     */
+    function findComponentFiberAbove(el: Element): any | null {
+      const fiber = getFiber(el);
+      if (!fiber) return null;
+      let candidate = fiber.return;
+      while (candidate) {
+        const tag = candidate.tag;
+        if (tag === 0 || tag === 1 || tag === 11 || tag === 14 || tag === 15) {
+          // Check if this component's root host element is our element
+          if (findOwnHostElement(candidate) === el) return candidate;
+        }
+        candidate = candidate.return;
+      }
+      return null;
+    }
+
+    /**
+     * Read memoizedProps from a fiber, filtering to simple values only.
+     * Skips children, ref, key, className, style, and data-* props.
+     */
+    function extractFiberProps(fiber: any): Record<string, string | number | boolean> | null {
+      const props = fiber?.memoizedProps;
+      if (!props || typeof props !== "object") return null;
+      const skipKeys = new Set(["children", "ref", "key", "className", "style"]);
+      const result: Record<string, string | number | boolean> = {};
+      let count = 0;
+      for (const k of Object.keys(props)) {
+        if (skipKeys.has(k)) continue;
+        if (k.startsWith("data-")) continue;
+        const v = props[k];
+        if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
+          result[k] = v;
+          count++;
+        }
+      }
+      return count > 0 ? result : null;
+    }
+
     function extractElementData(el: Element) {
       const computed = getComputedStyle(el);
       const rect = el.getBoundingClientRect();
@@ -635,16 +707,14 @@ export function CodeSurface() {
       }
 
       // For component instances: read data-instance-source directly from the DOM element.
-      // The Babel transform adds this attribute to component JSX (<Button>, <Card>)
-      // and it propagates via {...props} to the rendered DOM element, carrying exact
-      // page-level coordinates of each component usage site.
       let instanceSourceFile: string | null = null;
       let instanceSourceLine: number | null = null;
       let instanceSourceCol: number | null = null;
       let componentName: string | null = null;
 
+      const dataSlot = el.getAttribute("data-slot");
       const instanceSource = el.getAttribute("data-instance-source");
-      if (instanceSource && el.getAttribute("data-slot")) {
+      if (instanceSource && dataSlot) {
         const lc = instanceSource.lastIndexOf(":");
         const slc = instanceSource.lastIndexOf(":", lc - 1);
         if (slc > 0) {
@@ -654,11 +724,19 @@ export function CodeSurface() {
         }
 
         // Derive component name from data-slot (e.g. "card-title" -> "CardTitle")
-        const slot = el.getAttribute("data-slot") || "";
-        componentName = slot
+        componentName = dataSlot
           .split("-")
           .map((s: string) => s.charAt(0).toUpperCase() + s.slice(1))
           .join("");
+      }
+
+      // Extract runtime props from React fiber for component instances
+      let fiberProps: Record<string, string | number | boolean> | null = null;
+      if (dataSlot) {
+        const compFiber = findComponentFiberAbove(el);
+        if (compFiber) {
+          fiberProps = extractFiberProps(compFiber);
+        }
       }
 
       return {
@@ -677,6 +755,7 @@ export function CodeSurface() {
         instanceSourceLine,
         instanceSourceCol,
         componentName,
+        fiberProps,
       };
     }
 
@@ -732,6 +811,27 @@ export function CodeSurface() {
       tick();
     }
 
+    // --- Helper to hide/show selection overlays ---
+    function hideSelectionOverlays() {
+      if (s.highlightOverlay) s.highlightOverlay.style.display = "none";
+      if (s.tooltip) s.tooltip.style.display = "none";
+      if (s.selectedOverlay) s.selectedOverlay.style.display = "none";
+      s.hoveredElement = null;
+    }
+
+    function enterSelectionMode() {
+      s.selectionMode = true;
+      document.body.style.cursor = "crosshair";
+    }
+
+    function exitSelectionMode() {
+      s.selectionMode = false;
+      document.body.style.cursor = "";
+      if (s.highlightOverlay) s.highlightOverlay.style.display = "none";
+      if (s.tooltip) s.tooltip.style.display = "none";
+      s.hoveredElement = null;
+    }
+
     // --- Event handlers ---
     function onMouseMove(e: MouseEvent) {
       if (!s.selectionMode || !s.highlightOverlay || !s.tooltip) return;
@@ -772,15 +872,10 @@ export function CodeSurface() {
 
       switch (msg.type) {
         case "tool:enterSelectionMode":
-          s.selectionMode = true;
-          document.body.style.cursor = "crosshair";
+          enterSelectionMode();
           break;
         case "tool:exitSelectionMode":
-          s.selectionMode = false;
-          document.body.style.cursor = "";
-          if (s.highlightOverlay) s.highlightOverlay.style.display = "none";
-          if (s.tooltip) s.tooltip.style.display = "none";
-          s.hoveredElement = null;
+          exitSelectionMode();
           break;
         case "tool:previewInlineStyle": {
           if (s.selectedElement && s.selectedElement instanceof HTMLElement) {
@@ -809,12 +904,7 @@ export function CodeSurface() {
         case "tool:previewTokenValue": {
           const prop = msg.property as string;
           const value = msg.value as string;
-          // Track current preview value
           s.tokenPreviewValues.set(prop, value);
-          // Inject a <style> tag override.
-          // Tailwind v4 resolves @theme variables at build time and inlines
-          // them into utility classes, so setting CSS custom properties on
-          // :root has no effect. Instead we target utility classes directly.
           if (!s.tokenPreviewStyle) {
             s.tokenPreviewStyle = document.createElement("style");
             s.tokenPreviewStyle.id = "codesurface-token-preview";
@@ -822,13 +912,10 @@ export function CodeSurface() {
           }
           const cssRules: string[] = [];
           for (const [k, v] of s.tokenPreviewValues) {
-            // Derive Tailwind utility class from CSS variable name:
-            // --shadow-sm → .shadow-sm, --shadow → .shadow
             if (k.startsWith("--shadow")) {
-              const cls = k.slice(2); // "--shadow-sm" → "shadow-sm"
+              const cls = k.slice(2);
               cssRules.push(`.${cls}, [class*="${cls}"] { box-shadow: ${v} !important; }`);
             } else {
-              // For other tokens (colors, spacing, etc.) override the custom property
               cssRules.push(`*, *::before, *::after { ${k}: ${v} !important; }`);
             }
           }
@@ -886,6 +973,66 @@ export function CodeSurface() {
           }
           break;
         }
+        case "tool:renderPreview": {
+          const { componentPath, exportName, combinations: combos, defaultChildren: children } = msg;
+          const currentRegistry = (window as any).__DESIGNTOOLS_REGISTRY__ as Record<string, () => Promise<any>> | undefined;
+
+          if (!currentRegistry) {
+            setPreviewRef.current.setPreviewError("No component registry available. Ensure designtools-registry.ts is imported.");
+            setPreviewRef.current.setShowPreview(true);
+            return;
+          }
+
+          const loader = currentRegistry[componentPath];
+          if (!loader) {
+            setPreviewRef.current.setPreviewError(
+              `Component "${componentPath}" not found in registry. Available: ${Object.keys(currentRegistry).join(", ")}`
+            );
+            setPreviewRef.current.setShowPreview(true);
+            return;
+          }
+
+          // Disable selection mode and hide overlays
+          exitSelectionMode();
+          hideSelectionOverlays();
+
+          // Load the component
+          loader().then((mod: any) => {
+            const Comp = mod[exportName] || mod.default;
+            if (!Comp) {
+              setPreviewRef.current.setPreviewError(`Export "${exportName}" not found in ${componentPath}`);
+              setPreviewRef.current.setShowPreview(true);
+              return;
+            }
+
+            setPreviewRef.current.setPreviewError(null);
+            setPreviewRef.current.setPreviewComponent(() => Comp);
+            setPreviewRef.current.setPreviewCombinations(combos || []);
+            setPreviewRef.current.setPreviewDefaultChildren(children || exportName);
+            setPreviewRef.current.setShowPreview(true);
+
+            // Notify editor that preview is ready
+            window.parent.postMessage(
+              { type: "tool:previewReady", cellCount: (combos || []).length },
+              "*"
+            );
+          }).catch((err: any) => {
+            setPreviewRef.current.setPreviewError(`Failed to load component: ${err.message}`);
+            setPreviewRef.current.setShowPreview(true);
+          });
+          break;
+        }
+        case "tool:exitPreview": {
+          setPreviewRef.current.setShowPreview(false);
+          setPreviewRef.current.setPreviewComponent(null);
+          setPreviewRef.current.setPreviewCombinations([]);
+          setPreviewRef.current.setPreviewDefaultChildren("");
+          setPreviewRef.current.setPreviewError(null);
+
+          // Restore selection mode
+          enterSelectionMode();
+          break;
+        }
       }
     }
 
@@ -923,6 +1070,88 @@ export function CodeSurface() {
     };
   }, []);
 
-  // This component renders nothing — overlays are created imperatively
-  return null;
+  // --- Preview overlay rendered via portal ---
+  if (!showPreview) return null;
+
+  if (previewError) {
+    return createPortal(
+      <div style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 999999,
+        background: "var(--background, white)",
+        overflow: "auto",
+        padding: 32,
+      }}>
+        <div style={{ color: "var(--destructive, #ef4444)", fontFamily: "monospace", fontSize: 14 }}>
+          {previewError}
+        </div>
+      </div>,
+      document.body
+    );
+  }
+
+  if (!previewComponent) {
+    return createPortal(
+      <div style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 999999,
+        background: "var(--background, white)",
+        overflow: "auto",
+        padding: 32,
+      }}>
+        <div style={{ color: "var(--muted-foreground, #888)", fontFamily: "inherit", fontSize: 14 }}>
+          Loading component...
+        </div>
+      </div>,
+      document.body
+    );
+  }
+
+  const Component = previewComponent;
+
+  return createPortal(
+    <div style={{
+      position: "fixed",
+      inset: 0,
+      zIndex: 999999,
+      background: "var(--background, white)",
+      overflow: "auto",
+      padding: 32,
+    }}>
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+        gap: 24,
+      }}>
+        {previewCombinations.map((combo, i) => (
+          <div key={i} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{
+              fontSize: 11,
+              fontWeight: 600,
+              color: "var(--muted-foreground, #888)",
+              textTransform: "uppercase" as const,
+              letterSpacing: "0.05em",
+            }}>
+              {combo.label}
+            </div>
+            <div style={{
+              padding: 16,
+              border: "1px solid var(--border, #e5e7eb)",
+              borderRadius: 8,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              minHeight: 64,
+              background: "var(--card, var(--background, #fff))",
+            }}>
+              {createElement(Component, combo.props, previewDefaultChildren)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>,
+    document.body
+  );
 }

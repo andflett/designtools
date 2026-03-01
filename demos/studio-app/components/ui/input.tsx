@@ -26,7 +26,6 @@ const Input = React.forwardRef<
     type={type}
     ref={ref}
     data-slot="input"
-    data-size={size || "default"}
     className={cn(inputVariants({ size }), className)}
     {...props}
   />

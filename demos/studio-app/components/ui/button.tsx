@@ -44,9 +44,6 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         data-slot="button"
-        data-variant={variant || "default"}
-        data-size={size || "default"}
-        data-full-width={fullWidth || false}
         className={cn(buttonVariants({ variant, size, fullWidth, className }))}
         {...props}
       />

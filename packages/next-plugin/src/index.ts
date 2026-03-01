@@ -8,7 +8,7 @@
  */
 
 import path from "path";
-import { generatePreviewRoute } from "./preview-route.js";
+import { generateComponentRegistry } from "./preview-route.js";
 
 export function withDesigntools<T extends Record<string, any>>(nextConfig: T = {} as T): T {
   return {
@@ -43,12 +43,10 @@ export function withDesigntools<T extends Record<string, any>>(nextConfig: T = {
           ],
         });
 
-        // Generate the component isolation preview route
-        // This creates app/__designtools/preview/page.tsx which Next.js
-        // picks up as a route automatically via file-system routing.
+        // Generate the component registry for isolation overlay
         const appDir = path.resolve(context.dir, "app");
         try {
-          generatePreviewRoute(appDir);
+          generateComponentRegistry(appDir);
         } catch {
           // Non-fatal — isolation feature just won't work
         }

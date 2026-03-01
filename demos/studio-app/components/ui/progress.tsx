@@ -41,8 +41,6 @@ const Progress = React.forwardRef<HTMLDivElement, ProgressProps>(
       aria-valuemax={max}
       aria-valuenow={value}
       data-slot="progress"
-      data-size={size || "default"}
-      data-variant={variant || "default"}
       className={cn(progressVariants({ size, variant }), className)}
       {...props}
     >

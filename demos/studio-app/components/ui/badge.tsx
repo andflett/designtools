@@ -41,9 +41,6 @@ function Badge({ className, variant, size, weight, ...props }: BadgeProps) {
   return (
     <div
       data-slot="badge"
-      data-variant={variant || "default"}
-      data-size={size || "default"}
-      data-weight={weight || "semibold"}
       className={cn(badgeVariants({ variant, size, weight }), className)}
       {...props}
     />

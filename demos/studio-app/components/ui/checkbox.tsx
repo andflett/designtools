@@ -42,8 +42,6 @@ const Checkbox = React.forwardRef<HTMLButtonElement, CheckboxProps>(
       ref={ref}
       data-slot="checkbox"
       data-state={checked ? "checked" : "unchecked"}
-      data-size={size || "default"}
-      data-variant={variant || "default"}
       className={cn(checkboxVariants({ size, variant }), className)}
       onClick={() => onCheckedChange?.(!checked)}
       {...props}

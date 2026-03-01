@@ -60,8 +60,6 @@ const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
       ref={ref}
       data-slot="switch"
       data-state={checked ? "checked" : "unchecked"}
-      data-size={size || "default"}
-      data-variant={variant || "default"}
       className={cn(
         switchVariants({ size, variant }),
         checked ? switchCheckedColors[variant || "default"] : "bg-input",

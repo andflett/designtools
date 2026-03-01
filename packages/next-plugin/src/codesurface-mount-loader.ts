@@ -28,17 +28,21 @@ export default function codesurfaceMountLoader(this: LoaderContext, source: stri
     return;
   }
 
-  // Add import at the top (after "use client" or first import)
-  // CodeSurface is a "use client" component — importing it from an RSC is fine in Next.js
-  const importStatement = `import { CodeSurface } from "@designtools/next-plugin/codesurface";\n`;
+  // Add imports at the top (after "use client" or first import)
+  // The registry import is a side-effect — it self-registers on window.
+  const importStatements = [
+    `import { CodeSurface } from "@designtools/next-plugin/codesurface";`,
+    `import "./designtools-registry";`,
+  ].join("\n") + "\n";
+
   let modified = source;
 
-  // Find a good insertion point for the import
+  // Find a good insertion point for the imports
   const firstImportIndex = source.indexOf("import ");
   if (firstImportIndex !== -1) {
-    modified = source.slice(0, firstImportIndex) + importStatement + source.slice(firstImportIndex);
+    modified = source.slice(0, firstImportIndex) + importStatements + source.slice(firstImportIndex);
   } else {
-    modified = importStatement + source;
+    modified = importStatements + source;
   }
 
   // Add <CodeSurface /> just before {children}

@@ -33,8 +33,6 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     data-slot="card"
-    data-variant={variant || "default"}
-    data-elevation={elevation || "default"}
     className={cn(cardVariants({ variant, elevation }), className)}
     {...props}
   />

@@ -46,9 +46,6 @@ const Avatar = React.forwardRef<
   <span
     ref={ref}
     data-slot="avatar"
-    data-size={size || "default"}
-    data-shape={shape || "circle"}
-    data-status={status || "none"}
     className={cn(avatarVariants({ size, shape, status }), "relative", className)}
     {...props}
   >
