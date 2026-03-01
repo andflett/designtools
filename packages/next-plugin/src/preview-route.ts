@@ -71,9 +71,10 @@ function ensureGitignore(projectRoot: string): void {
 /**
  * Scan the project for component .tsx files in known directories.
  * Returns paths like "components/ui/button" (no extension).
+ * Accepts an optional override directory to skip hardcoded candidates.
  */
-function discoverComponentFiles(projectRoot: string): string[] {
-  const dirs = ["components/ui", "src/components/ui"];
+function discoverComponentFiles(projectRoot: string, overrideDir?: string): string[] {
+  const dirs = overrideDir ? [overrideDir] : ["components/ui", "src/components/ui"];
   for (const dir of dirs) {
     const fullDir = path.join(projectRoot, dir);
     if (fs.existsSync(fullDir)) {

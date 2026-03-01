@@ -3,7 +3,7 @@ import path from "path";
 import process from "process";
 import readline from "readline";
 import open from "open";
-import { detectFramework } from "./server/lib/detect-framework.js";
+import { detectFramework, type FrameworkInfo } from "./server/lib/detect-framework.js";
 import { detectStylingSystem, type StylingSystem } from "./server/lib/detect-styling.js";
 import { createServer } from "./server/index.js";
 
@@ -60,10 +60,178 @@ async function promptPort(message: string, options: number[]): Promise<number> {
   });
 }
 
+/** Prompt user to pick a component directory when detection fails. */
+async function promptComponentDir(
+  framework: FrameworkInfo,
+  projectRoot: string
+): Promise<{ dir: string; exists: boolean; fileCount: number }> {
+  // Gather candidate directories (from fallback scan, plus any dirs with .tsx/.jsx files)
+  const candidates = framework.fallbackComponentDirs.length > 0
+    ? framework.fallbackComponentDirs
+    : await findDirsWithComponentFiles(projectRoot);
+
+  if (candidates.length === 0) {
+    // No directories with component files found at all — can't offer choices
+    return { dir: framework.componentDir, exists: false, fileCount: 0 };
+  }
+
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  console.log("");
+  console.log(`  ${yellow("?")} Where are your UI components?`);
+  for (let i = 0; i < candidates.length; i++) {
+    const c = candidates[i];
+    console.log(`    ${cyan(String(i + 1))}. ${c.dir}/ ${dim(`(${c.fileCount} files)`)}`);
+  }
+  const enterIdx = candidates.length + 1;
+  const skipIdx = candidates.length + 2;
+  console.log(`    ${cyan(String(enterIdx))}. Enter a path`);
+  console.log(`    ${cyan(String(skipIdx))}. Skip — continue without component editing`);
+  console.log("");
+
+  return new Promise((resolve) => {
+    rl.question(`  ${dim("Choice [1]:")} `, (answer) => {
+      rl.close();
+      const trimmed = answer.trim();
+      if (!trimmed || trimmed === "1") {
+        const best = candidates[0];
+        resolve({ dir: best.dir, exists: true, fileCount: best.fileCount });
+        return;
+      }
+      const idx = parseInt(trimmed, 10);
+      if (idx >= 1 && idx <= candidates.length) {
+        const picked = candidates[idx - 1];
+        resolve({ dir: picked.dir, exists: true, fileCount: picked.fileCount });
+        return;
+      }
+      if (idx === enterIdx) {
+        const rl2 = readline.createInterface({ input: process.stdin, output: process.stdout });
+        rl2.question(`  ${dim("Path:")} `, (pathAnswer) => {
+          rl2.close();
+          const customDir = pathAnswer.trim();
+          if (customDir && fs.existsSync(path.join(projectRoot, customDir))) {
+            resolve({ dir: customDir, exists: true, fileCount: 0 });
+          } else {
+            resolve({ dir: customDir || framework.componentDir, exists: false, fileCount: 0 });
+          }
+        });
+        return;
+      }
+      // Skip or invalid
+      resolve({ dir: framework.componentDir, exists: false, fileCount: 0 });
+    });
+  });
+}
+
+/** Prompt user to pick a CSS file when detection fails. */
+async function promptCssFile(
+  framework: FrameworkInfo,
+  projectRoot: string
+): Promise<string[]> {
+  const candidates = framework.fallbackCssFiles;
+
+  if (candidates.length === 0) {
+    return [];
+  }
+
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  console.log("");
+  console.log(`  ${yellow("?")} Which CSS file has your design tokens / custom properties?`);
+  for (let i = 0; i < candidates.length; i++) {
+    console.log(`    ${cyan(String(i + 1))}. ${candidates[i]}`);
+  }
+  const enterIdx = candidates.length + 1;
+  const skipIdx = candidates.length + 2;
+  console.log(`    ${cyan(String(enterIdx))}. Enter a path`);
+  console.log(`    ${cyan(String(skipIdx))}. Skip — continue without token editing`);
+  console.log("");
+
+  return new Promise((resolve) => {
+    rl.question(`  ${dim("Choice [1]:")} `, (answer) => {
+      rl.close();
+      const trimmed = answer.trim();
+      if (!trimmed || trimmed === "1") {
+        resolve([candidates[0]]);
+        return;
+      }
+      const idx = parseInt(trimmed, 10);
+      if (idx >= 1 && idx <= candidates.length) {
+        resolve([candidates[idx - 1]]);
+        return;
+      }
+      if (idx === enterIdx) {
+        const rl2 = readline.createInterface({ input: process.stdin, output: process.stdout });
+        rl2.question(`  ${dim("Path:")} `, (pathAnswer) => {
+          rl2.close();
+          const customPath = pathAnswer.trim();
+          if (customPath && fs.existsSync(path.join(projectRoot, customPath))) {
+            resolve([customPath]);
+          } else {
+            resolve([]);
+          }
+        });
+        return;
+      }
+      // Skip
+      resolve([]);
+    });
+  });
+}
+
+/**
+ * Find directories containing .tsx/.jsx files (even without data-slot).
+ * Used as a last resort for prompting.
+ */
+async function findDirsWithComponentFiles(
+  projectRoot: string
+): Promise<{ dir: string; fileCount: number }[]> {
+  const scanDirs = [
+    "components", "src/components", "lib", "src/lib", "ui", "src/ui",
+  ];
+  const results: { dir: string; fileCount: number }[] = [];
+
+  for (const dir of scanDirs) {
+    const fullDir = path.join(projectRoot, dir);
+    try {
+      const stat = fs.statSync(fullDir);
+      if (!stat.isDirectory()) continue;
+    } catch {
+      continue;
+    }
+    try {
+      const files = fs.readdirSync(fullDir);
+      const count = files.filter((f) => f.endsWith(".tsx") || f.endsWith(".jsx")).length;
+      if (count > 0) {
+        results.push({ dir, fileCount: count });
+      }
+      // Also check subdirectories
+      for (const file of files) {
+        const subPath = path.join(fullDir, file);
+        try {
+          if (!fs.statSync(subPath).isDirectory()) continue;
+        } catch {
+          continue;
+        }
+        const subFiles = fs.readdirSync(subPath);
+        const subCount = subFiles.filter((f) => f.endsWith(".tsx") || f.endsWith(".jsx")).length;
+        if (subCount > 0) {
+          results.push({ dir: `${dir}/${file}`, fileCount: subCount });
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  results.sort((a, b) => b.fileCount - a.fileCount);
+  return results;
+}
+
 async function main() {
   const args = process.argv.slice(2);
   let targetPort = 3000;
   let toolPort = 4400;
+  let componentsOverride: string | undefined;
+  let cssOverride: string | undefined;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--port" && args[i + 1]) {
@@ -72,6 +240,14 @@ async function main() {
     }
     if (args[i] === "--tool-port" && args[i + 1]) {
       toolPort = parseInt(args[i + 1], 10);
+      i++;
+    }
+    if (args[i] === "--components" && args[i + 1]) {
+      componentsOverride = args[i + 1];
+      i++;
+    }
+    if (args[i] === "--css" && args[i + 1]) {
+      cssOverride = args[i + 1];
       i++;
     }
   }
@@ -96,6 +272,21 @@ async function main() {
   // 2. Detect framework
   const framework = await detectFramework(projectRoot);
 
+  // Apply CLI overrides
+  if (componentsOverride) {
+    framework.componentDir = componentsOverride;
+    framework.componentDirExists = fs.existsSync(path.join(projectRoot, componentsOverride));
+    if (framework.componentDirExists) {
+      const files = fs.readdirSync(path.join(projectRoot, componentsOverride));
+      framework.componentFileCount = files.filter((f) => f.endsWith(".tsx") || f.endsWith(".jsx")).length;
+    }
+  }
+  if (cssOverride) {
+    framework.cssFiles = fs.existsSync(path.join(projectRoot, cssOverride))
+      ? [cssOverride]
+      : [];
+  }
+
   const frameworkLabel =
     framework.name === "nextjs"
       ? "Next.js"
@@ -118,13 +309,31 @@ async function main() {
       `  ${green("✓")} Components     ${framework.componentDir}/ ${dim(`(${framework.componentFileCount} files)`)}`
     );
   } else {
-    console.log(`  ${yellow("⚠")} Components     ${dim("not found — component editing won't be available")}`);
+    console.log(`  ${yellow("⚠")} Components     ${dim("not found")}`);
+    // Prompt if we're in an interactive terminal and no CLI override was given
+    if (!componentsOverride && process.stdin.isTTY) {
+      const result = await promptComponentDir(framework, projectRoot);
+      if (result.exists) {
+        framework.componentDir = result.dir;
+        framework.componentDirExists = true;
+        framework.componentFileCount = result.fileCount;
+        console.log(`  ${green("✓")} Components     ${framework.componentDir}/ ${dim(`(${framework.componentFileCount} files)`)}`);
+      }
+    }
   }
 
   if (framework.cssFiles.length > 0) {
     console.log(`  ${green("✓")} CSS files      ${framework.cssFiles[0]}`);
   } else {
     console.log(`  ${yellow("⚠")} CSS files      ${dim("no CSS files found")}`);
+    // Prompt if we're in an interactive terminal and no CLI override was given
+    if (!cssOverride && process.stdin.isTTY) {
+      const result = await promptCssFile(framework, projectRoot);
+      if (result.length > 0) {
+        framework.cssFiles = result;
+        console.log(`  ${green("✓")} CSS files      ${framework.cssFiles[0]}`);
+      }
+    }
   }
 
   // 3. Detect styling system
@@ -216,6 +425,8 @@ async function main() {
     toolPort,
     projectRoot,
     stylingType: styling.type,
+    framework,
+    styling,
   });
 
   // Try to listen on the tool port, auto-increment if busy

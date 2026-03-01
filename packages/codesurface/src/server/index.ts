@@ -9,12 +9,18 @@ import { createComponentRouter } from "./api/write-component.js";
 import { createShadowsRouter } from "./api/write-shadows.js";
 import { createGradientsRouter } from "./api/write-gradients.js";
 import { createScanRouter } from "./lib/scanner.js";
+import type { FrameworkInfo } from "./lib/detect-framework.js";
+import type { StylingSystem } from "./lib/detect-styling.js";
 
 export interface ServerConfig {
   targetPort: number;
   toolPort: number;
   projectRoot: string;
   stylingType: string;
+  /** Pre-detected framework info from CLI (avoids re-detection in scanner). */
+  framework?: FrameworkInfo;
+  /** Pre-detected styling system from CLI. */
+  styling?: StylingSystem;
 }
 
 export async function createServer(config: ServerConfig) {
@@ -103,7 +109,7 @@ export async function createServer(config: ServerConfig) {
   });
 
   // Scan router: /scan/all, /scan/tokens, /scan/components, /scan/rescan, /scan/resolve-route
-  app.use("/scan", createScanRouter(config.projectRoot));
+  app.use("/scan", createScanRouter(config.projectRoot, config.framework, config.styling));
 
   // Determine if we're in dev or production
   const __dirname = path.dirname(fileURLToPath(import.meta.url));

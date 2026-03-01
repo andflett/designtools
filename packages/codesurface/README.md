@@ -12,7 +12,7 @@ A CLI-launched visual design layer for React applications. Select elements in yo
 ## Installation
 
 ```bash
-npm install -D @designtools/codesurface @designtools/next-plugin
+npm install -D @designtools/next-plugin
 ```
 
 ## Setup
@@ -78,8 +78,10 @@ Your app loads inside an iframe — no proxy, no middleware.
 |------|---------|-------------|
 | `--port` | `3000` | Port your dev server runs on |
 | `--tool-port` | `4400` | Port for the editor UI |
+| `--components` | auto-detected | Path to your UI components directory |
+| `--css` | auto-detected | Path to your CSS tokens file |
 
-Both ports auto-increment if the default is busy.
+Both ports auto-increment if the default is busy. Component and CSS paths are auto-detected but can be overridden when detection fails.
 
 ## How it works
 

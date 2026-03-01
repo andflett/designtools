@@ -25,12 +25,17 @@ export interface ScanResult {
 
 let cachedScan: ScanResult | null = null;
 
+/** Pre-detected values from CLI, set by createScanRouter. */
+let predetectedFramework: FrameworkInfo | undefined;
+let predetectedStyling: StylingSystem | undefined;
+
 async function runScan(projectRoot: string): Promise<ScanResult> {
-  const framework = await detectFramework(projectRoot);
-  const styling = await detectStylingSystem(projectRoot, framework);
+  const framework = predetectedFramework || await detectFramework(projectRoot);
+  const styling = predetectedStyling || await detectStylingSystem(projectRoot, framework);
+  const componentDir = framework.componentDirExists ? framework.componentDir : undefined;
   const [tokens, components, shadows, borders, gradients, spacing, usages] = await Promise.all([
     scanTokens(projectRoot, framework),
-    scanComponents(projectRoot),
+    scanComponents(projectRoot, componentDir),
     scanShadows(projectRoot, framework, styling),
     scanBorders(projectRoot, framework, styling),
     scanGradients(projectRoot, framework, styling),
@@ -92,7 +97,15 @@ export async function rescanGradients(projectRoot: string): Promise<GradientMap>
 // Router
 // ---------------------------------------------------------------------------
 
-export function createScanRouter(projectRoot: string) {
+export function createScanRouter(
+  projectRoot: string,
+  framework?: FrameworkInfo,
+  styling?: StylingSystem,
+) {
+  // Store pre-detected values so runScan() can use them instead of re-detecting
+  predetectedFramework = framework;
+  predetectedStyling = styling;
+
   const router = Router();
 
   // Run initial scan

@@ -28,21 +28,26 @@ export interface ComponentRegistry {
 }
 
 export async function scanComponents(
-  projectRoot: string
+  projectRoot: string,
+  overrideDir?: string,
 ): Promise<ComponentRegistry> {
-  const componentDirs = [
-    "components/ui",
-    "src/components/ui",
-  ];
+  let componentDir = overrideDir || "";
 
-  let componentDir = "";
-  for (const dir of componentDirs) {
-    try {
-      await fs.access(path.join(projectRoot, dir));
-      componentDir = dir;
-      break;
-    } catch {
-      // doesn't exist
+  if (!componentDir) {
+    // Fallback: check hardcoded candidates
+    const componentDirs = [
+      "components/ui",
+      "src/components/ui",
+    ];
+
+    for (const dir of componentDirs) {
+      try {
+        await fs.access(path.join(projectRoot, dir));
+        componentDir = dir;
+        break;
+      } catch {
+        // doesn't exist
+      }
     }
   }
 
@@ -52,7 +57,7 @@ export async function scanComponents(
 
   const fullDir = path.join(projectRoot, componentDir);
   const files = await fs.readdir(fullDir);
-  const tsxFiles = files.filter((f) => f.endsWith(".tsx"));
+  const tsxFiles = files.filter((f) => f.endsWith(".tsx") || f.endsWith(".jsx"));
 
   const parser = await getParser();
   const components: ComponentEntry[] = [];

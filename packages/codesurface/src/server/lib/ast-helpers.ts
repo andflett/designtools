@@ -12,7 +12,7 @@ let _parser: any = null;
 /** Lazy-load the babel-ts parser for recast. */
 export async function getParser() {
   if (!_parser) {
-    _parser = await import("recast/parsers/babel-ts");
+    _parser = await import("recast/parsers/babel-ts.js");
   }
   return _parser;
 }
