@@ -182,6 +182,10 @@ export function App() {
     send({ type: "tool:previewTokenValue", property: variableName, value });
   }, [send]);
 
+  const handleSelectParentInstance = useCallback(() => {
+    send({ type: "tool:selectParentInstance" });
+  }, [send]);
+
   const handleCloseEditor = useCallback(() => {
     setSelectedElement(null);
     setUsagePanelOpen(false);
@@ -423,6 +427,7 @@ export function App() {
                 setLeftPanelCollapsed(false);
               }}
       onIsolate={handleIsolate}
+      onSelectParentInstance={handleSelectParentInstance}
     />
   );
 

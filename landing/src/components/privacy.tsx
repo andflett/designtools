@@ -64,7 +64,7 @@ export function Privacy() {
           <p>
             Questions about this policy? Reach out via{" "}
             <a
-              href="https://github.com/AJFletcher/designtools"
+              href="https://github.com/andflett/designtools"
               target="_blank"
               rel="noopener"
               className="underline hover:text-ink transition-colors"

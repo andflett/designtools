@@ -94,6 +94,12 @@ interface ComputedPropertyPanelProps {
   className: string;
   computedStyles: Record<string, string>;
   parentComputedStyles: Record<string, string>;
+  /** When true, all controls are disabled and values are display-only */
+  isReadOnly?: boolean;
+  /** Package name shown in the read-only banner */
+  readOnlyPackageName?: string;
+  /** Navigate to the nearest ancestor with instanceSource */
+  onSelectParentInstance?: () => void;
   onPreviewInlineStyle: (property: string, value: string) => void;
   onRevertInlineStyles: () => void;
   onCommitClass: (tailwindClass: string, oldClass?: string) => void;
@@ -111,6 +117,9 @@ export function ComputedPropertyPanel({
   className: elementClassName,
   computedStyles,
   parentComputedStyles,
+  isReadOnly,
+  readOnlyPackageName,
+  onSelectParentInstance,
   onPreviewInlineStyle,
   onRevertInlineStyles,
   onCommitClass,
@@ -153,8 +162,53 @@ export function ComputedPropertyPanel({
   const displayValue = computedStyles["display"] || "block";
   const twScales = getTwScales(tailwindTheme);
 
+  // In read-only mode, replace callbacks with no-ops
+  const effectivePreview = isReadOnly ? () => {} : onPreviewInlineStyle;
+  const effectiveRevert = isReadOnly ? () => {} : onRevertInlineStyles;
+  const effectiveCommitClass = isReadOnly ? () => {} : onCommitClass;
+  const effectiveCommitStyle = isReadOnly ? undefined : onCommitStyle;
+
   return (
     <div>
+      {isReadOnly && (
+        <div
+          className="px-4 py-2.5"
+          style={{ borderBottom: "1px solid var(--studio-border-subtle)" }}
+        >
+          <div
+            className="text-[10px] px-2.5 py-2 rounded"
+            style={{
+              color: "var(--studio-text-dimmed)",
+              background: "var(--studio-surface-hover)",
+              lineHeight: 1.5,
+            }}
+          >
+            This element is from{" "}
+            <span className="font-mono font-semibold" style={{ color: "var(--studio-text-muted)" }}>
+              {readOnlyPackageName || "an external package"}
+            </span>{" "}
+            and cannot be edited directly.
+            {onSelectParentInstance && (
+              <button
+                onClick={onSelectParentInstance}
+                className="block mt-1.5 text-[10px] font-medium"
+                style={{
+                  color: "var(--studio-accent)",
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  cursor: "pointer",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
+                onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
+              >
+                Select parent instance to override styles
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+      <div style={isReadOnly ? { pointerEvents: "none", opacity: 0.45 } : undefined}>
       {nonEmpty.map((section) => (
         <UnifiedSection
           key={section.key}
@@ -167,14 +221,15 @@ export function ComputedPropertyPanel({
           gradients={gradients}
           displayValue={displayValue}
           elementClassName={elementClassName}
-          onPreviewInlineStyle={onPreviewInlineStyle}
-          onRevertInlineStyles={onRevertInlineStyles}
-          onCommitClass={onCommitClass}
-          onCommitStyle={onCommitStyle}
+          onPreviewInlineStyle={effectivePreview}
+          onRevertInlineStyles={effectiveRevert}
+          onCommitClass={effectiveCommitClass}
+          onCommitStyle={effectiveCommitStyle}
           tailwindTheme={tailwindTheme}
           twScales={twScales}
         />
       ))}
+      </div>
     </div>
   );
 }

@@ -95,11 +95,11 @@ export function Waitlist() {
           <p className="text-xs font-medium text-ink3 uppercase tracking-widest mb-3 font-mono">
             Early access
           </p>
-          <h2 className="text-[clamp(1.75rem,3.5vw,2.5rem)] font-semibold tracking-[-0.03em] leading-tight mb-4">
+          <h2 className="text-[clamp(1.75rem,4vw,3rem)] font-normal tracking-[-0.025em] leading-[1.1] mb-4" style={{ fontFamily: "'Jersey 25', sans-serif" }}>
             Get notified when we launch
           </h2>
           <p className="text-ink2 max-w-[420px] mx-auto mb-8 text-[15px] leading-relaxed">
-            Join the waitlist and be the first to know when new features ship.
+            We'll let you know when it's safe to use.
           </p>
           <WaitlistForm />
           <p className="text-[11px] text-ink3/60 mt-4 font-mono">

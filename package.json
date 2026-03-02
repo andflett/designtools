@@ -16,6 +16,7 @@
   ],
   "scripts": {
     "surface": "npm -w packages/next-plugin run build && cd demos/studio-app && npm run dev & sleep 3 && cd demos/studio-app && npx tsx ../../packages/surface/src/cli.ts",
+    "surface:screenshot": "npm -w packages/next-plugin run build && cd demos/screenshot-app && npm run dev & sleep 3 && cd demos/screenshot-app && npx tsx ../../packages/surface/src/cli.ts",
     "surface:design-system": "npm -w packages/next-plugin run build && cd demos/design-system && npm run dev & sleep 3 && cd demos/design-system && npx tsx ../../packages/surface/src/cli.ts",
     "surface:vite": "npm -w packages/vite-plugin run build && cd demos/vite-app && npm run dev & sleep 3 && cd demos/vite-app && npx tsx ../../packages/surface/src/cli.ts",
     "surface:css": "npm -w packages/vite-plugin run build && cd demos/css-app && npm run dev & sleep 3 && cd demos/css-app && npx tsx ../../packages/surface/src/cli.ts",

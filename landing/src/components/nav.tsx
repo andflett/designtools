@@ -9,7 +9,7 @@ export function Nav() {
         <div className="hidden md:flex items-center gap-6">
           <a href="#how-it-works" className="text-[13px] text-white/50 hover:text-white/80 transition-colors font-mono">how-it-works</a>
           <a href="#compatibility" className="text-[13px] text-white/50 hover:text-white/80 transition-colors font-mono">compatibility</a>
-          <a href="https://github.com/AJFletcher/designtools" target="_blank" rel="noopener" className="text-[13px] text-white/50 hover:text-white/80 transition-colors font-mono">
+          <a href="https://github.com/andflett/designtools" target="_blank" rel="noopener" className="text-[13px] text-white/50 hover:text-white/80 transition-colors font-mono">
             github
           </a>
           <a

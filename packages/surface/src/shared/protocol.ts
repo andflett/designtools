@@ -86,6 +86,7 @@ export type EditorToIframe =
   | { type: "tool:highlightByTreeId"; id: string }
   | { type: "tool:clearHighlight" }
   | { type: "tool:selectByTreeId"; id: string }
+  | { type: "tool:selectParentInstance" }
   | { type: "tool:renderPreview"; dataSlot: string; componentPath: string; exportName: string;
       combinations: PreviewCombination[]; defaultChildren: string }
   | { type: "tool:exitPreview" };

@@ -1029,6 +1029,18 @@ export function Surface() {
           }
           break;
         }
+        case "tool:selectParentInstance": {
+          if (!s.selectedElement) break;
+          let el: Element | null = s.selectedElement.parentElement;
+          while (el && el !== document.body) {
+            if (el.getAttribute("data-instance-source")) {
+              selectElement(el);
+              break;
+            }
+            el = el.parentElement;
+          }
+          break;
+        }
         case "tool:renderPreview": {
           const { componentPath, exportName, combinations: combos, defaultChildren: children } = msg;
           const currentRegistry = (window as any).__DESIGNTOOLS_REGISTRY__ as Record<string, () => Promise<any>> | undefined;

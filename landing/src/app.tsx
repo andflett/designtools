@@ -40,21 +40,12 @@ export function App() {
       <Nav />
       <Hero />
       <DemoWindow />
-      <div className="max-w-[1100px] mx-auto px-6 relative pt-4 pb-20">
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.22 }}
-        >
-          <WaitlistForm />
-        </motion.div>
-      </div>
+      <Waitlist />
       <Philosophy />
       <ThreeTiers />
       <Compatibility />
       <Differentiators />
       <Stack />
-      <Waitlist />
       <Footer />
     </>
   );

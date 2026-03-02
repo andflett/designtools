@@ -56,6 +56,7 @@ import {
 } from "lucide-react";
 import { useTokens, useComponents } from "../lib/scan-hooks.js";
 import type { IndexedTokenMap } from "../lib/scan-store.js";
+import { getEditability } from "../lib/editability.js";
 
 type EditMode = "token" | "component" | "instance";
 
@@ -74,6 +75,7 @@ interface EditorPanelProps {
   onReselectElement: () => void;
   onToggleUsagePanel?: () => void;
   onIsolate?: (entry: ComponentEntry) => void;
+  onSelectParentInstance?: () => void;
 }
 
 /** Open a file in the user's editor via the local server. */
@@ -98,6 +100,7 @@ export function EditorPanel({
   onReselectElement,
   onToggleUsagePanel,
   onIsolate,
+  onSelectParentInstance,
   tailwindTheme,
 }: EditorPanelProps) {
   const tokenData = useTokens();
@@ -131,7 +134,8 @@ export function EditorPanel({
   // Serialize writes so only one goes at a time
   const writeQueueRef = useRef<Promise<void>>(Promise.resolve());
 
-  const isNpmComponent = !!element?.packageName && !element?.source;
+  const editability = getEditability(element);
+  const isNpmComponent = editability !== "full";
 
   const elementName = element
     ? isComponent
@@ -484,6 +488,9 @@ export function EditorPanel({
                   className={element.className}
                   computedStyles={element.computed}
                   parentComputedStyles={element.parentComputed || {}}
+                  isReadOnly={editability === "inspect-only"}
+                  readOnlyPackageName={element.packageName ?? undefined}
+                  onSelectParentInstance={onSelectParentInstance}
                   onPreviewInlineStyle={onPreviewInlineStyle}
                   onRevertInlineStyles={onRevertInlineStyles}
                   onCommitClass={isCssMode ? () => {} : (tailwindClass, oldClass) => {
@@ -663,6 +670,9 @@ export function EditorPanel({
                       className={element.className}
                       computedStyles={element.computed}
                       parentComputedStyles={element.parentComputed || {}}
+                      isReadOnly={editability === "inspect-only"}
+                      readOnlyPackageName={element.packageName ?? undefined}
+                      onSelectParentInstance={onSelectParentInstance}
                       onPreviewInlineStyle={onPreviewInlineStyle}
                       onRevertInlineStyles={onRevertInlineStyles}
                       onCommitClass={isCssMode ? () => {} : (tailwindClass, oldClass) => {
@@ -694,6 +704,9 @@ export function EditorPanel({
                   className={element.className}
                   computedStyles={element.computed}
                   parentComputedStyles={element.parentComputed || {}}
+                  isReadOnly={editability === "inspect-only"}
+                  readOnlyPackageName={element.packageName ?? undefined}
+                  onSelectParentInstance={onSelectParentInstance}
                   onPreviewInlineStyle={onPreviewInlineStyle}
                   onRevertInlineStyles={onRevertInlineStyles}
                   onCommitClass={isCssMode ? () => {} : (tailwindClass, oldClass) => {

@@ -132,7 +132,7 @@ The Tailwind coupling in the client was resolved by adding `onCommitStyle` as a 
 | 1a. Plain CSS adapter | S | Every non-framework CSS project | **P0** | ✅ Done |
 | 1b. CSS Variables adapter | S | Growing — modern CSS movement | **P0** | ✅ Done |
 | 1c. CSS Modules | S-M | #1 non-Tailwind approach in React | **P0** | ✅ Done |
-| npm component handling | S-M | Every real app (robustness) | **P1** | |
+| npm component handling | S-M | Every real app (robustness) | **P1** | ✅ Done |
 | 2a. Vite plugin | M | All non-Next.js React apps | **P1** | ✅ Done |
 | 2b. Vue/Nuxt plugin | L | Zero competition, large global market | **P2** | |
 | 3a. Tailwind theme (v3+v4) | M | Correctness fix, not new market | **P2** | ✅ Done |
@@ -154,10 +154,11 @@ All P0 items and the highest-priority P1 item are done:
 
 The pitch is now real: "surface works on your existing project, whatever styling approach you use, whether it's Next.js, Vite, or Astro."
 
+6. ✅ **npm component handling** — editability tiers (full/instance-only/inspect-only), read-only mode for ComputedPropertyPanel, "go to parent instance" action, Page Explorer package badges
+
 ## Recommended Next Sprint
 
-1. **npm component handling** (P1) — robustness for real apps with shadcn/ui, Radix, MUI, etc.
-2. **Vue/Nuxt plugin** (2b, P2) — zero competition, large global market
+1. **Vue/Nuxt plugin** (2b, P2) — zero competition, large global market
 
 Bootstrap is deprioritized to P3. The 22% developer number is misleading — it skews heavily toward legacy enterprise teams unlikely to adopt new dev tools. Lower ROI than framework expansion.
 
