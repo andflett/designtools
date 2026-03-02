@@ -7,6 +7,7 @@ import { Differentiators } from "./components/differentiators.js";
 import { Compatibility } from "./components/compatibility.js";
 
 import { Stack } from "./components/stack.js";
+import { Waitlist } from "./components/waitlist.js";
 import { Footer } from "./components/footer.js";
 
 export function App() {
@@ -20,6 +21,7 @@ export function App() {
       <Compatibility />
       <Differentiators />
       <Stack />
+      <Waitlist />
       <Footer />
     </>
   );
