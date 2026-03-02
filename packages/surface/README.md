@@ -1,46 +1,50 @@
 # @designtools/surface
 
-A CLI-launched visual design layer for React applications. Select elements in your running app and edit styles, tokens, and component variants — changes write back to your source files.
+A CLI-launched visual design layer for web applications. Select elements in your running app and edit styles, tokens, and component variants — changes write back to your source files.
 
-## Requirements
+## Getting started
 
-- Node.js >= 18
-- **Next.js** >= 14 (via `@designtools/next-plugin`)
-- **Vite + React** (via `@designtools/vite-plugin`)
-- **Astro** (via `@designtools/astro-plugin`)
-- **Remix** (via `@designtools/vite-plugin` — Vite-based)
-- **React** >= 18
+Pick your framework and follow the setup below. Each one takes under a minute.
+
+- [Next.js](#nextjs)
+- [Vite + React](#vite--react)
+- [Remix](#remix)
+- [Astro](#astro)
+
+### Prerequisites
+
+- Node.js 18+
+- A running dev server for your app
 - A supported styling system: **Tailwind CSS** v3/v4, **CSS Custom Properties**, **Plain CSS**, or **CSS Modules**
 
-## Installation
+---
+
+### Next.js
 
 ```bash
 npm install -D @designtools/next-plugin
 ```
 
-## Setup
-
-### 1. Wrap your Next.js config
-
 ```ts
 // next.config.ts
 import { withDesigntools } from "@designtools/next-plugin";
 
-const nextConfig = {
-  // your existing config
-};
-
-export default withDesigntools(nextConfig);
+export default withDesigntools({
+  /* your existing config */
+});
 ```
 
-In development, this:
+```bash
+# Terminal 1 — start your app
+npm run dev
 
-- Adds a Babel pass that injects `data-source="file:line:col"` attributes into every JSX element, mapping each element to its source location. These only exist in the compiled output — your source files are not modified.
-- Auto-mounts the `<Surface />` selection overlay component into your root layout (`app/layout.tsx` or `src/app/layout.tsx`).
+# Terminal 2 — start surface
+npx @designtools/surface
+```
 
-Neither is included in production builds.
+---
 
-### Vite + React (including Remix)
+### Vite + React
 
 ```bash
 npm install -D @designtools/vite-plugin
@@ -59,6 +63,41 @@ export default defineConfig({
 
 The plugin must be listed **before** `@vitejs/plugin-react`.
 
+```bash
+# Terminal 1 — start your app
+npm run dev
+
+# Terminal 2 — start surface
+npx @designtools/surface
+```
+
+---
+
+### Remix
+
+Remix uses Vite under the hood, so the setup is the same as Vite + React.
+
+```bash
+npm install -D @designtools/vite-plugin
+```
+
+```ts
+// vite.config.ts
+import { defineConfig } from "vite";
+import { reactRouter } from "@react-router/dev/vite";
+import designtools from "@designtools/vite-plugin";
+
+export default defineConfig({
+  plugins: [designtools(), reactRouter()],
+});
+```
+
+```bash
+npx @designtools/surface
+```
+
+---
+
 ### Astro
 
 ```bash
@@ -76,7 +115,22 @@ export default defineConfig({
 });
 ```
 
-### 2. Add `data-slot` to your components
+```bash
+npx @designtools/surface
+```
+
+---
+
+## What the plugins do
+
+In development, each framework plugin:
+
+- Injects `data-source="file:line:col"` attributes into every element, mapping each element to its source location. These only exist in the compiled output — your source files are not modified.
+- Auto-mounts the `<Surface />` selection overlay component into your app.
+
+Neither is included in production builds.
+
+## Component editing with `data-slot`
 
 For Surface to recognize reusable components (and distinguish them from plain HTML elements), add a `data-slot` attribute to the root element of each component:
 
@@ -95,23 +149,7 @@ The `data-slot` value should be a kebab-case name matching the component (e.g. `
 
 Components without `data-slot` can still be selected and edited at the element level.
 
-### 3. Run it
-
-Start your Next.js dev server, then run Surface from your project root:
-
-```bash
-# Terminal 1: start your app
-npm run dev
-
-# Terminal 2: start the editor
-npx @designtools/surface
-```
-
-The CLI auto-detects your dev server on port 3000 (also scanning 3001 and 3002 in case Next.js picked a different port). The editor opens at `http://localhost:4400`.
-
-Your app loads inside an iframe — no proxy, no middleware.
-
-### CLI options
+## CLI options
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -129,7 +167,9 @@ Both ports auto-increment if the default is busy. Component and CSS paths are au
 3. Edit values — changes are written directly to your source files
 4. Your dev server picks up the file change and hot-reloads
 
-For Tailwind projects, changes are written as utility classes (e.g. `text-sm`, `bg-blue-500`). When a project customizes its Tailwind theme (v3 config or v4 `@theme` blocks), Surface resolves the custom scales and uses them for class suggestions. When no matching utility exists, arbitrary value syntax is used (e.g. `text-[14px]`).
+For Tailwind projects, changes are written as utility classes. When a project customizes its Tailwind theme (v3 config or v4 `@theme` blocks), Surface resolves the custom scales and uses them for class suggestions. When no matching utility exists, arbitrary value syntax is used (e.g. `text-[14px]`).
+
+For CSS/CSS Modules/CSS Variables projects, writes go directly to the relevant CSS files. Inline style fallback when no matching CSS rule is found.
 
 ## What it can edit
 
@@ -152,7 +192,7 @@ For Tailwind projects, changes are written as utility classes (e.g. `text-sm`, `
 | Astro | `@designtools/astro-plugin` | Stable |
 | Remix | `@designtools/vite-plugin` | Beta |
 
-### Styling Systems
+### Styling systems
 
 | System | Write format | Status |
 |--------|-------------|--------|
@@ -165,10 +205,9 @@ For Tailwind projects, changes are written as utility classes (e.g. `text-sm`, `
 
 ## Limitations
 
-- **Remix** — should work via Vite plugin but is not yet fully tested
-- **Class writes** — for Tailwind projects, `className` writes produce utility classes. For CSS/CSS Modules/CSS Variables projects, writes go directly to CSS files. Inline style fallback when no CSS rule is found.
 - **Development only** — the plugin and overlays are stripped from production builds
-- **App Router only** — the auto-mount targets `app/layout.tsx` (or `src/app/layout.tsx`). Pages Router is not supported
+- **Next.js App Router only** — the auto-mount targets `app/layout.tsx`. Pages Router is not supported.
+- **Remix** — should work via Vite plugin but is not yet fully tested
 
 ## License
 

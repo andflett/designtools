@@ -1,6 +1,6 @@
 # @designtools/surface
 
-Visual editing for production frontends. A multi-framework design tool that understands your design system, sits on top of your production code, and writes changes back to source.
+A multi-framework design tool that understands your design system, sits on top of your production code, and writes changes back to source.
 
 [Read the write-up](https://www.flett.cc/projects/design-engineer-studio) · [Website](https://designsurface.dev)
 
