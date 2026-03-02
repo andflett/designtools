@@ -27,12 +27,14 @@ export function BoxRadiusControl({
   computedStyles,
   onPreviewInlineStyle,
   onCommitClass,
+  radiusScale,
 }: {
   activeProps: UnifiedProperty[];
   allProperties: UnifiedProperty[];
   computedStyles: Record<string, string>;
   onPreviewInlineStyle: (p: string, v: string) => void;
   onCommitClass: (c: string, oldClass?: string) => void;
+  radiusScale?: readonly string[];
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -64,7 +66,7 @@ export function BoxRadiusControl({
           }
           computedValue={uniform || "0"}
           currentClass={activeProps[0]?.fullClass || null}
-          scale={RADIUS_SCALE as string[]}
+          scale={(radiusScale ?? RADIUS_SCALE) as string[]}
           prefix="rounded"
           cssProp="border-radius"
           onPreview={(v) => onPreviewInlineStyle("border-radius", v)}
@@ -83,7 +85,7 @@ export function BoxRadiusControl({
                 value={prop?.tailwindValue || (cv === "0px" || cv === "0" ? "—" : cv)}
                 computedValue={cv}
                 currentClass={prop?.fullClass || null}
-                scale={RADIUS_SCALE as string[]}
+                scale={(radiusScale ?? RADIUS_SCALE) as string[]}
                 prefix={prefix}
                 cssProp={cssProp}
                 onPreview={(v) => onPreviewInlineStyle(cssProp, v)}

@@ -2,7 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 
 export interface FrameworkInfo {
-  name: "nextjs" | "vite" | "remix" | "unknown";
+  name: "nextjs" | "vite" | "remix" | "astro" | "unknown";
   appDir: string;
   appDirExists: boolean;
   componentDir: string;
@@ -36,11 +36,15 @@ export async function detectFramework(
   let appDirCandidates: string[];
   let componentDirCandidates: string[];
 
-  if (deps.next) {
+  if (deps.astro) {
+    name = "astro";
+    appDirCandidates = ["src/pages", "src/content"];
+    componentDirCandidates = ["src/components", "src/components/ui"];
+  } else if (deps.next) {
     name = "nextjs";
     appDirCandidates = ["app", "src/app"];
     componentDirCandidates = ["components/ui", "src/components/ui"];
-  } else if (deps["@remix-run/react"] || deps["@remix-run/node"]) {
+  } else if (deps["@remix-run/react"] || deps["@remix-run/node"] || deps["@react-router/dev"]) {
     name = "remix";
     appDirCandidates = ["app/routes", "src/routes"];
     componentDirCandidates = ["components/ui", "app/components/ui", "src/components/ui"];
@@ -132,6 +136,10 @@ async function findCssFiles(projectRoot: string): Promise<string[]> {
     "src/index.css",
     "src/app.css",
     "styles/globals.css",
+    "src/styles/global.css",
+    "src/styles/globals.css",
+    "app/app.css",
+    "app/root.css",
   ];
 
   const found: string[] = [];
@@ -157,6 +165,7 @@ const COMPONENT_SCAN_DIRS = [
   "src/lib",
   "ui",
   "src/ui",
+  "app/components",
 ];
 
 /**

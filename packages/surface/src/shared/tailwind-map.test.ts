@@ -7,6 +7,7 @@ import {
   matchValueToToken,
   matchColorToToken,
 } from "./tailwind-map.js";
+import type { ResolvedTailwindTheme } from "./tailwind-theme.js";
 
 describe("computedToTailwindClass", () => {
   describe("direct lookups", () => {
@@ -191,5 +192,187 @@ describe("matchColorToToken", () => {
 
   it("returns null for unmatched color", () => {
     expect(matchColorToToken("rgb(0, 0, 0)", tokenGroups)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Theme-aware mapping tests
+// ---------------------------------------------------------------------------
+
+const customTheme: ResolvedTailwindTheme = {
+  spacing: [
+    { key: "sm", value: "4px" },
+    { key: "md", value: "8px" },
+    { key: "lg", value: "16px" },
+    { key: "xl", value: "32px" },
+  ],
+  fontSize: [
+    { key: "tiny", value: "0.625rem" },
+    { key: "body", value: "1rem" },
+    { key: "heading", value: "2rem" },
+  ],
+  fontWeight: [
+    { key: "normal", value: "400" },
+    { key: "bold", value: "700" },
+  ],
+  lineHeight: [
+    { key: "tight", value: "1.2" },
+    { key: "normal", value: "1.5" },
+  ],
+  letterSpacing: [
+    { key: "tight", value: "-0.02em" },
+    { key: "normal", value: "0em" },
+  ],
+  borderRadius: [
+    { key: "sm", value: "0.25rem" },
+    { key: "lg", value: "1rem" },
+    { key: "full", value: "9999px" },
+  ],
+  borderWidth: [],
+  opacity: [],
+};
+
+describe("computedToTailwindClass with custom theme", () => {
+  it("maps custom spacing scale", () => {
+    expect(computedToTailwindClass("padding-top", "4px", customTheme)).toEqual({
+      tailwindClass: "pt-sm", exact: true,
+    });
+    expect(computedToTailwindClass("padding-top", "16px", customTheme)).toEqual({
+      tailwindClass: "pt-lg", exact: true,
+    });
+  });
+
+  it("falls back to arbitrary for spacing not in custom scale", () => {
+    // 24px is in the default scale but NOT in our custom theme
+    expect(computedToTailwindClass("padding-top", "24px", customTheme)).toEqual({
+      tailwindClass: "pt-[24px]", exact: false,
+    });
+  });
+
+  it("maps custom font-size scale", () => {
+    expect(computedToTailwindClass("font-size", "1rem", customTheme)).toEqual({
+      tailwindClass: "text-body", exact: true,
+    });
+    expect(computedToTailwindClass("font-size", "2rem", customTheme)).toEqual({
+      tailwindClass: "text-heading", exact: true,
+    });
+  });
+
+  it("maps custom font-size by px via rem→px conversion", () => {
+    // 0.625rem = 10px
+    expect(computedToTailwindClass("font-size", "10px", customTheme)).toEqual({
+      tailwindClass: "text-tiny", exact: true,
+    });
+  });
+
+  it("maps custom font-weight scale", () => {
+    expect(computedToTailwindClass("font-weight", "700", customTheme)).toEqual({
+      tailwindClass: "font-bold", exact: true,
+    });
+  });
+
+  it("falls back to arbitrary for font-weight not in custom scale", () => {
+    // 600 (semibold) is in default but not in our custom theme
+    expect(computedToTailwindClass("font-weight", "600", customTheme)).toEqual({
+      tailwindClass: "font-[600]", exact: false,
+    });
+  });
+
+  it("maps custom line-height scale", () => {
+    expect(computedToTailwindClass("line-height", "1.5", customTheme)).toEqual({
+      tailwindClass: "leading-normal", exact: true,
+    });
+  });
+
+  it("maps custom letter-spacing scale", () => {
+    expect(computedToTailwindClass("letter-spacing", "-0.02em", customTheme)).toEqual({
+      tailwindClass: "tracking-tight", exact: true,
+    });
+  });
+
+  it("still uses hardcoded maps for non-overridden properties", () => {
+    // display is not in the theme — should still work from REVERSE_MAP
+    expect(computedToTailwindClass("display", "flex", customTheme)).toEqual({
+      tailwindClass: "flex", exact: true,
+    });
+  });
+
+  it("uses default maps when theme is null", () => {
+    expect(computedToTailwindClass("font-size", "16px", null)).toEqual({
+      tailwindClass: "text-base", exact: true,
+    });
+    expect(computedToTailwindClass("padding-top", "16px", null)).toEqual({
+      tailwindClass: "pt-4", exact: true,
+    });
+  });
+});
+
+describe("uniformBoxToTailwind with custom theme", () => {
+  it("maps custom spacing for padding", () => {
+    expect(uniformBoxToTailwind("padding", "8px", customTheme)).toEqual({
+      tailwindClass: "p-md", exact: true,
+    });
+  });
+
+  it("maps custom spacing for margin", () => {
+    expect(uniformBoxToTailwind("margin", "32px", customTheme)).toEqual({
+      tailwindClass: "m-xl", exact: true,
+    });
+  });
+
+  it("falls back to arbitrary for non-custom-scale value", () => {
+    expect(uniformBoxToTailwind("padding", "12px", customTheme)).toEqual({
+      tailwindClass: "p-[12px]", exact: false,
+    });
+  });
+
+  it("uses default when theme is null", () => {
+    expect(uniformBoxToTailwind("padding", "16px", null)).toEqual({
+      tailwindClass: "p-4", exact: true,
+    });
+  });
+});
+
+describe("axisBoxToTailwind with custom theme", () => {
+  it("maps custom spacing for both axes", () => {
+    const result = axisBoxToTailwind("padding", "4px", "16px", customTheme);
+    expect(result.xClass).toEqual({ tailwindClass: "px-sm", exact: true });
+    expect(result.yClass).toEqual({ tailwindClass: "py-lg", exact: true });
+  });
+
+  it("uses default when theme is null", () => {
+    const result = axisBoxToTailwind("padding", "16px", "8px", null);
+    expect(result.xClass).toEqual({ tailwindClass: "px-4", exact: true });
+    expect(result.yClass).toEqual({ tailwindClass: "py-2", exact: true });
+  });
+});
+
+describe("uniformRadiusToTailwind with custom theme", () => {
+  it("maps custom radius scale", () => {
+    expect(uniformRadiusToTailwind("9999px", customTheme)).toEqual({
+      tailwindClass: "rounded-full", exact: true,
+    });
+  });
+
+  it("maps custom radius by rem→px conversion", () => {
+    // 0.25rem = 4px, 1rem = 16px
+    expect(uniformRadiusToTailwind("4px", customTheme)).toEqual({
+      tailwindClass: "rounded-sm", exact: true,
+    });
+    expect(uniformRadiusToTailwind("16px", customTheme)).toEqual({
+      tailwindClass: "rounded-lg", exact: true,
+    });
+  });
+
+  it("falls back to arbitrary for non-custom-scale radius", () => {
+    expect(uniformRadiusToTailwind("6px", customTheme)).toEqual({
+      tailwindClass: "rounded-[6px]", exact: false,
+    });
+  });
+
+  it("uses default when theme is null", () => {
+    expect(uniformRadiusToTailwind("8px", null)).toEqual({
+      tailwindClass: "rounded-lg", exact: true,
+    });
   });
 });

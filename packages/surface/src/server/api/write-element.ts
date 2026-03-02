@@ -19,6 +19,7 @@ import {
 } from "../lib/ast-helpers.js";
 import { findElementAtSource, findComponentAtSource } from "../lib/find-element.js";
 import { computedToTailwindClass } from "../../shared/tailwind-map.js";
+import type { ResolvedTailwindTheme } from "../../shared/tailwind-theme.js";
 import { parseClasses } from "../../shared/tailwind-parser.js";
 import { writeCssProperty, findCssRule, findCssModuleImports, resolveModuleClassNames } from "../lib/write-css-rule.js";
 
@@ -26,6 +27,7 @@ interface WriteElementConfig {
   projectRoot: string;
   stylingType: string;
   cssFiles: string[];
+  tailwindTheme: ResolvedTailwindTheme | null;
 }
 
 interface StyleChange {
@@ -439,7 +441,7 @@ export function createWriteElementRouter(config: WriteElementConfig) {
           newClass = change.hint.tailwindClass;
         } else {
           // Map CSS value to Tailwind class
-          const match = computedToTailwindClass(change.property, change.value);
+          const match = computedToTailwindClass(change.property, change.value, config.tailwindTheme);
           if (!match) continue;
           newClass = match.tailwindClass;
         }

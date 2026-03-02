@@ -56,7 +56,10 @@ export default function designtools(options?: DesigntoolsOptions): Plugin {
 
         // Mount injection (main.tsx only)
         const basename = path.basename(id);
-        if (basename === "main.tsx" || basename === "main.jsx") {
+        if (
+          basename === "main.tsx" || basename === "main.jsx" ||
+          basename === "entry.client.tsx" || basename === "entry.client.jsx"
+        ) {
           result = transformMount(result);
         }
 

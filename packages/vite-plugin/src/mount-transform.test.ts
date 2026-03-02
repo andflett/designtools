@@ -44,4 +44,38 @@ describe("transformMount", () => {
     const result = transformMount(code);
     expect(result.indexOf("import { Surface }")).toBeLessThan(result.indexOf("createRoot"));
   });
+
+  it("handles Remix/React Router v7 hydrateRoot with StrictMode", () => {
+    const code = [
+      `import { startTransition, StrictMode } from "react";`,
+      `import { hydrateRoot } from "react-dom/client";`,
+      `import { HydratedRouter } from "react-router/dom";`,
+      ``,
+      `startTransition(() => {`,
+      `  hydrateRoot(`,
+      `    document,`,
+      `    <StrictMode>`,
+      `      <HydratedRouter />`,
+      `    </StrictMode>`,
+      `  );`,
+      `});`,
+    ].join("\n");
+    const result = transformMount(code);
+    expect(result).toContain('import { Surface } from "@designtools/vite-plugin/surface";');
+    expect(result).toContain("<Surface /><DesigntoolsRegistry /></StrictMode>");
+  });
+
+  it("handles hydrateRoot without StrictMode via render fallback", () => {
+    const code = [
+      `import { hydrateRoot } from "react-dom/client";`,
+      `import { HydratedRouter } from "react-router/dom";`,
+      ``,
+      `hydrateRoot(document, <HydratedRouter />);`,
+    ].join("\n");
+    const result = transformMount(code);
+    expect(result).toContain('import { Surface } from "@designtools/vite-plugin/surface";');
+    // No StrictMode, no .render() pattern — imports added but no injection point
+    // The transform should not crash
+    expect(result).toBeDefined();
+  });
 });

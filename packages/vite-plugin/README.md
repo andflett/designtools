@@ -52,3 +52,33 @@ npx @designtools/surface
 ```
 
 The Surface editor opens at `localhost:4400` and loads your Vite app in an iframe.
+
+## Supported frameworks
+
+The Vite plugin works with any Vite-based React project:
+
+| Framework | Notes |
+|-----------|-------|
+| Vite + React | Direct support |
+| Remix | Vite-based — works with the standard Vite plugin |
+
+For **Next.js**, use [`@designtools/next-plugin`](../next-plugin) instead.
+For **Astro**, use [`@designtools/astro-plugin`](../astro-plugin) instead.
+
+## Supported styling systems
+
+All styling systems supported by Surface work with the Vite plugin:
+
+| System | Status |
+|--------|--------|
+| Tailwind CSS v3 / v4 | Stable |
+| CSS Variables | Stable |
+| Plain CSS | Stable |
+| CSS Modules | Stable |
+| Sass / SCSS | Planned |
+
+See the [Surface README](../surface/README.md) for the full support matrix.
+
+## License
+
+CC-BY-NC-4.0

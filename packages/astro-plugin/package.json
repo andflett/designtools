@@ -1,0 +1,29 @@
+{
+  "name": "@designtools/astro-plugin",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/andflett/designtools"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts src/astro-source-transform.ts --format esm --dts --external @astrojs/compiler --external react --external react/jsx-runtime --external react-dom"
+  },
+  "dependencies": {
+    "@designtools/vite-plugin": "*",
+    "@astrojs/compiler": "^2.10.0"
+  },
+  "peerDependencies": {
+    "astro": ">=4.0.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "vite": "^6.0.0"
+  }
+}

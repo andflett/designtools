@@ -32,6 +32,7 @@ import {
 } from "@radix-ui/react-icons";
 import type { SelectedElementData, SourceLocation } from "../../shared/protocol.js";
 import type { ComponentEntry } from "../../server/lib/scan-components.js";
+import type { ResolvedTailwindTheme } from "../../shared/tailwind-theme.js";
 import { TokenEditor } from "./token-editor.js";
 import { PropertyPanel } from "./property-panel.js";
 import { ComputedPropertyPanel } from "./computed-property-panel.js";
@@ -63,6 +64,7 @@ interface EditorPanelProps {
   theme: "light" | "dark";
   iframePath: string;
   stylingType: string;
+  tailwindTheme?: ResolvedTailwindTheme | null;
   onPreviewToken: (token: string, value: string) => void;
   onClearTokenPreview: () => void;
   onPreviewShadow: (variableName: string, value: string, shadowName?: string) => void;
@@ -96,6 +98,7 @@ export function EditorPanel({
   onReselectElement,
   onToggleUsagePanel,
   onIsolate,
+  tailwindTheme,
 }: EditorPanelProps) {
   const tokenData = useTokens();
   const componentData = useComponents();
@@ -486,6 +489,7 @@ export function EditorPanel({
                     const source = element.source!;
                     withSave(() => handleWriteStyle(source, prop, val));
                   } : undefined}
+                  tailwindTheme={tailwindTheme}
                 />
               </div>
             )}
@@ -613,6 +617,7 @@ export function EditorPanel({
                         const source = element.source!;
                         withSave(() => handleWriteStyle(source, prop, val));
                       } : undefined}
+                      tailwindTheme={tailwindTheme}
                     />
                   </div>
                 )}
@@ -664,6 +669,7 @@ export function EditorPanel({
                     const source = element.source!;
                     withSave(() => handleWriteStyle(source, prop, val));
                   } : undefined}
+                  tailwindTheme={tailwindTheme}
                 />
               </div>
             )}

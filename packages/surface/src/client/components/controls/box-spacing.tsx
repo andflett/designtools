@@ -22,6 +22,7 @@ import {
   axisBoxToTailwind,
 } from "../../../shared/tailwind-map.js";
 import { SPACING_SCALE } from "../../../shared/tailwind-parser.js";
+import type { ResolvedTailwindTheme } from "../../../shared/tailwind-theme.js";
 
 /** Wrap a lucide icon so it matches the `{ style? }` signature ScaleInput expects. */
 const wrapLucide = (Icon: typeof PanelTopDashed) =>
@@ -50,6 +51,8 @@ export function BoxSpacingControl({
   onPreviewInlineStyle,
   onCommitClass,
   onCommitStyle,
+  spacingScale,
+  tailwindTheme,
 }: {
   /** "padding" or "margin" */
   box: "padding" | "margin";
@@ -60,12 +63,15 @@ export function BoxSpacingControl({
   onPreviewInlineStyle: (p: string, v: string) => void;
   onCommitClass: (c: string, oldClass?: string) => void;
   onCommitStyle?: (cssProp: string, cssValue: string) => void;
+  spacingScale?: readonly string[];
+  tailwindTheme?: ResolvedTailwindTheme | null;
 }) {
   const [expanded, setExpanded] = useState(false);
 
   const twShort = box === "padding" ? "p" : "m"; // p, m
   const uniform = getUniformBoxValue(computedStyles, box);
   const axis = !uniform ? getAxisBoxValues(computedStyles, box) : null;
+  const scale = (spacingScale ?? SPACING_SCALE) as string[];
 
   const formatVal = (p: UnifiedProperty) => {
     const v = p.computedValue;
@@ -104,18 +110,18 @@ export function BoxSpacingControl({
             value={activeProps[0]?.tailwindValue || (uniform === "0px" || uniform === "0" ? "—" : uniform)}
             computedValue={uniform || "0"}
             currentClass={activeProps[0]?.fullClass || null}
-            scale={SPACING_SCALE as string[]}
+            scale={scale}
             prefix={twShort}
             cssProp={box}
             onPreview={(v) => onPreviewInlineStyle(box, v)}
             onCommitClass={onCommitClass}
             onCommitStyle={onCommitStyle ? (v) => onCommitStyle(box, v) : undefined}
             onCommitValue={onCommitStyle ? undefined : (v) => {
-              const match = uniformBoxToTailwind(box, v);
+              const match = uniformBoxToTailwind(box, v, tailwindTheme);
               if (match) {
                 onCommitClass(match.tailwindClass);
               } else {
-                const mapped = computedToTailwindClass(box, v);
+                const mapped = computedToTailwindClass(box, v, tailwindTheme);
                 if (mapped) onCommitClass(mapped.tailwindClass);
                 else onCommitClass(`${twShort}-[${v.trim()}]`);
               }
@@ -138,7 +144,7 @@ export function BoxSpacingControl({
                   value={xTwVal || (xIsZero ? "—" : axis.x)}
                   computedValue={axis.x}
                   currentClass={xProp?.fullClass || null}
-                  scale={SPACING_SCALE as string[]}
+                  scale={scale}
                   prefix={`${twShort}x`}
                   cssProp={`${box}-left`}
                   onPreview={(v) => {
@@ -151,11 +157,11 @@ export function BoxSpacingControl({
                     onCommitStyle(`${box}-right`, v);
                   } : undefined}
                   onCommitValue={onCommitStyle ? undefined : (v) => {
-                    const { xClass } = axisBoxToTailwind(box, v, axis.y);
+                    const { xClass } = axisBoxToTailwind(box, v, axis.y, tailwindTheme);
                     if (xClass) {
                       onCommitClass(xClass.tailwindClass);
                     } else {
-                      const mapped = computedToTailwindClass(`${box}-left`, v);
+                      const mapped = computedToTailwindClass(`${box}-left`, v, tailwindTheme);
                       if (mapped) onCommitClass(mapped.tailwindClass);
                       else onCommitClass(`${twShort}x-[${v.trim()}]`);
                     }
@@ -167,7 +173,7 @@ export function BoxSpacingControl({
                   value={yTwVal || (yIsZero ? "—" : axis.y)}
                   computedValue={axis.y}
                   currentClass={yProp?.fullClass || null}
-                  scale={SPACING_SCALE as string[]}
+                  scale={scale}
                   prefix={`${twShort}y`}
                   cssProp={`${box}-top`}
                   onPreview={(v) => {
@@ -180,11 +186,11 @@ export function BoxSpacingControl({
                     onCommitStyle(`${box}-bottom`, v);
                   } : undefined}
                   onCommitValue={onCommitStyle ? undefined : (v) => {
-                    const { yClass } = axisBoxToTailwind(box, axis.x, v);
+                    const { yClass } = axisBoxToTailwind(box, axis.x, v, tailwindTheme);
                     if (yClass) {
                       onCommitClass(yClass.tailwindClass);
                     } else {
-                      const mapped = computedToTailwindClass(`${box}-top`, v);
+                      const mapped = computedToTailwindClass(`${box}-top`, v, tailwindTheme);
                       if (mapped) onCommitClass(mapped.tailwindClass);
                       else onCommitClass(`${twShort}y-[${v.trim()}]`);
                     }
@@ -203,7 +209,7 @@ export function BoxSpacingControl({
               if (onCommitStyle) {
                 onCommitStyle(box, v);
               } else {
-                const match = uniformBoxToTailwind(box, v);
+                const match = uniformBoxToTailwind(box, v, tailwindTheme);
                 if (match) onCommitClass(match.tailwindClass);
               }
             }}
@@ -225,7 +231,7 @@ export function BoxSpacingControl({
                 value={prop?.tailwindValue || (cv === "0px" || cv === "0" ? "—" : cv)}
                 computedValue={cv}
                 currentClass={prop?.fullClass || null}
-                scale={SPACING_SCALE as string[]}
+                scale={scale}
                 prefix={sidePrefix}
                 cssProp={cssProp}
                 onPreview={(v) => onPreviewInlineStyle(cssProp, v)}

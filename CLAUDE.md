@@ -13,27 +13,30 @@ Visual editing CLI tools for web applications — edit styles, tokens, and compo
 | `@designtools/surface` | Hybrid architecture — selection in target app, editor UI separate |
 | `@designtools/next-plugin` | Config wrapper for `data-source` attributes + `<Surface />` mount |
 | `@designtools/vite-plugin` | Vite plugin for `data-source` attributes + `<Surface />` auto-mount |
+| `@designtools/astro-plugin` | Astro integration wrapping vite-plugin + `.astro` template annotation |
 
 ## Monorepo layout
 
 ```
 packages/
-  surface/      Hybrid visual editor (CLI + server + React SPA)
-  next-plugin/  Next.js config wrapper + data-source Babel transform
-  vite-plugin/  Vite plugin for source annotation + Surface auto-mount
+  surface/       Hybrid visual editor (CLI + server + React SPA)
+  next-plugin/   Next.js config wrapper + data-source Babel transform
+  vite-plugin/   Vite plugin for source annotation + Surface auto-mount
+  astro-plugin/  Astro integration + .astro template annotation
 demos/
   studio-app/           Tailwind CSS v4 demo (Next.js)
   vite-app/             Tailwind CSS v4 demo (Vite + React)
-  bootstrap-app/        Bootstrap 5 demo
-  w3c-tokens-app/       W3C Design Tokens demo
-  css-variables-app/    Plain CSS variables demo
-  tailwind-shadows-app/ Tailwind shadows demo
+  design-system/        Comprehensive design tokens demo (Next.js)
+  css-app/              Plain CSS + CSS variables demo (Vite + React)
+  css-modules-app/      CSS Modules demo (Vite + React)
+  astro-app/            Astro + React islands demo
+  tailwind-v3-app/      Tailwind CSS v3 custom theme demo (Vite + React)
 tests/
   fixtures/             Test fixture projects (for integration tests)
   write-element.test.ts Server integration tests (supertest)
 ```
 
-- `packages/next-plugin`, `packages/surface`, and `packages/vite-plugin` are npm workspaces.
+- `packages/next-plugin`, `packages/surface`, `packages/vite-plugin`, and `packages/astro-plugin` are npm workspaces.
 - `demos/*` are standalone apps (not workspaces).
 
 ## Key conventions
@@ -103,7 +106,7 @@ Editor UI (Vite, 4400)
 
 - No proxy — iframe loads the target app directly at its dev server URL
 - Framework plugins inject `data-source` attributes at compile time and mount the `<Surface />` selection component
-- `data-source="file:line:col"` on every JSX element provides exact source mapping
+- `data-source="file:line:col"` on every JSX element and `.astro` template element provides exact source mapping
 - Editor UI and write server run on port 4400
 - postMessage is the only communication channel between editor and target app
 
@@ -153,6 +156,8 @@ The `instanceSource` field carries the usage site location (from `data-instance-
 | `packages/surface/src/server/lib/scan-tokens.ts` | CSS token scanner |
 | `packages/surface/src/server/lib/scan-components.ts` | Component scanner (CVA, data-slot) |
 | `packages/surface/src/server/lib/detect-styling.ts` | Styling system detection |
+| `packages/surface/src/server/lib/resolve-tailwind-theme.ts` | Tailwind v3/v4 theme scale resolver |
+| `packages/surface/src/shared/tailwind-theme.ts` | ResolvedTailwindTheme type definitions |
 | `packages/surface/src/client/app.tsx` | Main React app |
 | `packages/surface/src/client/components/editor-panel.tsx` | Three-tab editor (Token, Component, Instance) |
 | `packages/surface/src/client/components/computed-property-panel.tsx` | Figma-style property controls |
@@ -163,6 +168,8 @@ The `instanceSource` field carries the usage site location (from `data-instance-
 | `packages/next-plugin/src/loader.ts` | Babel transform for data-source attributes |
 | `packages/vite-plugin/src/plugin.ts` | Vite transform hook for data-source attributes |
 | `packages/vite-plugin/src/mount-transform.ts` | Auto-mount Surface in Vite entry points |
+| `packages/astro-plugin/src/index.ts` | Astro integration entry (wraps vite-plugin + mounts Surface) |
+| `packages/astro-plugin/src/astro-source-transform.ts` | .astro template annotation via @astrojs/compiler |
 
 ## Editor UI conventions
 
@@ -203,7 +210,7 @@ npm run test:watch    # watch mode
 
 | Tier | What | Examples |
 |------|------|---------|
-| **Unit** | Pure functions with no I/O | `tailwind-parser.test.ts`, `tailwind-map.test.ts`, `oklch.test.ts`, `safe-path.test.ts`, `write-css-rule.test.ts`, `mount-transform.test.ts` |
+| **Unit** | Pure functions with no I/O | `tailwind-parser.test.ts`, `tailwind-map.test.ts`, `oklch.test.ts`, `safe-path.test.ts`, `write-css-rule.test.ts`, `mount-transform.test.ts`, `resolve-tailwind-theme.test.ts`, `astro-source-transform.test.ts` |
 | **AST fixtures** | Parse → transform → verify source output | `ast-helpers.test.ts`, `find-element.test.ts` |
 | **Server integration** | supertest against Express router + fixture project | `tests/write-element.test.ts` — covers replaceClass, addClass, cssProperty (CSS modules, stylesheets, inline fallback), path traversal |
 
@@ -271,12 +278,25 @@ cd demos/vite-app && npm run dev
 npm run surface:vite
 ```
 
+### Run surface in dev (CSS / CSS Variables)
+
+```bash
+npm run surface:css
+```
+
+### Run surface in dev (CSS Modules)
+
+```bash
+npm run surface:css-modules
+```
+
 ### Publish
 
 ```bash
 npm run publish:surface       # publish surface only
 npm run publish:vite-plugin   # publish vite-plugin only
 npm run publish:next-plugin   # publish next-plugin only
+npm run publish:astro-plugin  # publish astro-plugin only
 npm run publish               # publish all packages
 ```
 

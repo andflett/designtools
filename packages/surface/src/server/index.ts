@@ -11,6 +11,8 @@ import { createGradientsRouter } from "./api/write-gradients.js";
 import { createScanRouter } from "./lib/scanner.js";
 import type { FrameworkInfo } from "./lib/detect-framework.js";
 import type { StylingSystem } from "./lib/detect-styling.js";
+import type { ResolvedTailwindTheme } from "../shared/tailwind-theme.js";
+import { resolveTailwindV3Theme, resolveTailwindV4Theme } from "./lib/resolve-tailwind-theme.js";
 
 export interface ServerConfig {
   targetPort: number;
@@ -26,6 +28,14 @@ export interface ServerConfig {
 export async function createServer(config: ServerConfig) {
   const app = express();
 
+  // Resolve Tailwind theme (non-blocking — null on failure)
+  let tailwindTheme: ResolvedTailwindTheme | null = null;
+  if (config.stylingType === "tailwind-v4" && config.styling?.cssFiles?.length) {
+    tailwindTheme = await resolveTailwindV4Theme(config.projectRoot, config.styling.cssFiles);
+  } else if (config.stylingType === "tailwind-v3" && config.styling?.configPath) {
+    tailwindTheme = await resolveTailwindV3Theme(config.projectRoot, config.styling.configPath);
+  }
+
   // JSON body parsing for API and scan routes
   app.use("/api", express.json());
   app.use("/scan", express.json());
@@ -36,6 +46,7 @@ export async function createServer(config: ServerConfig) {
       targetUrl: `http://localhost:${config.targetPort}`,
       stylingType: config.stylingType,
       projectRoot: config.projectRoot,
+      tailwindTheme,
     });
   });
 
@@ -46,6 +57,7 @@ export async function createServer(config: ServerConfig) {
       projectRoot: config.projectRoot,
       stylingType: config.stylingType,
       cssFiles: config.styling?.cssFiles || [],
+      tailwindTheme,
     })
   );
 

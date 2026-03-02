@@ -8,7 +8,11 @@ import {
   LINE_HEIGHT_SCALE,
   LETTER_SPACING_SCALE,
   SPACING_SCALE,
+  RADIUS_SCALE,
+  BORDER_WIDTH_SCALE,
+  OPACITY_SCALE,
 } from "../../../shared/tailwind-parser.js";
+import type { ResolvedTailwindTheme } from "../../../shared/tailwind-theme.js";
 
 export const CSS_PROP_TO_TW_PREFIX: Record<string, string> = {
   "font-size": "text",
@@ -57,3 +61,50 @@ export const CSS_PROP_TO_TW_SCALE: Record<string, { scale: readonly string[]; pr
   "width": { scale: SPACING_SCALE, prefix: "w" },
   "height": { scale: SPACING_SCALE, prefix: "h" },
 };
+
+/** Theme-aware scale maps. Returns per-scale arrays, falling back to defaults when theme is null or a scale is empty. */
+export interface TwScales {
+  spacing: readonly string[];
+  fontSize: readonly string[];
+  fontWeight: readonly string[];
+  lineHeight: readonly string[];
+  letterSpacing: readonly string[];
+  borderRadius: readonly string[];
+  borderWidth: readonly string[];
+  opacity: readonly string[];
+  /** CSS_PROP_TO_TW_SCALE with theme overrides applied */
+  propToScale: Record<string, { scale: readonly string[]; prefix: string }>;
+}
+
+export function getTwScales(theme: ResolvedTailwindTheme | null | undefined): TwScales {
+  const spacing = theme?.spacing?.length ? theme.spacing.map((e) => e.key) : SPACING_SCALE;
+  const fontSize = theme?.fontSize?.length ? theme.fontSize.map((e) => e.key) : FONT_SIZE_SCALE;
+  const fontWeight = theme?.fontWeight?.length ? theme.fontWeight.map((e) => e.key) : FONT_WEIGHT_SCALE;
+  const lineHeight = theme?.lineHeight?.length ? theme.lineHeight.map((e) => e.key) : LINE_HEIGHT_SCALE;
+  const letterSpacing = theme?.letterSpacing?.length ? theme.letterSpacing.map((e) => e.key) : LETTER_SPACING_SCALE;
+  const borderRadius = theme?.borderRadius?.length ? theme.borderRadius.map((e) => e.key) : RADIUS_SCALE;
+  const borderWidth = theme?.borderWidth?.length ? theme.borderWidth.map((e) => e.key) : BORDER_WIDTH_SCALE;
+  const opacity = theme?.opacity?.length ? theme.opacity.map((e) => e.key) : OPACITY_SCALE;
+
+  const propToScale: Record<string, { scale: readonly string[]; prefix: string }> = {
+    "font-size": { scale: fontSize, prefix: "text" },
+    "font-weight": { scale: fontWeight, prefix: "font" },
+    "line-height": { scale: lineHeight, prefix: "leading" },
+    "letter-spacing": { scale: letterSpacing, prefix: "tracking" },
+    "gap": { scale: spacing, prefix: "gap" },
+    "row-gap": { scale: spacing, prefix: "gap-y" },
+    "column-gap": { scale: spacing, prefix: "gap-x" },
+    "padding-top": { scale: spacing, prefix: "pt" },
+    "padding-right": { scale: spacing, prefix: "pr" },
+    "padding-bottom": { scale: spacing, prefix: "pb" },
+    "padding-left": { scale: spacing, prefix: "pl" },
+    "margin-top": { scale: spacing, prefix: "mt" },
+    "margin-right": { scale: spacing, prefix: "mr" },
+    "margin-bottom": { scale: spacing, prefix: "mb" },
+    "margin-left": { scale: spacing, prefix: "ml" },
+    "width": { scale: spacing, prefix: "w" },
+    "height": { scale: spacing, prefix: "h" },
+  };
+
+  return { spacing, fontSize, fontWeight, lineHeight, letterSpacing, borderRadius, borderWidth, opacity, propToScale };
+}

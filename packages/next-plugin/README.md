@@ -53,6 +53,20 @@ Both loaders are skipped entirely in production builds.
 | `@designtools/next-plugin` | `withDesigntools()` config wrapper |
 | `@designtools/next-plugin/surface` | `<Surface />` React component (mounted automatically — you shouldn't need to import this directly) |
 
+## Supported styling systems
+
+All styling systems supported by Surface work with the Next.js plugin:
+
+| System | Status |
+|--------|--------|
+| Tailwind CSS v3 / v4 | Stable |
+| CSS Variables | Stable |
+| Plain CSS | Stable |
+| CSS Modules | Stable |
+| Sass / SCSS | Planned |
+
+See the [Surface README](../surface/README.md) for the full support matrix.
+
 ## License
 
 CC-BY-NC-4.0

@@ -1,9 +1,24 @@
+import { useState } from "react";
 import { motion } from "motion/react";
 import { DitherGradient } from "./dither-gradient.js";
 import { DitherGlow } from "./dither-glow.js";
+import { LogoBar } from "./logo-bar.js";
 import { WaitlistForm } from "./waitlist.js";
 
+const PIXEL_FONTS = [
+  { name: "Jersey 25", family: "'Jersey 25', sans-serif" },
+  { name: "Rubik Pixels", family: "'Rubik Pixels', system-ui" },
+  { name: "Sixtyfour", family: "'Sixtyfour', monospace" },
+  { name: "Bitcount Single", family: "'Bitcount Single', monospace" },
+  { name: "Pixelify Sans", family: "'Pixelify Sans', sans-serif" },
+  { name: "Silkscreen", family: "'Silkscreen', monospace" },
+  { name: "Inter (default)", family: "'Inter', sans-serif" },
+] as const;
+
 export function Hero() {
+  const [fontIdx, setFontIdx] = useState(0);
+  const currentFont = PIXEL_FONTS[fontIdx];
+
   return (
     <section className="relative pt-0 text-center overflow-hidden">
       {/* Dark header band that dissolves via Bayer dither */}
@@ -24,7 +39,8 @@ export function Hero() {
           </div>
 
           <motion.h1
-            className="text-[clamp(2.75rem,6.5vw,4.5rem)] font-semibold leading-[1.05] tracking-[0.025em] text-white mb-5"
+            className="text-[clamp(2.75rem,6.5vw,4.5rem)] font-normal leading-[1.05] tracking-[-0.025em] text-white mb-5"
+            style={{ fontFamily: currentFont.family }}
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.08 }}
@@ -33,6 +49,23 @@ export function Hero() {
             <br />
             production code
           </motion.h1>
+
+          {/* Font switcher — temporary */}
+          <div className="flex flex-wrap items-center justify-center gap-1.5 mb-6">
+            {PIXEL_FONTS.map((f, i) => (
+              <button
+                key={f.name}
+                onClick={() => setFontIdx(i)}
+                className={`px-2.5 py-1 text-[10px] font-mono rounded-full border transition-colors ${
+                  i === fontIdx
+                    ? "border-white/40 bg-white/10 text-white"
+                    : "border-white/10 text-white/40 hover:text-white/70 hover:border-white/20"
+                }`}
+              >
+                {f.name}
+              </button>
+            ))}
+          </div>
 
           <motion.p
             className="text-lg text-white/80 max-w-[460px] mx-auto leading-relaxed"
@@ -43,6 +76,8 @@ export function Hero() {
             A visual design layer that understands your design system, sits on
             top of your production code, and writes changes back to source
           </motion.p>
+
+          <LogoBar />
         </div>
       </div>
 
@@ -54,15 +89,7 @@ export function Hero() {
         color="#09090b"
       />
 
-      <div className="max-w-[1100px] mx-auto px-6 relative pt-4 pb-20">
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.22 }}
-        >
-          <WaitlistForm />
-        </motion.div>
-      </div>
+     
     </section>
   );
 }

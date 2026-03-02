@@ -10,6 +10,8 @@ Visual editing CLI tools for web applications — edit styles, tokens, and compo
 |---------|-------------|
 | [`@designtools/surface`](packages/surface) | Hybrid visual editor — selection overlays in the target app, editor UI in a separate Vite app |
 | [`@designtools/next-plugin`](packages/next-plugin) | Next.js config wrapper — injects `data-source` attributes and mounts `<Surface />` |
+| [`@designtools/vite-plugin`](packages/vite-plugin) | Vite plugin — injects `data-source` attributes and auto-mounts `<Surface />` |
+| [`@designtools/astro-plugin`](packages/astro-plugin) | Astro integration — `.astro` template transform and auto-mounts `<Surface />` |
 
 ## Architecture
 
@@ -20,7 +22,7 @@ Editor UI (Vite, 4400)
   |-- <iframe src="http://localhost:3000" />   <- direct, no proxy
   |       |
   |       +-- Target app with <Surface /> component
-  |               mounted by withDesigntools()
+  |               mounted by withDesigntools() or vite-plugin
   |               communicates via postMessage
   |
   +-- Write server (API routes on same port)
@@ -29,7 +31,32 @@ Editor UI (Vite, 4400)
 Key design decisions:
 - `data-source` attributes (injected at compile time) provide exact file:line:col mapping for every element
 - CSS property/value pairs as the universal editing primitive, with styling-system hints to preserve tokens
-- Framework plugins (Next.js, Vite, etc.) and styling-system adapters (Tailwind, CSS variables, etc.) are orthogonal
+- Framework plugins (Next.js, Vite) and styling-system adapters (Tailwind, CSS variables, etc.) are orthogonal
+- Tailwind theme resolution — custom scales from v3 configs and v4 `@theme` blocks are auto-detected and used for class suggestions
+
+### Support Matrix
+
+#### Frameworks
+
+| Framework | Plugin | Status | Notes |
+|-----------|--------|--------|-------|
+| Next.js | `@designtools/next-plugin` | Stable | App Router. Babel transform for `data-source` attributes |
+| Vite + React | `@designtools/vite-plugin` | Stable | Any Vite + React project |
+| Astro | `@designtools/astro-plugin` | Stable | `.astro` templates + React/Preact islands |
+| Remix | `@designtools/vite-plugin` | Beta | Vite-based — use the Vite plugin |
+| Vue / Nuxt | — | Planned | |
+| Svelte / SvelteKit | — | Planned | |
+
+#### Styling Systems
+
+| System | Detection | Write format | Status |
+|--------|-----------|-------------|--------|
+| Tailwind CSS v4 | `tailwindcss ^4` in package.json | Utility classes via resolved theme | Stable |
+| Tailwind CSS v3 | `tailwindcss ^3` + config file | Utility classes via theme config | Stable |
+| CSS Variables | `--*` custom properties in stylesheets | Direct property writes in CSS files | Stable |
+| Plain CSS | `.css` files with class selectors | Direct property writes in CSS files | Stable |
+| CSS Modules | `.module.css` imports in JSX | Property writes in module CSS files | Stable |
+| Sass / SCSS | — | — | Planned |
 
 ## Demo apps
 
@@ -40,6 +67,10 @@ Key design decisions:
 | **W3C Tokens** (`demos/w3c-tokens-app`) | W3C Design Tokens Format (DTCG) | 3002 |
 | **CSS Variables** (`demos/css-variables-app`) | Plain CSS custom properties | 3003 |
 | **Tailwind Shadows** (`demos/tailwind-shadows-app`) | Tailwind CSS v4 `@theme` | 3004 |
+| **Vite** (`demos/vite-app`) | Tailwind CSS v4 (Vite + React) | 3000 |
+| **Tailwind v3** (`demos/tailwind-v3-app`) | Tailwind CSS v3 custom theme | 3000 |
+| **CSS** (`demos/css-app`) | Plain CSS + CSS Variables | 3000 |
+| **CSS Modules** (`demos/css-modules-app`) | CSS Modules (.module.css) | 3000 |
 
 ### Prerequisites
 
@@ -74,15 +105,63 @@ npm run surface
 
 The editor opens at [http://localhost:4400](http://localhost:4400) with the target app loaded in an iframe.
 
+### Framework setup
+
+#### Next.js
+
+```bash
+npm install -D @designtools/next-plugin
+```
+
+```ts
+// next.config.ts
+import { withDesigntools } from "@designtools/next-plugin";
+export default withDesigntools({ /* your config */ });
+```
+
+#### Vite + React (including Remix)
+
+```bash
+npm install -D @designtools/vite-plugin
+```
+
+```ts
+// vite.config.ts
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import designtools from "@designtools/vite-plugin";
+
+export default defineConfig({
+  plugins: [designtools(), react()],
+});
+```
+
+#### Astro
+
+```bash
+npm install -D @designtools/astro-plugin
+```
+
+```js
+// astro.config.mjs
+import { defineConfig } from "astro/config";
+import react from "@astrojs/react";
+import designtools from "@designtools/astro-plugin";
+
+export default defineConfig({
+  integrations: [react(), designtools()],
+});
+```
+
 ## Supported styling systems
 
 | System | Detection | Write format |
 |--------|-----------|-------------|
 | Tailwind CSS v4 | `tailwindcss ^4` in package.json | Utility class replacement via resolved theme |
 | Tailwind CSS v3 | `tailwindcss ^3` + config file | Utility class replacement |
-| Bootstrap 5 | `bootstrap` in package.json | Sass variables / CSS custom properties |
-| W3C Design Tokens | `.tokens.json` files with `$type` | DTCG composite values |
-| CSS Variables | `--*` custom properties in `:root` | Direct property writes |
+| CSS Variables | `--*` custom properties in stylesheets | Direct property writes in CSS files |
+| Plain CSS | `.css` files with class selectors | Direct property writes in CSS files |
+| CSS Modules | `.module.css` imports in JSX | Property writes in module CSS files |
 
 ## Project structure
 
@@ -90,13 +169,19 @@ The editor opens at [http://localhost:4400](http://localhost:4400) with the targ
 designtools/
 ├── packages/
 │   ├── surface/       Hybrid visual editor
-│   └── next-plugin/   Next.js config wrapper + data-source transform
+│   ├── next-plugin/   Next.js config wrapper + data-source transform
+│   ├── vite-plugin/   Vite plugin + data-source transform
+│   └── astro-plugin/  Astro integration + .astro template transform
 ├── demos/
 │   ├── studio-app/              Tailwind CSS v4 + CVA demo
 │   ├── bootstrap-app/           Bootstrap 5 demo
 │   ├── w3c-tokens-app/          W3C Design Tokens demo
 │   ├── css-variables-app/       Plain CSS variables demo
-│   └── tailwind-shadows-app/    Tailwind CSS v4 shadows demo
+│   ├── tailwind-shadows-app/    Tailwind CSS v4 shadows demo
+│   ├── vite-app/                Tailwind CSS v4 (Vite + React)
+│   ├── tailwind-v3-app/         Tailwind CSS v3 custom theme
+│   ├── css-app/                 Plain CSS + CSS Variables
+│   └── css-modules-app/         CSS Modules (.module.css)
 ```
 
 ## Testing with a local project
@@ -122,6 +207,19 @@ cd packages/next-plugin && npm link
 cd /path/to/your-app
 npm link @designtools/next-plugin
 ```
+
+### Vite / Astro projects
+
+```bash
+# Register the vite-plugin globally (one-time)
+cd packages/vite-plugin && npm link
+
+# In your target project
+cd /path/to/your-app
+npm link @designtools/vite-plugin
+```
+
+For Astro projects, link `@designtools/astro-plugin` instead.
 
 ### 3. Run surface from source
 

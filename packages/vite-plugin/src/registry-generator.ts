@@ -1,7 +1,7 @@
 /**
  * Component registry generator for Vite apps.
  * Adapted from packages/next-plugin/src/preview-route.ts.
- * Writes a static import map into the target app's src directory.
+ * Writes a static import map into the target app's source directory.
  */
 
 import fs from "fs";
@@ -9,19 +9,33 @@ import path from "path";
 
 const REGISTRY_FILE = "designtools-registry.ts";
 
-/** Generate the component registry file in the target app's src directory. */
+/** Detect whether this is a Remix/React Router app (app/ root with ~/ alias) or standard Vite (src/ root with @/ alias). */
+function detectSourceConvention(projectRoot: string): {
+  sourceDir: string;
+  importAlias: string;
+} {
+  // Remix / React Router v7 convention: app/root.tsx exists
+  if (fs.existsSync(path.join(projectRoot, "app", "root.tsx"))) {
+    return { sourceDir: "app", importAlias: "~/" };
+  }
+  // Default Vite convention
+  return { sourceDir: "src", importAlias: "@/" };
+}
+
+/** Generate the component registry file in the target app's source directory. */
 export function generateComponentRegistry(
   projectRoot: string,
   componentDir?: string
 ): void {
-  const srcDir = path.join(projectRoot, "src");
-  const componentPaths = discoverComponentFiles(projectRoot, componentDir);
+  const { sourceDir, importAlias } = detectSourceConvention(projectRoot);
+  const fullSourceDir = path.join(projectRoot, sourceDir);
+  const componentPaths = discoverComponentFiles(projectRoot, componentDir, sourceDir);
 
   const registryEntries = componentPaths
     .map((p) => {
-      // Strip leading src/ for @/ alias (since @ maps to src/)
-      const importPath = p.startsWith("src/") ? p.slice(4) : p;
-      return `  "${p}": () => import("@/${importPath}"),`;
+      // Strip leading sourceDir/ for import alias
+      const importPath = p.startsWith(sourceDir + "/") ? p.slice(sourceDir.length + 1) : p;
+      return `  "${p}": () => import("${importAlias}${importPath}"),`;
     })
     .join("\n");
 
@@ -40,13 +54,14 @@ export function DesigntoolsRegistry() {
 }
 `;
 
-  fs.writeFileSync(path.join(srcDir, REGISTRY_FILE), content, "utf-8");
-  ensureGitignore(projectRoot);
+  fs.writeFileSync(path.join(fullSourceDir, REGISTRY_FILE), content, "utf-8");
+  ensureGitignore(projectRoot, sourceDir);
 }
 
 /** Clean up generated registry file. */
 export function cleanupComponentRegistry(projectRoot: string): void {
-  const registryPath = path.join(projectRoot, "src", REGISTRY_FILE);
+  const { sourceDir } = detectSourceConvention(projectRoot);
+  const registryPath = path.join(projectRoot, sourceDir, REGISTRY_FILE);
   try {
     fs.unlinkSync(registryPath);
   } catch {
@@ -54,9 +69,9 @@ export function cleanupComponentRegistry(projectRoot: string): void {
   }
 }
 
-function ensureGitignore(projectRoot: string): void {
+function ensureGitignore(projectRoot: string, sourceDir: string): void {
   const gitignorePath = path.join(projectRoot, ".gitignore");
-  const entry = "src/designtools-registry.ts";
+  const entry = `${sourceDir}/designtools-registry.ts`;
 
   try {
     const existing = fs.existsSync(gitignorePath)
@@ -75,11 +90,15 @@ function ensureGitignore(projectRoot: string): void {
 
 function discoverComponentFiles(
   projectRoot: string,
-  overrideDir?: string
+  overrideDir?: string,
+  sourceDir?: string
 ): string[] {
-  const dirs = overrideDir
-    ? [overrideDir]
-    : ["src/components/ui", "components/ui"];
+  const defaultDirs = [
+    "src/components/ui",
+    "components/ui",
+    "app/components/ui",
+  ];
+  const dirs = overrideDir ? [overrideDir] : defaultDirs;
   for (const dir of dirs) {
     const fullDir = path.join(projectRoot, dir);
     if (fs.existsSync(fullDir)) {

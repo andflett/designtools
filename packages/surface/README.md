@@ -5,9 +5,12 @@ A CLI-launched visual design layer for React applications. Select elements in yo
 ## Requirements
 
 - Node.js >= 18
-- **Next.js** >= 14 (App Router)
+- **Next.js** >= 14 (via `@designtools/next-plugin`)
+- **Vite + React** (via `@designtools/vite-plugin`)
+- **Astro** (via `@designtools/astro-plugin`)
+- **Remix** (via `@designtools/vite-plugin` — Vite-based)
 - **React** >= 18
-- A supported styling system: **Tailwind CSS** v3/v4, **CSS Custom Properties**, **Bootstrap**, or plain CSS
+- A supported styling system: **Tailwind CSS** v3/v4, **CSS Custom Properties**, **Plain CSS**, or **CSS Modules**
 
 ## Installation
 
@@ -36,6 +39,42 @@ In development, this:
 - Auto-mounts the `<Surface />` selection overlay component into your root layout (`app/layout.tsx` or `src/app/layout.tsx`).
 
 Neither is included in production builds.
+
+### Vite + React (including Remix)
+
+```bash
+npm install -D @designtools/vite-plugin
+```
+
+```ts
+// vite.config.ts
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import designtools from "@designtools/vite-plugin";
+
+export default defineConfig({
+  plugins: [designtools(), react()],
+});
+```
+
+The plugin must be listed **before** `@vitejs/plugin-react`.
+
+### Astro
+
+```bash
+npm install -D @designtools/astro-plugin
+```
+
+```js
+// astro.config.mjs
+import { defineConfig } from "astro/config";
+import react from "@astrojs/react";
+import designtools from "@designtools/astro-plugin";
+
+export default defineConfig({
+  integrations: [react(), designtools()],
+});
+```
 
 ### 2. Add `data-slot` to your components
 
@@ -90,7 +129,7 @@ Both ports auto-increment if the default is busy. Component and CSS paths are au
 3. Edit values — changes are written directly to your source files
 4. Your dev server picks up the file change and hot-reloads
 
-For Tailwind projects, changes are written as utility classes (e.g. `text-sm`, `bg-blue-500`). When no matching utility exists, arbitrary value syntax is used (e.g. `text-[14px]`).
+For Tailwind projects, changes are written as utility classes (e.g. `text-sm`, `bg-blue-500`). When a project customizes its Tailwind theme (v3 config or v4 `@theme` blocks), Surface resolves the custom scales and uses them for class suggestions. When no matching utility exists, arbitrary value syntax is used (e.g. `text-[14px]`).
 
 ## What it can edit
 
@@ -102,10 +141,32 @@ For Tailwind projects, changes are written as utility classes (e.g. `text-sm`, `
 - **Spacing** — spacing scale tokens
 - **Borders** — border radius and border width tokens
 
+## Support matrix
+
+### Frameworks
+
+| Framework | Plugin | Status |
+|-----------|--------|--------|
+| Next.js (App Router) | `@designtools/next-plugin` | Stable |
+| Vite + React | `@designtools/vite-plugin` | Stable |
+| Astro | `@designtools/astro-plugin` | Stable |
+| Remix | `@designtools/vite-plugin` | Beta |
+
+### Styling Systems
+
+| System | Write format | Status |
+|--------|-------------|--------|
+| Tailwind CSS v4 | Utility classes via resolved theme | Stable |
+| Tailwind CSS v3 | Utility classes via theme config | Stable |
+| CSS Variables | Direct property writes in CSS files | Stable |
+| Plain CSS | Direct property writes in CSS files | Stable |
+| CSS Modules | Property writes in .module.css files | Stable |
+| Sass / SCSS | — | Planned |
+
 ## Limitations
 
-- **Next.js only** — framework detection exists for Remix and Vite but they are untested
-- **Tailwind for class writes** — CSS variable and plain CSS token editing works, but `className` writes produce Tailwind utility classes
+- **Remix** — should work via Vite plugin but is not yet fully tested
+- **Class writes** — for Tailwind projects, `className` writes produce utility classes. For CSS/CSS Modules/CSS Variables projects, writes go directly to CSS files. Inline style fallback when no CSS rule is found.
 - **Development only** — the plugin and overlays are stripped from production builds
 - **App Router only** — the auto-mount targets `app/layout.tsx` (or `src/app/layout.tsx`). Pages Router is not supported
 

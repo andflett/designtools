@@ -3,6 +3,7 @@ import { Component1Icon } from "@radix-ui/react-icons";
 import { PanelLeft } from "lucide-react";
 import type { SelectedElementData, ComponentTreeNode, PreviewCombination } from "../shared/protocol.js";
 import type { ComponentEntry } from "../server/lib/scan-components.js";
+import type { ResolvedTailwindTheme } from "../shared/tailwind-theme.js";
 import { usePostMessage } from "./lib/use-postmessage.js";
 import { ToolChrome } from "./components/tool-chrome.js";
 import { EditorPanel } from "./components/editor-panel.js";
@@ -13,6 +14,7 @@ import { useScanReady, useComponents } from "./lib/scan-hooks.js";
 import { UsagePanel } from "./components/usage-panel.js";
 import { PageExplorer } from "./components/page-explorer.js";
 import { IsolationView, generateCombinations } from "./components/isolation-view.js";
+import { ProjectInfo } from "./components/project-info.js";
 
 /** Set to false to skip the boot screen (disable before publishing) */
 const SHOW_BOOT_SCREEN = false;
@@ -48,6 +50,7 @@ export function App() {
   const [targetUrl, setTargetUrl] = useState("");
   const [stylingType, setStylingType] = useState("");
   const [projectName, setProjectName] = useState("");
+  const [tailwindTheme, setTailwindTheme] = useState<ResolvedTailwindTheme | null>(null);
   const [selectedElement, setSelectedElement] = useState<SelectedElementData | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
@@ -77,6 +80,7 @@ export function App() {
       .then((config) => {
         setTargetUrl(config.targetUrl);
         setStylingType(config.stylingType || "");
+        setTailwindTheme(config.tailwindTheme || null);
         if (config.projectRoot) {
           setProjectName(config.projectRoot.split("/").filter(Boolean).pop() ?? "");
         }
@@ -351,23 +355,26 @@ export function App() {
       {/* Collapse button + Elements explorer */}
       <div className="flex-1 overflow-hidden flex flex-col">
         <div
-          className="flex items-center pl-2 pr-2.5 py-1.5 shrink-0"
+          className="pl-2 pr-2.5 py-1.5 shrink-0"
           style={{ borderBottom: "1px solid var(--studio-border-subtle)" }}
         >
-          <span
-            className="flex-1 text-[10px] font-semibold uppercase tracking-wide pl-1"
-            style={{ color: "var(--studio-text-muted)" }}
-          >
-            {projectName || "Explorer"}
-          </span>
-          <button
-            onClick={() => setLeftPanelCollapsed(true)}
-            className="studio-icon-btn shrink-0"
-            style={{ width: 24, height: 24 }}
-            title="Collapse panel"
-          >
-            <PanelLeft strokeWidth={1.5} size={14} />
-          </button>
+          <div className="flex items-center">
+            <span
+              className="flex-1 text-[10px] font-semibold uppercase tracking-wide pl-1"
+              style={{ color: "var(--studio-text-muted)" }}
+            >
+              {projectName || "Explorer"}
+            </span>
+            <button
+              onClick={() => setLeftPanelCollapsed(true)}
+              className="studio-icon-btn shrink-0"
+              style={{ width: 24, height: 24 }}
+              title="Collapse panel"
+            >
+              <PanelLeft strokeWidth={1.5} size={14} />
+            </button>
+          </div>
+          <ProjectInfo targetPort={targetUrl ? parseInt(new URL(targetUrl).port, 10) || 3000 : 3000} />
         </div>
         {/* Usage panel (above explorer, when open) */}
         {showUsages && (
@@ -403,6 +410,7 @@ export function App() {
       theme={theme}
       iframePath={iframePath}
       stylingType={stylingType}
+      tailwindTheme={tailwindTheme}
       onPreviewToken={handlePreviewToken}
       onClearTokenPreview={handleClearTokenPreview}
       onPreviewShadow={handlePreviewShadow}

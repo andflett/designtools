@@ -1,11 +1,15 @@
 /**
  * Maps computed CSS values back to Tailwind classes.
  * Uses a static reverse lookup table with arbitrary value fallback.
+ * When a ResolvedTailwindTheme is provided, builds maps from the project's
+ * actual theme — overriding hardcoded defaults on a per-scale basis.
  *
  * Tier 1: Token match (handled externally by checking scan data)
  * Tier 2: Tailwind scale match (this module)
  * Tier 3: Arbitrary value fallback (this module)
  */
+
+import type { ResolvedTailwindTheme, ScaleEntry } from "./tailwind-theme.js";
 
 /** Reverse lookup: CSS property → { computed value → Tailwind class } */
 const REVERSE_MAP: Record<string, Record<string, string>> = {
@@ -257,6 +261,98 @@ const RADIUS_PROPS = new Set([
   "border-bottom-right-radius", "border-bottom-left-radius",
 ]);
 
+// ---------------------------------------------------------------------------
+// Theme-derived maps (memoized by reference)
+// ---------------------------------------------------------------------------
+
+interface ThemeMaps {
+  spacingPx: Record<string, string> | null;
+  radiusMap: Record<string, string> | null;
+  reverseOverrides: Record<string, Record<string, string>>;
+}
+
+let cachedTheme: ResolvedTailwindTheme | null | undefined;
+let cachedMaps: ThemeMaps | null = null;
+
+/** Convert a rem value to px (× 16). */
+function remToPx(value: string): string | null {
+  const m = value.match(/^([\d.]+)rem$/);
+  if (!m) return null;
+  return `${parseFloat(m[1]) * 16}px`;
+}
+
+function buildSpacingPxMap(entries: ScaleEntry[]): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const { key, value } of entries) {
+    // Map the raw value
+    map[value] = key;
+    // Also add px equivalent for rem values
+    const px = remToPx(value);
+    if (px && !map[px]) map[px] = key;
+    // For bare numbers that could be px
+    if (/^\d+px$/.test(value)) map[value] = key;
+  }
+  return map;
+}
+
+function buildRadiusMap(entries: ScaleEntry[]): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const { key, value } of entries) {
+    const cls = key === "DEFAULT" ? "rounded" : `rounded-${key}`;
+    map[value] = cls;
+    const px = remToPx(value);
+    if (px) map[px] = cls;
+  }
+  return map;
+}
+
+function buildReverseMap(entries: ScaleEntry[], prefix: string): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const { key, value } of entries) {
+    const cls = `${prefix}-${key}`;
+    map[value] = cls;
+    const px = remToPx(value);
+    if (px) map[px] = cls;
+  }
+  return map;
+}
+
+function getThemeMaps(theme: ResolvedTailwindTheme | null | undefined): ThemeMaps | null {
+  if (theme === cachedTheme && cachedMaps) return cachedMaps;
+
+  if (!theme) {
+    cachedTheme = theme;
+    cachedMaps = null;
+    return null;
+  }
+
+  const maps: ThemeMaps = {
+    spacingPx: theme.spacing.length > 0 ? buildSpacingPxMap(theme.spacing) : null,
+    radiusMap: theme.borderRadius.length > 0 ? buildRadiusMap(theme.borderRadius) : null,
+    reverseOverrides: {},
+  };
+
+  if (theme.fontSize.length > 0) {
+    maps.reverseOverrides["font-size"] = buildReverseMap(theme.fontSize, "text");
+  }
+  if (theme.fontWeight.length > 0) {
+    maps.reverseOverrides["font-weight"] = buildReverseMap(theme.fontWeight, "font");
+  }
+  if (theme.lineHeight.length > 0) {
+    maps.reverseOverrides["line-height"] = buildReverseMap(theme.lineHeight, "leading");
+  }
+  if (theme.letterSpacing.length > 0) {
+    maps.reverseOverrides["letter-spacing"] = buildReverseMap(theme.letterSpacing, "tracking");
+  }
+  if (theme.opacity.length > 0) {
+    maps.reverseOverrides["opacity"] = buildReverseMap(theme.opacity, "opacity");
+  }
+
+  cachedTheme = theme;
+  cachedMaps = maps;
+  return maps;
+}
+
 export interface TailwindMatch {
   tailwindClass: string;
   exact: boolean;
@@ -264,15 +360,25 @@ export interface TailwindMatch {
 
 export function computedToTailwindClass(
   cssProp: string,
-  computedValue: string
+  computedValue: string,
+  theme?: ResolvedTailwindTheme | null,
 ): TailwindMatch | null {
+  const themeMaps = getThemeMaps(theme);
+
+  // Check theme-derived reverse overrides first (font-size, font-weight, etc.)
+  if (themeMaps?.reverseOverrides[cssProp]?.[computedValue]) {
+    return { tailwindClass: themeMaps.reverseOverrides[cssProp][computedValue], exact: true };
+  }
+
   const directMap = REVERSE_MAP[cssProp];
-  if (directMap?.[computedValue]) {
+  // Skip hardcoded maps for properties that the theme overrides
+  if (!themeMaps?.reverseOverrides[cssProp] && directMap?.[computedValue]) {
     return { tailwindClass: directMap[computedValue], exact: true };
   }
 
   if (SPACING_PROPS.has(cssProp)) {
-    const scaleVal = SPACING_PX_MAP[computedValue];
+    const spacingMap = themeMaps?.spacingPx || SPACING_PX_MAP;
+    const scaleVal = spacingMap[computedValue];
     const prefix = CSS_TO_TW_PREFIX[cssProp];
     if (scaleVal && prefix) {
       return { tailwindClass: `${prefix}-${scaleVal}`, exact: true };
@@ -283,7 +389,8 @@ export function computedToTailwindClass(
   }
 
   if (RADIUS_PROPS.has(cssProp)) {
-    const radiusClass = RADIUS_MAP[computedValue];
+    const rMap = themeMaps?.radiusMap || RADIUS_MAP;
+    const radiusClass = rMap[computedValue];
     if (radiusClass) {
       const prefix = CSS_TO_TW_PREFIX[cssProp];
       if (prefix) {
@@ -308,10 +415,13 @@ export function computedToTailwindClass(
 
 export function uniformBoxToTailwind(
   type: "padding" | "margin",
-  value: string
+  value: string,
+  theme?: ResolvedTailwindTheme | null,
 ): TailwindMatch | null {
   const prefix = type === "padding" ? "p" : "m";
-  const scaleVal = SPACING_PX_MAP[value];
+  const themeMaps = getThemeMaps(theme);
+  const spacingMap = themeMaps?.spacingPx || SPACING_PX_MAP;
+  const scaleVal = spacingMap[value];
   if (scaleVal) {
     return { tailwindClass: `${prefix}-${scaleVal}`, exact: true };
   }
@@ -324,13 +434,16 @@ export function uniformBoxToTailwind(
 export function axisBoxToTailwind(
   type: "padding" | "margin",
   x: string,
-  y: string
+  y: string,
+  theme?: ResolvedTailwindTheme | null,
 ): { xClass: TailwindMatch | null; yClass: TailwindMatch | null } {
   const xPrefix = type === "padding" ? "px" : "mx";
   const yPrefix = type === "padding" ? "py" : "my";
 
-  const xScale = SPACING_PX_MAP[x];
-  const yScale = SPACING_PX_MAP[y];
+  const themeMaps = getThemeMaps(theme);
+  const spacingMap = themeMaps?.spacingPx || SPACING_PX_MAP;
+  const xScale = spacingMap[x];
+  const yScale = spacingMap[y];
 
   return {
     xClass: xScale
@@ -342,8 +455,13 @@ export function axisBoxToTailwind(
   };
 }
 
-export function uniformRadiusToTailwind(value: string): TailwindMatch | null {
-  const cls = RADIUS_MAP[value];
+export function uniformRadiusToTailwind(
+  value: string,
+  theme?: ResolvedTailwindTheme | null,
+): TailwindMatch | null {
+  const themeMaps = getThemeMaps(theme);
+  const rMap = themeMaps?.radiusMap || RADIUS_MAP;
+  const cls = rMap[value];
   if (cls) return { tailwindClass: cls, exact: true };
   if (value !== "0px") return { tailwindClass: `rounded-[${value}]`, exact: false };
   return null;

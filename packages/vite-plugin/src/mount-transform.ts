@@ -11,7 +11,7 @@ export function transformMount(code: string): string {
   }
 
   // Must have createRoot or render call to be a valid entry point
-  if (!code.includes("createRoot") && !code.includes("render")) {
+  if (!code.includes("createRoot") && !code.includes("hydrateRoot") && !code.includes("render")) {
     return code;
   }
 

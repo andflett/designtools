@@ -11,17 +11,23 @@
   "workspaces": [
     "packages/next-plugin",
     "packages/surface",
-    "packages/vite-plugin"
+    "packages/vite-plugin",
+    "packages/astro-plugin"
   ],
   "scripts": {
     "surface": "npm -w packages/next-plugin run build && cd demos/studio-app && npm run dev & sleep 3 && cd demos/studio-app && npx tsx ../../packages/surface/src/cli.ts",
     "surface:design-system": "npm -w packages/next-plugin run build && cd demos/design-system && npm run dev & sleep 3 && cd demos/design-system && npx tsx ../../packages/surface/src/cli.ts",
     "surface:vite": "npm -w packages/vite-plugin run build && cd demos/vite-app && npm run dev & sleep 3 && cd demos/vite-app && npx tsx ../../packages/surface/src/cli.ts",
+    "surface:css": "npm -w packages/vite-plugin run build && cd demos/css-app && npm run dev & sleep 3 && cd demos/css-app && npx tsx ../../packages/surface/src/cli.ts",
+    "surface:css-modules": "npm -w packages/vite-plugin run build && cd demos/css-modules-app && npm run dev & sleep 3 && cd demos/css-modules-app && npx tsx ../../packages/surface/src/cli.ts",
+    "surface:remix": "npm -w packages/vite-plugin run build && cd demos/remix-app && npm run dev & sleep 3 && cd demos/remix-app && npx tsx ../../packages/surface/src/cli.ts",
     "build:surface": "npm -w packages/next-plugin run build && npm -w packages/surface run build",
     "build:vite-plugin": "npm -w packages/vite-plugin run build",
+    "build:astro-plugin": "npm -w packages/astro-plugin run build",
     "publish:vite-plugin": "bash scripts/publish.sh patch vite-plugin",
+    "publish:astro-plugin": "bash scripts/publish.sh patch astro-plugin",
     "publish:surface": "bash scripts/publish.sh patch surface",
-    "build": "npm -w packages/next-plugin run build && npm -w packages/surface run build && npm -w packages/vite-plugin run build",
+    "build": "npm -w packages/next-plugin run build && npm -w packages/surface run build && npm -w packages/vite-plugin run build && npm -w packages/astro-plugin run build",
     "publish": "bash scripts/publish.sh",
     "publish:next-plugin": "bash scripts/publish.sh patch next-plugin",
     "test": "vitest run",

@@ -65,6 +65,8 @@ import {
   RADIUS_SCALE,
   BORDER_WIDTH_SCALE,
 } from "../../shared/tailwind-parser.js";
+import type { ResolvedTailwindTheme } from "../../shared/tailwind-theme.js";
+import { getTwScales, type TwScales } from "./controls/tailwind-maps.js";
 import { Tooltip } from "./tooltip.js";
 import {
   ScrubInput,
@@ -97,6 +99,7 @@ interface ComputedPropertyPanelProps {
   onCommitClass: (tailwindClass: string, oldClass?: string) => void;
   /** CSS mode: commit raw CSS property/value instead of Tailwind classes */
   onCommitStyle?: (cssProp: string, cssValue: string) => void;
+  tailwindTheme?: ResolvedTailwindTheme | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -112,6 +115,7 @@ export function ComputedPropertyPanel({
   onRevertInlineStyles,
   onCommitClass,
   onCommitStyle,
+  tailwindTheme,
 }: ComputedPropertyPanelProps) {
   const tokenData = useTokens();
   const shadowData = useShadows();
@@ -147,6 +151,7 @@ export function ComputedPropertyPanel({
   }
 
   const displayValue = computedStyles["display"] || "block";
+  const twScales = getTwScales(tailwindTheme);
 
   return (
     <div>
@@ -166,6 +171,8 @@ export function ComputedPropertyPanel({
           onRevertInlineStyles={onRevertInlineStyles}
           onCommitClass={onCommitClass}
           onCommitStyle={onCommitStyle}
+          tailwindTheme={tailwindTheme}
+          twScales={twScales}
         />
       ))}
     </div>
@@ -190,6 +197,8 @@ function UnifiedSection({
   onRevertInlineStyles,
   onCommitClass,
   onCommitStyle,
+  tailwindTheme,
+  twScales,
 }: {
   category: ComputedCategory;
   label: string;
@@ -204,6 +213,8 @@ function UnifiedSection({
   onRevertInlineStyles: () => void;
   onCommitClass: (c: string, oldClass?: string) => void;
   onCommitStyle?: (cssProp: string, cssValue: string) => void;
+  tailwindTheme?: ResolvedTailwindTheme | null;
+  twScales?: TwScales;
 }) {
   const [collapsed, setCollapsed] = useState(true);
   const activeProps = properties.filter((p) => p.hasValue);
@@ -242,6 +253,8 @@ function UnifiedSection({
               onRevertInlineStyles={onRevertInlineStyles}
               onCommitClass={onCommitClass}
               onCommitStyle={onCommitStyle}
+              spacingScale={twScales?.spacing}
+              tailwindTheme={tailwindTheme}
             />
           ) : category === "border" ? (
             <BorderSection
@@ -252,6 +265,8 @@ function UnifiedSection({
               onRevertInlineStyles={onRevertInlineStyles}
               onCommitClass={onCommitClass}
               onCommitStyle={onCommitStyle}
+              twScales={twScales}
+              tailwindTheme={tailwindTheme}
             />
           ) : category === "size" ? (
             <SizeSection
@@ -261,6 +276,7 @@ function UnifiedSection({
               onRevertInlineStyles={onRevertInlineStyles}
               onCommitClass={onCommitClass}
               onCommitStyle={onCommitStyle}
+              twScales={twScales}
             />
           ) : category === "typography" ? (
             <TypographySection
@@ -270,6 +286,8 @@ function UnifiedSection({
               onRevertInlineStyles={onRevertInlineStyles}
               onCommitClass={onCommitClass}
               onCommitStyle={onCommitStyle}
+              twScales={twScales}
+              tailwindTheme={tailwindTheme}
             />
           ) : category === "effects" ? (
             <EffectsSection
@@ -293,6 +311,7 @@ function UnifiedSection({
                 onRevertInlineStyles={onRevertInlineStyles}
                 onCommitClass={onCommitClass}
                 onCommitStyle={onCommitStyle}
+                twScales={twScales}
               />
             ))
           )}
@@ -510,6 +529,7 @@ function SizeSection({
   onRevertInlineStyles,
   onCommitClass,
   onCommitStyle,
+  twScales,
 }: {
   properties: UnifiedProperty[];
   tokenGroups: Record<string, any[]>;
@@ -517,6 +537,7 @@ function SizeSection({
   onRevertInlineStyles: () => void;
   onCommitClass: (c: string, oldClass?: string) => void;
   onCommitStyle?: (cssProp: string, cssValue: string) => void;
+  twScales?: TwScales;
 }) {
   const active = properties.filter((p) => p.hasValue);
   const widthProp = active.find((p) => p.cssProperty === "width");
@@ -535,6 +556,7 @@ function SizeSection({
               onRevertInlineStyles={onRevertInlineStyles}
               onCommitClass={onCommitClass}
               onCommitStyle={onCommitStyle}
+              twScales={twScales}
             />
           )}
           {heightProp && (
@@ -545,6 +567,7 @@ function SizeSection({
               onRevertInlineStyles={onRevertInlineStyles}
               onCommitClass={onCommitClass}
               onCommitStyle={onCommitStyle}
+              twScales={twScales}
             />
           )}
         </div>
@@ -558,6 +581,7 @@ function SizeSection({
           onRevertInlineStyles={onRevertInlineStyles}
           onCommitClass={onCommitClass}
           onCommitStyle={onCommitStyle}
+          twScales={twScales}
         />
       ))}
     </>
@@ -576,6 +600,8 @@ function SpacingSection({
   onRevertInlineStyles,
   onCommitClass,
   onCommitStyle,
+  spacingScale,
+  tailwindTheme,
 }: {
   properties: UnifiedProperty[];
   computedStyles: Record<string, string>;
@@ -584,6 +610,8 @@ function SpacingSection({
   onRevertInlineStyles: () => void;
   onCommitClass: (c: string, oldClass?: string) => void;
   onCommitStyle?: (cssProp: string, cssValue: string) => void;
+  spacingScale?: readonly string[];
+  tailwindTheme?: ResolvedTailwindTheme | null;
 }) {
   const activeProps = properties.filter((p) => p.hasValue);
   const paddingProps = activeProps.filter((p) => p.cssProperty.startsWith("padding-"));
@@ -602,6 +630,8 @@ function SpacingSection({
           onPreviewInlineStyle={onPreviewInlineStyle}
           onCommitClass={onCommitClass}
           onCommitStyle={onCommitStyle}
+          spacingScale={spacingScale}
+          tailwindTheme={tailwindTheme}
         />
       )}
 
@@ -615,6 +645,8 @@ function SpacingSection({
           onPreviewInlineStyle={onPreviewInlineStyle}
           onCommitClass={onCommitClass}
           onCommitStyle={onCommitStyle}
+          spacingScale={spacingScale}
+          tailwindTheme={tailwindTheme}
         />
       )}
 
@@ -665,6 +697,8 @@ function TypographySection({
   onRevertInlineStyles,
   onCommitClass,
   onCommitStyle,
+  twScales,
+  tailwindTheme,
 }: {
   properties: UnifiedProperty[];
   tokenGroups: Record<string, any[]>;
@@ -672,6 +706,8 @@ function TypographySection({
   onRevertInlineStyles: () => void;
   onCommitClass: (c: string, oldClass?: string) => void;
   onCommitStyle?: (cssProp: string, cssValue: string) => void;
+  twScales?: TwScales;
+  tailwindTheme?: ResolvedTailwindTheme | null;
 }) {
   const findProp = (cssProp: string) => properties.find((p) => p.cssProperty === cssProp);
 
@@ -689,7 +725,7 @@ function TypographySection({
     if (onCommitStyle) {
       onCommitStyle(cssProp, cssValue);
     } else {
-      const match = computedToTailwindClass(cssProp, cssValue);
+      const match = computedToTailwindClass(cssProp, cssValue, tailwindTheme);
       if (match) {
         const prop = findProp(cssProp);
         const oldClass = prop?.fullClass || undefined;
@@ -735,7 +771,7 @@ function TypographySection({
                 value={fontSize.tailwindValue || fontSize.computedValue}
                 computedValue={fontSize.computedValue}
                 currentClass={fontSize.fullClass}
-                scale={FONT_SIZE_SCALE as string[]}
+                scale={(twScales?.fontSize ?? FONT_SIZE_SCALE) as string[]}
                 prefix="text"
                 cssProp="font-size"
                 onPreview={(v) => onPreviewInlineStyle("font-size", v)}
@@ -752,7 +788,7 @@ function TypographySection({
                 value={fontWeight.tailwindValue || fontWeight.computedValue}
                 computedValue={fontWeight.computedValue}
                 currentClass={fontWeight.fullClass}
-                scale={FONT_WEIGHT_SCALE as string[]}
+                scale={(twScales?.fontWeight ?? FONT_WEIGHT_SCALE) as string[]}
                 prefix="font"
                 cssProp="font-weight"
                 onPreview={(v) => onPreviewInlineStyle("font-weight", v)}
@@ -775,7 +811,7 @@ function TypographySection({
                 value={lineHeight.tailwindValue || lineHeight.computedValue}
                 computedValue={lineHeight.computedValue}
                 currentClass={lineHeight.fullClass}
-                scale={LINE_HEIGHT_SCALE as string[]}
+                scale={(twScales?.lineHeight ?? LINE_HEIGHT_SCALE) as string[]}
                 prefix="leading"
                 cssProp="line-height"
                 onPreview={(v) => onPreviewInlineStyle("line-height", v)}
@@ -792,7 +828,7 @@ function TypographySection({
                 value={letterSpacing.tailwindValue || letterSpacing.computedValue}
                 computedValue={letterSpacing.computedValue}
                 currentClass={letterSpacing.fullClass}
-                scale={LETTER_SPACING_SCALE as string[]}
+                scale={(twScales?.letterSpacing ?? LETTER_SPACING_SCALE) as string[]}
                 prefix="tracking"
                 cssProp="letter-spacing"
                 onPreview={(v) => onPreviewInlineStyle("letter-spacing", v)}
@@ -879,6 +915,8 @@ function BorderSection({
   onRevertInlineStyles,
   onCommitClass,
   onCommitStyle,
+  twScales,
+  tailwindTheme,
 }: {
   properties: UnifiedProperty[];
   computedStyles: Record<string, string>;
@@ -887,6 +925,8 @@ function BorderSection({
   onRevertInlineStyles: () => void;
   onCommitClass: (c: string, oldClass?: string) => void;
   onCommitStyle?: (cssProp: string, cssValue: string) => void;
+  twScales?: TwScales;
+  tailwindTheme?: ResolvedTailwindTheme | null;
 }) {
   const active = properties.filter((p) => p.hasValue);
   const allRadiusProps = properties.filter((p) => p.cssProperty.includes("radius"));
@@ -907,6 +947,7 @@ function BorderSection({
           computedStyles={computedStyles}
           onPreviewInlineStyle={onPreviewInlineStyle}
           onCommitClass={onCommitClass}
+          radiusScale={twScales?.borderRadius}
         />
       )}
 
@@ -925,7 +966,7 @@ function BorderSection({
             }
             computedValue={uniformBorderWidth || "0px"}
             currentClass={widthProps[0]?.fullClass || null}
-            scale={BORDER_WIDTH_SCALE as string[]}
+            scale={(twScales?.borderWidth ?? BORDER_WIDTH_SCALE) as string[]}
             prefix="border"
             cssProp="border-width"
             onPreview={(v) => onPreviewInlineStyle("border-width", v)}
@@ -1148,6 +1189,7 @@ function UnifiedControl({
   onRevertInlineStyles: _revert,
   onCommitClass,
   onCommitStyle,
+  twScales,
 }: {
   prop: UnifiedProperty;
   tokenGroups: Record<string, any[]>;
@@ -1155,6 +1197,7 @@ function UnifiedControl({
   onRevertInlineStyles: () => void;
   onCommitClass: (c: string, oldClass?: string) => void;
   onCommitStyle?: (cssProp: string, cssValue: string) => void;
+  twScales?: TwScales;
 }) {
   // 1. Color controls
   if (prop.controlType === "color") {
@@ -1275,7 +1318,7 @@ function UnifiedControl({
   }
 
   // 4. Tailwind scale → ScaleInput
-  const twScale = CSS_PROP_TO_TW_SCALE[prop.cssProperty];
+  const twScale = (twScales?.propToScale ?? CSS_PROP_TO_TW_SCALE)[prop.cssProperty];
   if (twScale) {
     // Show "—" for zero/default computed values when no explicit class exists
     const isZeroDefault = !prop.tailwindValue && (prop.computedValue === "0px" || prop.computedValue === "0");

@@ -31,16 +31,17 @@ Meanwhile, the developer working on a production app with CSS Modules, or CSS va
 |------------|--------|
 | Styling detection | All 6 types (tailwind-v4, v3, bootstrap, css-variables, plain-css, unknown) |
 | Token scanning | CSS custom properties, shadows, borders, gradients, spacing |
-| Element style writes (Tailwind) | ✅ className replacement via AST |
+| Element style writes (Tailwind) | ✅ className replacement via AST, theme-aware scale mapping |
 | Element style writes (CSS) | ✅ CSS rule edit, CSS modules, inline style fallback |
 | Token value writes | CSS custom properties (regex in :root/.dark blocks) |
 | Component class writes | Regex-based with cva()/variant awareness |
 | Shadow writes | CSS, SCSS, @theme, W3C Design Tokens |
-| Framework detection | Next.js, Vite, Remix (from package.json) |
+| Framework detection | Next.js, Vite, Remix, Astro (from package.json) |
 | Framework plugin (Next.js) | ✅ Webpack + Turbopack (`@designtools/next-plugin`) |
 | Framework plugin (Vite) | ✅ Vite transform hook (`@designtools/vite-plugin`) |
+| Framework plugin (Astro) | ✅ Astro integration + .astro template annotation (`@designtools/astro-plugin`) |
 | postMessage protocol | Selection, inline style preview, token preview, revert |
-| Test suite | ✅ 154 tests — unit, AST fixtures, server integration (vitest + supertest) |
+| Test suite | ✅ 206 tests — unit, AST fixtures, server integration, theme resolution, Astro transform (vitest + supertest) |
 
 ## Remaining Gap
 
@@ -95,10 +96,10 @@ The Tailwind coupling in the client was resolved by adding `onCommitStyle` as a 
   - Mount injection: add component to app layout (Nuxt has predictable `app.vue`)
   - Style editing: Vue's `<style scoped>` maps directly to the plain CSS adapter from Phase 1
 
-#### 2c. Astro plugin
-- **Effort:** Medium (requires 2a as base)
-- **Market:** Growing fast for content/marketing sites. Vite-based, has JSX support via React/Preact islands
-- **How:** Astro integration wrapping the Vite plugin from 2a, with Astro-specific entry point detection (`src/layouts/`)
+#### 2c. Astro plugin ✅
+- **Status:** Done
+- **What:** Astro integration wrapping the Vite plugin from 2a, with `.astro` template annotation via `@astrojs/compiler`
+- **Implementation:** `@designtools/astro-plugin` — Astro integration hooks into `astro:config:setup` to inject Vite plugins + mount Surface via `injectScript`. `.astro` files annotated by parsing with `@astrojs/compiler` and string-splicing `data-source`/`data-instance-source` at AST offsets. React islands get annotation for free via the Vite plugin's Babel transform
 
 #### 2d. Svelte/SvelteKit plugin
 - **Effort:** Large
@@ -109,9 +110,10 @@ The Tailwind coupling in the client was resolved by adding `onCommitStyle` as a 
 
 **Goal:** Best-in-class design token management across any project.
 
-#### 3a. Tailwind v3 theme resolution
-- **Effort:** Medium
-- **What:** `tailwind-map.ts` currently uses hardcoded default scale values. Projects with custom themes get wrong class suggestions. Read and resolve `tailwind.config.js` (already detected but unused)
+#### 3a. Tailwind theme resolution (v3 + v4) ✅
+- **Status:** Done
+- **What:** `tailwind-map.ts` used hardcoded default scale values. Projects with custom themes got wrong class suggestions. Now resolves actual theme at server startup and uses it for all mapping
+- **Implementation:** `resolve-tailwind-theme.ts` with two adapters: v4 parses `@theme` CSS blocks (pure text parsing), v3 uses `tailwindcss/resolveConfig`. Theme is sent to the client via `/api/config` and threaded through all scale dropdowns and class mapping functions. Falls back to hardcoded defaults when theme is null or a scale has no custom entries
 
 #### 3b. W3C Design Tokens import/export
 - **Effort:** Medium
@@ -133,8 +135,8 @@ The Tailwind coupling in the client was resolved by adding `onCommitStyle` as a 
 | npm component handling | S-M | Every real app (robustness) | **P1** | |
 | 2a. Vite plugin | M | All non-Next.js React apps | **P1** | ✅ Done |
 | 2b. Vue/Nuxt plugin | L | Zero competition, large global market | **P2** | |
-| 3a. Tailwind v3 theme | M | Correctness fix, not new market | **P2** | |
-| 2c. Astro plugin | M | Growing content site market | **P3** | |
+| 3a. Tailwind theme (v3+v4) | M | Correctness fix, not new market | **P2** | ✅ Done |
+| 2c. Astro plugin | M | Growing content site market | **P3** | ✅ Done |
 | 3b. W3C Design Tokens | M | Future-facing standard | **P3** | |
 | 1d. Bootstrap adapter | M | Enterprise/legacy (slow adopters) | **P3** | |
 | 3c. Sass/SCSS variables | M | Declining, overlaps with Bootstrap | **P3** | |
@@ -148,14 +150,14 @@ All P0 items and the highest-priority P1 item are done:
 2. ✅ **CSS Variables element adapter** (1b) — `onCommitStyle` prop chain for non-Tailwind projects
 3. ✅ **CSS Modules support** (1c) — `findCssModuleImports()` + `resolveModuleClassNames()` + `writeCssProperty()`
 4. ✅ **Vite plugin** (2a) — `@designtools/vite-plugin` with data-source transform + Surface auto-mount
+5. ✅ **Astro plugin** (2c) — `@designtools/astro-plugin` wrapping vite-plugin + `.astro` template annotation via `@astrojs/compiler`
 
-The pitch is now real: "surface works on your existing project, whatever styling approach you use, whether it's Next.js or Vite."
+The pitch is now real: "surface works on your existing project, whatever styling approach you use, whether it's Next.js, Vite, or Astro."
 
 ## Recommended Next Sprint
 
 1. **npm component handling** (P1) — robustness for real apps with shadcn/ui, Radix, MUI, etc.
 2. **Vue/Nuxt plugin** (2b, P2) — zero competition, large global market
-3. **Tailwind v3 theme resolution** (3a, P2) — correctness fix for custom themes
 
 Bootstrap is deprioritized to P3. The 22% developer number is misleading — it skews heavily toward legacy enterprise teams unlikely to adopt new dev tools. Lower ROI than framework expansion.
 
@@ -309,7 +311,7 @@ The `instanceOverride` write type in `write-element.ts` already handles this cor
 
 | Tier | What | Status |
 |------|------|--------|
-| Unit tests | Pure functions (tailwind-parser, tailwind-map, oklch, safe-path, write-css-rule, mount-transform) | Done |
+| Unit tests | Pure functions (tailwind-parser, tailwind-map, oklch, safe-path, write-css-rule, mount-transform, resolve-tailwind-theme, astro-source-transform) | Done |
 | AST fixture tests | ast-helpers, find-element (parse → transform → verify) | Done |
 | Server integration | write-element API (supertest + fixture project, all write types) | Done |
 | E2E browser tests | Full editor ↔ iframe ↔ server round-trip | **Not started** |
@@ -341,6 +343,6 @@ The `instanceOverride` write type in `write-element.ts` already handles this cor
 | **Bolt.new** | Multi (React default) | Tailwind default | WebContainer | Prototypers |
 | **Webflow/Framer** | Own runtime | Own system | Cloud | Designers |
 | **Browser DevTools** | Any | Any | Local | Developers (no persistence) |
-| **Surface** | Next.js (expanding) | Multi-system (expanding) | Local | Developers on real codebases |
+| **Surface** | Next.js, Vite, Astro (expanding) | Multi-system (expanding) | Local | Developers on real codebases |
 
 The gap we fill: DevTools-level flexibility (any framework, any styling) with source-file persistence. Nobody else occupies this space.

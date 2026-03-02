@@ -4,17 +4,16 @@ const stylingRows = [
   { name: "Tailwind CSS", versions: "v3 / v4", status: "stable" },
   { name: "CSS Variables", versions: "Custom properties", status: "stable" },
   { name: "Plain CSS", versions: "Stylesheets", status: "stable" },
-  { name: "CSS Modules", versions: ".module.css", status: "next" },
-  { name: "Bootstrap", versions: "v5", status: "next" },
+  { name: "CSS Modules", versions: ".module.css", status: "stable" },
   { name: "Sass / SCSS", versions: "$variables", status: "planned" },
 ];
 
 const frameworkRows = [
   { name: "Next.js", versions: "App + Pages router", status: "stable" },
-  { name: "Vite + React", versions: "via plugin", status: "next" },
+  { name: "Vite + React", versions: "via plugin", status: "stable" },
+  { name: "Astro", versions: "Islands", status: "stable" },
   { name: "Remix", versions: "Vite-based", status: "next" },
   { name: "Vue / Nuxt", versions: "SFC templates", status: "planned" },
-  { name: "Astro", versions: "Islands", status: "planned" },
   { name: "Svelte", versions: "SvelteKit", status: "planned" },
 ];
 
@@ -49,7 +48,7 @@ export function Compatibility() {
           Any styling system. Any framework.
         </h2>
         <p className="text-base text-ink2 max-w-[520px] leading-relaxed mb-14">
-          Most visual editors only work with Tailwind on Next.js. Codesurface
+          Most visual editors only work with Tailwind on Next.js. Surface
           detects your styling approach and writes changes in your project's
           native format.
         </p>
