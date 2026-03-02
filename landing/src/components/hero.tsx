@@ -42,7 +42,7 @@ export function Hero() {
           </motion.h1>
 
           <motion.p
-            className="text-lg text-white/80 max-w-[500px] mx-auto leading-relaxed"
+            className="text-sm md:text-lg text-white/80 max-w-[500px] mx-auto leading-relaxed"
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.15 }}
