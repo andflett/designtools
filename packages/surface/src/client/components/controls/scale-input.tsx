@@ -209,6 +209,7 @@ export function ScaleInput({
             ...(!isInScale ? [{ value: "__custom__", label: normalizedValue || "—" }] : []),
             ...scale.map((val) => ({ value: val })),
           ]}
+          data-testid={`scale-dropdown-${cssProp}`}
         />
       ) : (
         <input
@@ -237,6 +238,7 @@ export function ScaleInput({
               setFocused(false);
             }
           }}
+          data-testid={`scale-arbitrary-input-${cssProp}`}
           style={{
             flex: 1,
             minWidth: 0,
@@ -258,6 +260,7 @@ export function ScaleInput({
             if (!arbitraryMode) setDraft(computedValue);
           }}
           className={`studio-scale-toggle${arbitraryMode ? " active" : ""}`}
+          data-testid={`scale-toggle-${cssProp}`}
         >
           {arbitraryMode
             ? <CodeIcon style={{ width: 12, height: 12 }} />

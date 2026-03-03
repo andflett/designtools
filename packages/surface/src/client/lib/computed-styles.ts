@@ -360,6 +360,12 @@ export interface UnifiedProperty {
   hasValue: boolean;
   /** Whether this is a flex/grid-only property */
   flexGridOnly: boolean;
+  /** The authored value from stylesheets (may contain CSS functions like clamp(), var()) */
+  authoredValue: string | null;
+  /** Whether the authored value is a CSS function */
+  isFunction: boolean;
+  /** The CSS function name if isFunction (e.g. "clamp", "calc", "var") */
+  functionName: string | null;
 }
 
 export interface CategorizedUnified {
@@ -483,6 +489,7 @@ export function buildUnifiedProperties(
   computedStyles: Record<string, string>,
   parentComputedStyles: Record<string, string>,
   tokenGroups: Record<string, any[]>,
+  authoredStyles?: Record<string, string | null>,
 ): CategorizedUnified {
   const result: CategorizedUnified = {
     layout: [],
@@ -552,6 +559,12 @@ export function buildUnifiedProperties(
       (displayClaim.value.includes("flex") || displayClaim.value.includes("grid"));
     const layoutOnly = def.category === "layout";
 
+    // Authored value from stylesheets (may contain CSS functions)
+    const authoredValue = authoredStyles?.[def.property] || null;
+    const funcMatch = authoredValue?.match(/^([\w-]+)\(/);
+    const isFunction = !!funcMatch;
+    const functionName = funcMatch ? funcMatch[1] : null;
+
     let prop: UnifiedProperty;
 
     if (claimed) {
@@ -569,6 +582,9 @@ export function buildUnifiedProperties(
         tokenMatch,
         hasValue: true,
         flexGridOnly: isFlexGridProp,
+        authoredValue,
+        isFunction,
+        functionName,
       };
     } else if (sizeOnly) {
       // Skip size properties not set via class — computed values are noise
@@ -590,6 +606,9 @@ export function buildUnifiedProperties(
           tokenMatch: null,
           hasValue: false,
           flexGridOnly: true,
+          authoredValue,
+          isFunction,
+          functionName,
         };
       } else {
         continue;
@@ -613,6 +632,9 @@ export function buildUnifiedProperties(
         tokenMatch,
         hasValue: true,
         flexGridOnly: isFlexGridProp,
+        authoredValue,
+        isFunction,
+        functionName,
       };
     } else if (!isHidden) {
       // Source: computed — has a meaningful, non-hidden computed value
@@ -631,6 +653,9 @@ export function buildUnifiedProperties(
         tokenMatch,
         hasValue: true,
         flexGridOnly: isFlexGridProp,
+        authoredValue,
+        isFunction,
+        functionName,
       };
     } else if (isRecommended(tag, def.property)) {
       // Source: none — no value set, but recommended for this element tag
@@ -647,6 +672,9 @@ export function buildUnifiedProperties(
         tokenMatch: null,
         hasValue: false,
         flexGridOnly: isFlexGridProp,
+        authoredValue,
+        isFunction,
+        functionName,
       };
     } else {
       // Not claimed, not meaningful computed, not recommended, not alwaysShow — skip

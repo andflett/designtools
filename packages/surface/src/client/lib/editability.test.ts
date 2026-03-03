@@ -17,6 +17,8 @@ function makeElement(overrides: Partial<SelectedElementData> = {}): SelectedElem
     textContent: "",
     attributes: {},
     fiberProps: null,
+    authored: {},
+    activeBreakpoint: null,
     ...overrides,
   };
 }

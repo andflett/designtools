@@ -28,6 +28,10 @@ export interface SelectedElementData {
   attributes: Record<string, string>;
   /** Runtime props read from React fiber's memoizedProps (string/number/boolean only) */
   fiberProps: Record<string, string | number | boolean> | null;
+  /** Authored CSS values from stylesheets (may contain CSS functions like clamp(), var()) */
+  authored: Record<string, string | null>;
+  /** Currently active responsive breakpoint (e.g. "md", "lg") or null for base */
+  activeBreakpoint: string | null;
 }
 
 export interface ComponentTreeNode {

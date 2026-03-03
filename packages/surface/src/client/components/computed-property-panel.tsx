@@ -94,6 +94,8 @@ interface ComputedPropertyPanelProps {
   className: string;
   computedStyles: Record<string, string>;
   parentComputedStyles: Record<string, string>;
+  /** Authored CSS values from stylesheets (may contain CSS functions like clamp(), var()) */
+  authoredStyles?: Record<string, string | null>;
   /** When true, all controls are disabled and values are display-only */
   isReadOnly?: boolean;
   /** Package name shown in the read-only banner */
@@ -117,6 +119,7 @@ export function ComputedPropertyPanel({
   className: elementClassName,
   computedStyles,
   parentComputedStyles,
+  authoredStyles,
   isReadOnly,
   readOnlyPackageName,
   onSelectParentInstance,
@@ -133,7 +136,7 @@ export function ComputedPropertyPanel({
   const shadows: ShadowItem[] | undefined = shadowData?.shadows;
   const gradients: GradientItem[] | undefined = gradientData?.gradients;
   const categorized = buildUnifiedProperties(
-    tag, elementClassName, computedStyles, parentComputedStyles, tokenGroups,
+    tag, elementClassName, computedStyles, parentComputedStyles, tokenGroups, authoredStyles,
   );
 
   const sections: { key: ComputedCategory; label: string }[] = [
@@ -1233,6 +1236,63 @@ function AddableRows({
 
 
 // ---------------------------------------------------------------------------
+// FunctionRawInput — editable text input for CSS function values
+// ---------------------------------------------------------------------------
+
+function FunctionRawInput({
+  prop,
+  onCommitStyle,
+  onCommitClass,
+}: {
+  prop: UnifiedProperty;
+  onCommitStyle?: (cssProp: string, cssValue: string) => void;
+  onCommitClass: (c: string, oldClass?: string) => void;
+}) {
+  const [editValue, setEditValue] = useState(prop.authoredValue || prop.computedValue);
+
+  const commit = (v: string) => {
+    const trimmed = v.trim();
+    if (!trimmed) return;
+    if (onCommitStyle) {
+      onCommitStyle(prop.cssProperty, trimmed);
+    } else {
+      const prefix = CSS_PROP_TO_TW_PREFIX[prop.cssProperty];
+      if (prefix) {
+        onCommitClass(`${prefix}-[${trimmed.replace(/ /g, "_")}]`, prop.fullClass || undefined);
+      }
+    }
+  };
+
+  return (
+    <div>
+      <PropLabel label={prop.label} inherited={prop.inherited} />
+      <div className="studio-scrub-input">
+        <input
+          className="studio-input"
+          style={{ flex: 1, fontSize: 11, fontFamily: "monospace" }}
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onBlur={(e) => commit(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") { e.currentTarget.blur(); }
+            if (e.key === "Escape") { setEditValue(prop.authoredValue || prop.computedValue); }
+          }}
+        />
+      </div>
+      {prop.authoredValue && prop.authoredValue !== prop.computedValue && (
+        <div
+          className="text-[10px] mt-0.5 truncate"
+          style={{ color: "var(--studio-text-dimmed)", paddingLeft: 8 }}
+          title={prop.computedValue}
+        >
+          → {prop.computedValue}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Unified control — handles tiered rendering
 // Priority: color → design token → tailwind scale → keyword → scrub input
 // ---------------------------------------------------------------------------
@@ -1335,7 +1395,18 @@ function UnifiedControl({
     );
   }
 
-  // 3. Design token match → use ScaleInput with token group as scale
+  // 3. CSS function value — show authored value, not resolved computed
+  if (prop.isFunction && prop.authoredValue) {
+    return (
+      <FunctionRawInput
+        prop={prop}
+        onCommitStyle={onCommitStyle}
+        onCommitClass={onCommitClass}
+      />
+    );
+  }
+
+  // 4. Design token match → use ScaleInput with token group as scale
   if (prop.tokenMatch) {
     const tm = prop.tokenMatch;
     const twPrefix = CSS_PROP_TO_TW_PREFIX[prop.cssProperty] || "";

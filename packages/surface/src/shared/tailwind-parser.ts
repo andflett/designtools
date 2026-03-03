@@ -141,6 +141,79 @@ const CLASS_PATTERNS: ClassPattern[] = [
   { regex: /^rounded-\[(-?[\w.%]+)\]$/, category: "shape", property: "borderRadius", label: "Radius", extractValue: (m) => `[${m[1]}]` },
 ];
 
+/**
+ * Extract the bracket-balanced value from an arbitrary Tailwind class.
+ * e.g. "text-[clamp(14px,2vw,24px)]" with prefixLen=5 → "clamp(14px,2vw,24px)"
+ * Returns null if the class doesn't have a valid `[...]` bracket section.
+ */
+export function extractBracketValue(cls: string, prefixLen: number): string | null {
+  const start = prefixLen;
+  if (cls[start] !== "[") return null;
+  let depth = 0;
+  let i = start;
+  while (i < cls.length) {
+    const ch = cls[i];
+    if (ch === "[" || ch === "(") depth++;
+    else if (ch === "]" || ch === ")") {
+      depth--;
+      if (ch === "]" && depth === 0) {
+        // Must be the last character
+        if (i === cls.length - 1) {
+          return cls.slice(start + 1, i);
+        }
+        return null;
+      }
+    }
+    i++;
+  }
+  return null;
+}
+
+/**
+ * Maps Tailwind class prefixes (e.g. "text-") to their parser property/category/label.
+ */
+interface ArbitraryPrefix {
+  prefix: string;
+  category: PropertyCategory;
+  property: string;
+  label: string;
+}
+
+const ARBITRARY_PREFIXES: ArbitraryPrefix[] = [
+  // Typography
+  { prefix: "text-", category: "typography", property: "fontSize", label: "Font Size" },
+  { prefix: "leading-", category: "typography", property: "lineHeight", label: "Line Height" },
+  { prefix: "tracking-", category: "typography", property: "letterSpacing", label: "Letter Spacing" },
+  { prefix: "font-", category: "typography", property: "fontWeight", label: "Font Weight" },
+  // Spacing
+  { prefix: "p-", category: "spacing", property: "padding", label: "Padding" },
+  { prefix: "px-", category: "spacing", property: "paddingX", label: "Padding X" },
+  { prefix: "py-", category: "spacing", property: "paddingY", label: "Padding Y" },
+  { prefix: "pt-", category: "spacing", property: "paddingTop", label: "Padding Top" },
+  { prefix: "pr-", category: "spacing", property: "paddingRight", label: "Padding Right" },
+  { prefix: "pb-", category: "spacing", property: "paddingBottom", label: "Padding Bottom" },
+  { prefix: "pl-", category: "spacing", property: "paddingLeft", label: "Padding Left" },
+  { prefix: "m-", category: "spacing", property: "margin", label: "Margin" },
+  { prefix: "mx-", category: "spacing", property: "marginX", label: "Margin X" },
+  { prefix: "my-", category: "spacing", property: "marginY", label: "Margin Y" },
+  { prefix: "mt-", category: "spacing", property: "marginTop", label: "Margin Top" },
+  { prefix: "mr-", category: "spacing", property: "marginRight", label: "Margin Right" },
+  { prefix: "mb-", category: "spacing", property: "marginBottom", label: "Margin Bottom" },
+  { prefix: "ml-", category: "spacing", property: "marginLeft", label: "Margin Left" },
+  { prefix: "gap-x-", category: "spacing", property: "gapX", label: "Gap X" },
+  { prefix: "gap-y-", category: "spacing", property: "gapY", label: "Gap Y" },
+  { prefix: "gap-", category: "spacing", property: "gap", label: "Gap" },
+  // Size
+  { prefix: "w-", category: "size", property: "width", label: "Width" },
+  { prefix: "h-", category: "size", property: "height", label: "Height" },
+  { prefix: "min-w-", category: "size", property: "minWidth", label: "Min Width" },
+  { prefix: "min-h-", category: "size", property: "minHeight", label: "Min Height" },
+  { prefix: "max-w-", category: "size", property: "maxWidth", label: "Max Width" },
+  { prefix: "max-h-", category: "size", property: "maxHeight", label: "Max Height" },
+  // Shape
+  { prefix: "rounded-", category: "shape", property: "borderRadius", label: "Radius" },
+];
+
 function stripPrefix(cls: string): { prefix: string | undefined; core: string } {
   const parts = cls.split(":");
   if (parts.length === 1) return { prefix: undefined, core: cls };
@@ -185,6 +258,30 @@ export function parseClasses(classString: string): StructuredProperties {
         });
         matched = true;
         break;
+      }
+    }
+
+    if (!matched) {
+      // Try arbitrary value prefixes with bracket-depth splitting
+      // This handles CSS functions like text-[clamp(14px,2vw,24px)]
+      for (const ap of ARBITRARY_PREFIXES) {
+        if (!core.startsWith(ap.prefix)) continue;
+        const bracketVal = extractBracketValue(core, ap.prefix.length);
+        if (bracketVal !== null) {
+          // Disambiguation: "text-" prefix is used for both fontSize and textColor
+          // Skip color-like values (contain letters but not function syntax)
+          if (ap.property === "fontSize" && !bracketVal.includes("(") && !bracketVal.match(/\d/)) continue;
+          result[ap.category].push({
+            category: ap.category,
+            property: ap.property,
+            label: ap.label,
+            value: `[${bracketVal}]`,
+            fullClass: cls,
+            prefix,
+          });
+          matched = true;
+          break;
+        }
       }
     }
 

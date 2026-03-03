@@ -232,6 +232,7 @@ async function main() {
   let toolPort = 4400;
   let componentsOverride: string | undefined;
   let cssOverride: string | undefined;
+  let noOpen = false;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--port" && args[i + 1]) {
@@ -249,6 +250,9 @@ async function main() {
     if (args[i] === "--css" && args[i + 1]) {
       cssOverride = args[i + 1];
       i++;
+    }
+    if (args[i] === "--no-open") {
+      noOpen = true;
     }
   }
 
@@ -461,7 +465,9 @@ async function main() {
   console.log(`  ${dim("All file writes are scoped to:")} ${bold(projectRoot)}`);
   console.log("");
 
-  open(`http://localhost:${toolPort}`);
+  if (!noOpen && !process.env.PLAYWRIGHT_TEST) {
+    open(`http://localhost:${toolPort}`);
+  }
 
   // Graceful shutdown — close Vite's HMR WebSocket and the HTTP server
   // so ports are released even if the process is killed abruptly.

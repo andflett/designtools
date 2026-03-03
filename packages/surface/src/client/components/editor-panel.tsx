@@ -241,6 +241,7 @@ export function EditorPanel({
             <span
               className="text-[12px] font-semibold truncate flex-1 min-w-0"
               style={{ color: "var(--studio-text)" }}
+              data-testid="editor-element-name"
             >
               {elementName}
             </span>
@@ -248,6 +249,7 @@ export function EditorPanel({
               <span
                 className="flex items-center gap-0.5 text-[10px] shrink-0"
                 style={{ color: "var(--studio-success)" }}
+                data-testid="save-indicator"
               >
                 <CheckIcon style={{ width: 10, height: 10 }} />
                 Saved
@@ -400,7 +402,7 @@ export function EditorPanel({
           className="px-4 py-2.5 shrink-0"
           style={{ borderColor: "var(--studio-border)" }}
         >
-          <div className="studio-segmented" style={{ width: "100%" }}>
+          <div className="studio-segmented" style={{ width: "100%" }} data-testid="editor-tabs">
             {availableModes.map((mode) => {
               const cfg = modeConfig[mode];
               return (
@@ -409,6 +411,7 @@ export function EditorPanel({
                   onClick={() => setActiveMode(mode)}
                   className={activeMode === mode ? "active" : ""}
                   style={{ flex: 1 }}
+                  data-testid={`editor-tab-${mode}`}
                 >
                   <cfg.icon style={{ width: 12, height: 12 }} />
                   {cfg.label}
@@ -468,6 +471,7 @@ export function EditorPanel({
                   onClick={() => setComponentSubTab("props")}
                   className={componentSubTab === "props" ? "active" : ""}
                   style={{ flex: 1 }}
+                  data-testid="component-subtab-props"
                 >
                   Props
                 </button>
@@ -475,6 +479,7 @@ export function EditorPanel({
                   onClick={() => setComponentSubTab("styles")}
                   className={componentSubTab === "styles" ? "active" : ""}
                   style={{ flex: 1 }}
+                  data-testid="component-subtab-styles"
                 >
                   Styles
                 </button>
@@ -488,6 +493,7 @@ export function EditorPanel({
                   className={element.className}
                   computedStyles={element.computed}
                   parentComputedStyles={element.parentComputed || {}}
+                  authoredStyles={element.authored}
                   isReadOnly={editability === "inspect-only"}
                   readOnlyPackageName={element.packageName ?? undefined}
                   onSelectParentInstance={onSelectParentInstance}
@@ -513,6 +519,8 @@ export function EditorPanel({
                             source,
                             "addClass",
                             tailwindClass,
+                            undefined,
+                            element.activeBreakpoint,
                           );
                         });
                       }
@@ -525,6 +533,7 @@ export function EditorPanel({
                             "replaceClass",
                             tailwindClass,
                             oldClass,
+                            element.activeBreakpoint,
                           );
                         });
                       } else {
@@ -533,6 +542,8 @@ export function EditorPanel({
                             source,
                             "addClass",
                             tailwindClass,
+                            undefined,
+                            element.activeBreakpoint,
                           );
                         });
                       }
@@ -540,7 +551,7 @@ export function EditorPanel({
                   }}
                   onCommitStyle={isCssMode && element.source ? (prop, val) => {
                     const source = element.source!;
-                    withSave(() => handleWriteStyle(source, prop, val));
+                    withSave(() => handleWriteStyle(source, prop, val, element.activeBreakpoint));
                   } : undefined}
                   tailwindTheme={tailwindTheme}
                 />
@@ -551,7 +562,9 @@ export function EditorPanel({
               componentEntry &&
               componentEntry.variants.length > 0 && (
                 <div className="">
-                  {componentEntry.variants.map((dim: any) => (
+                  {componentEntry.variants
+                    .filter((dim: any) => !isBooleanDim(dim))
+                    .map((dim: any) => (
                     <ComponentVariantSection
                       key={dim.name}
                       dim={dim}
@@ -621,6 +634,7 @@ export function EditorPanel({
                       onClick={() => setInstanceSubTab("props")}
                       className={instanceSubTab === "props" ? "active" : ""}
                       style={{ flex: 1 }}
+                      data-testid="instance-subtab-props"
                     >
                       Props
                     </button>
@@ -628,6 +642,7 @@ export function EditorPanel({
                       onClick={() => setInstanceSubTab("styles")}
                       className={instanceSubTab === "styles" ? "active" : ""}
                       style={{ flex: 1 }}
+                      data-testid="instance-subtab-styles"
                     >
                       Styles
                     </button>
@@ -671,6 +686,7 @@ export function EditorPanel({
                       className={element.className}
                       computedStyles={element.computed}
                       parentComputedStyles={element.parentComputed || {}}
+                  authoredStyles={element.authored}
                       isReadOnly={editability === "inspect-only"}
                       readOnlyPackageName={element.packageName ?? undefined}
                       onSelectParentInstance={onSelectParentInstance}
@@ -705,6 +721,7 @@ export function EditorPanel({
                   className={element.className}
                   computedStyles={element.computed}
                   parentComputedStyles={element.parentComputed || {}}
+                  authoredStyles={element.authored}
                   isReadOnly={editability === "inspect-only"}
                   readOnlyPackageName={element.packageName ?? undefined}
                   onSelectParentInstance={onSelectParentInstance}
@@ -731,6 +748,7 @@ export function EditorPanel({
                             "replaceClass",
                             tailwindClass,
                             oldClass,
+                            element.activeBreakpoint,
                           );
                         });
                       } else {
@@ -739,6 +757,8 @@ export function EditorPanel({
                             source,
                             "addClass",
                             tailwindClass,
+                            undefined,
+                            element.activeBreakpoint,
                           );
                         });
                       }
@@ -746,7 +766,7 @@ export function EditorPanel({
                   }}
                   onCommitStyle={isCssMode && element.source ? (prop, val) => {
                     const source = element.source!;
-                    withSave(() => handleWriteStyle(source, prop, val));
+                    withSave(() => handleWriteStyle(source, prop, val, element.activeBreakpoint));
                   } : undefined}
                   tailwindTheme={tailwindTheme}
                 />
@@ -788,6 +808,7 @@ function ComponentVariantSection({
       <button
         onClick={() => setCollapsed(!collapsed)}
         className="studio-section-hdr"
+        data-testid={`component-variant-section-${dim.name}`}
       >
         {collapsed ? <ChevronRightIcon /> : <ChevronDownIcon />}
         {dim.name}
@@ -994,6 +1015,7 @@ function InstanceVariantSection({
           options={dim.options.map((opt: string) => ({ value: opt, label: opt }))}
           icon={icon}
           tooltip={dim.name}
+          data-testid={`instance-prop-${dim.name}`}
         />
       )}
     </div>
@@ -1006,7 +1028,8 @@ async function handleWriteElement(
   source: SourceLocation,
   type: "replaceClass" | "addClass",
   newClass: string,
-  oldClass?: string
+  oldClass?: string,
+  activeBreakpoint?: string | null,
 ) {
   try {
     const res = await fetch("/api/write-element", {
@@ -1017,6 +1040,7 @@ async function handleWriteElement(
         type,
         newClass,
         oldClass: oldClass || undefined,
+        activeBreakpoint: activeBreakpoint || undefined,
       }),
     });
     const data = await res.json();
@@ -1095,6 +1119,7 @@ async function handleWriteStyle(
   source: SourceLocation,
   property: string,
   value: string,
+  activeBreakpoint?: string | null,
 ) {
   try {
     const res = await fetch("/api/write-element", {
@@ -1104,6 +1129,7 @@ async function handleWriteStyle(
         type: "cssProperty",
         source,
         changes: [{ property, value }],
+        activeBreakpoint: activeBreakpoint || undefined,
       }),
     });
     const data = await res.json();

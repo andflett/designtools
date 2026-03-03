@@ -730,6 +730,13 @@ function extractStringValue(node: any): string | null {
   if (n.TemplateLiteral.check(node) && node.expressions.length === 0 && node.quasis.length === 1) {
     return node.quasis[0].value.cooked || node.quasis[0].value.raw;
   }
+  // Handle boolean and numeric literals: false → "false", 2 → "2"
+  if (n.BooleanLiteral.check(node) || (n.Literal.check(node) && typeof node.value === "boolean")) {
+    return String(node.value);
+  }
+  if (n.NumericLiteral.check(node) || (n.Literal.check(node) && typeof node.value === "number")) {
+    return String(node.value);
+  }
   return null;
 }
 

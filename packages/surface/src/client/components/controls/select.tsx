@@ -23,6 +23,8 @@ interface StudioSelectProps {
   icon?: React.ComponentType<{ style?: React.CSSProperties }>;
   /** Tooltip shown on icon hover */
   tooltip?: string;
+  /** data-testid forwarded to the trigger button */
+  "data-testid"?: string;
 }
 
 export function StudioSelect({
@@ -34,11 +36,13 @@ export function StudioSelect({
   className,
   icon: Icon,
   tooltip,
+  "data-testid": testId,
 }: StudioSelectProps) {
   const trigger = (
     <Select.Trigger
       className={Icon ? "studio-select" : (className || "studio-select")}
       asChild={false}
+      data-testid={testId}
     >
       <span className="studio-prop-select-value">
         <Select.Value placeholder={placeholder} />

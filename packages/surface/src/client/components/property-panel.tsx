@@ -38,6 +38,8 @@ import {
   RADIUS_SCALE,
   FONT_SIZE_SCALE,
   FONT_WEIGHT_SCALE,
+  LINE_HEIGHT_SCALE,
+  LETTER_SPACING_SCALE,
   type ParsedProperty,
   type PropertyCategory,
 } from "../../shared/tailwind-parser.js";
@@ -109,6 +111,9 @@ function synthesizeBoxProps(
           tokenMatch: null,
           hasValue: true,
           flexGridOnly: false,
+          authoredValue: null,
+          isFunction: false,
+          functionName: null,
         });
       }
     }
@@ -143,6 +148,9 @@ function synthesizeBoxProps(
       tokenMatch: null,
       hasValue: false,
       flexGridOnly: false,
+      authoredValue: null,
+      isFunction: false,
+      functionName: null,
     },
   );
 
@@ -159,6 +167,7 @@ function getPropertyControl(prop: ParsedProperty, spacingScale: readonly string[
     return <Maximize style={style} strokeWidth={1} size={15} />;
   };
   switch (prop.property) {
+    // Size
     case "width": return { icon: WidthIcon, scale: spacingScale, label: "Width" };
     case "height": return { icon: HeightIcon, scale: spacingScale, label: "Height" };
     case "minWidth": return { icon: WidthIcon, scale: spacingScale, label: "Min W" };
@@ -166,11 +175,25 @@ function getPropertyControl(prop: ParsedProperty, spacingScale: readonly string[
     case "maxWidth": return { icon: WidthIcon, scale: spacingScale, label: "Max W" };
     case "maxHeight": return { icon: HeightIcon, scale: spacingScale, label: "Max H" };
     case "size": return { icon: SizeIcon, scale: spacingScale, label: "Size" };
+    // Spacing
+    case "padding": case "paddingX": case "paddingY":
+    case "paddingTop": case "paddingRight": case "paddingBottom": case "paddingLeft":
+      return { icon: PaddingIcon, scale: spacingScale, label: prop.label };
+    case "margin": case "marginX": case "marginY":
+    case "marginTop": case "marginRight": case "marginBottom": case "marginLeft":
+      return { icon: MarginIcon, scale: spacingScale, label: prop.label };
     case "gap": return { icon: ColumnSpacingIcon, scale: spacingScale, label: "Gap" };
     case "gapX": return { icon: ColumnSpacingIcon, scale: spacingScale, label: "Col Gap" };
     case "gapY": return { icon: ColumnSpacingIcon, scale: spacingScale, label: "Row Gap" };
+    case "spaceX": case "spaceY":
+      return { icon: ColumnSpacingIcon, scale: spacingScale, label: prop.label };
+    // Typography
     case "fontSize": return { icon: FontSizeIcon, scale: FONT_SIZE_SCALE, label: "Size" };
     case "fontWeight": return { icon: FontBoldIcon, scale: FONT_WEIGHT_SCALE, label: "Weight" };
+    case "lineHeight": return { icon: undefined, scale: LINE_HEIGHT_SCALE, label: "Leading" };
+    case "letterSpacing": return { icon: undefined, scale: LETTER_SPACING_SCALE, label: "Tracking" };
+    // Shape
+    case "borderRadius": return { icon: CornersIcon, scale: RADIUS_SCALE, label: "Radius" };
     case "borderWidth": return { icon: undefined, scale: ["0", "1", "2", "4", "8"], label: "Border" };
     default: return { icon: undefined, scale: [], label: prop.label };
   }
@@ -233,6 +256,7 @@ export function PropertyPanel({
             onClassChange={onClassChange}
             tokenGroups={tokenGroups}
             spacingScale={spacingScale}
+            flat
           />
         ))}
       </div>
@@ -289,12 +313,14 @@ function CategoryContent({
   onClassChange,
   tokenGroups,
   spacingScale,
+  flat,
 }: {
   category: PropertyCategory;
   properties: ParsedProperty[];
   onClassChange: (oldClass: string, newClass: string) => void;
   tokenGroups?: Record<string, any[]>;
   spacingScale?: readonly string[];
+  flat?: boolean;
 }) {
   if (category === "layout") {
     return <LayoutRows properties={properties} onClassChange={onClassChange} />;
@@ -315,7 +341,7 @@ function CategoryContent({
     return <ShapeRows properties={properties} onClassChange={onClassChange} />;
   }
   // size, typography, etc.
-  return <SmartRows properties={properties} onClassChange={onClassChange} spacingScale={spacingScale} />;
+  return <SmartRows properties={properties} onClassChange={onClassChange} spacingScale={spacingScale} flat={flat} />;
 }
 
 function CategorySection({
@@ -673,11 +699,24 @@ function SmartRows({
   properties,
   onClassChange,
   spacingScale,
+  flat,
 }: {
   properties: ParsedProperty[];
   onClassChange: (oldClass: string, newClass: string) => void;
   spacingScale?: readonly string[];
+  flat?: boolean;
 }) {
+  // In flat mode (Component tab tree), render all rows full-width — no pairing
+  if (flat) {
+    return (
+      <>
+        {properties.map((prop) => (
+          <PropertyRow key={prop.fullClass} prop={prop} onClassChange={onClassChange} spacingScale={spacingScale} />
+        ))}
+      </>
+    );
+  }
+
   const pairKeys: [string, string][] = [
     ["width", "height"],
     ["minWidth", "minHeight"],
@@ -729,18 +768,22 @@ function PropertyRow({
 
   if (ctrl.scale.length > 0) {
     return (
-      <ScaleInput
-        icon={ctrl.icon}
-        value={prop.value}
-        computedValue={prop.value}
-        currentClass={prop.fullClass}
-        scale={ctrl.scale}
-        prefix={twPrefix}
-        cssProp={ctrl.label}
-        onCommitClass={(newClass, _oldClass) => {
-          onClassChange(prop.fullClass, newClass);
-        }}
-      />
+      <div>
+        <PropLabel label={ctrl.label} prefix={prop.prefix} />
+        <ScaleInput
+          icon={ctrl.icon}
+          label={ctrl.label}
+          value={prop.value}
+          computedValue={prop.value}
+          currentClass={prop.fullClass}
+          scale={ctrl.scale}
+          prefix={twPrefix}
+          cssProp={ctrl.label}
+          onCommitClass={(newClass, _oldClass) => {
+            onClassChange(prop.fullClass, newClass);
+          }}
+        />
+      </div>
     );
   }
 

@@ -51,7 +51,29 @@ interface WriteElementBody {
   componentName?: string;
   propName?: string;
   propValue?: string;
+  /** Active responsive breakpoint prefix (e.g. "md:", "lg:") for class writes */
+  activeBreakpoint?: string | null;
 }
+
+/**
+ * Maps Tailwind parser property names to their shorthand parent(s).
+ * When the user edits a longhand like padding-left, and the element has p-4,
+ * we leave the shorthand in place and add the new longhand class alongside it.
+ */
+const SHORTHAND_PARENTS: Record<string, string[]> = {
+  paddingTop: ["padding", "paddingY"],
+  paddingBottom: ["padding", "paddingY"],
+  paddingLeft: ["padding", "paddingX"],
+  paddingRight: ["padding", "paddingX"],
+  marginTop: ["margin", "marginY"],
+  marginBottom: ["margin", "marginY"],
+  marginLeft: ["margin", "marginX"],
+  marginRight: ["margin", "marginX"],
+  borderTopWidth: ["borderWidth"],
+  borderRightWidth: ["borderWidth"],
+  borderBottomWidth: ["borderWidth"],
+  borderLeftWidth: ["borderWidth"],
+};
 
 /**
  * Maps CSS property names to the tailwind-parser property name
@@ -440,6 +462,9 @@ export function createWriteElementRouter(config: WriteElementConfig) {
         ? (classAttr.value?.value as string) || ""
         : "";
 
+      // Active breakpoint prefix (e.g. "md:", "lg:") for class writes
+      const activePrefix = body.activeBreakpoint ? `${body.activeBreakpoint}:` : undefined;
+
       // Apply each change
       for (const change of body.changes) {
         // Determine the new Tailwind class
@@ -456,6 +481,7 @@ export function createWriteElementRouter(config: WriteElementConfig) {
         }
 
         // Find existing class for the same CSS property
+        // When activeBreakpoint is set, prefer matching the same-prefix class
         const parserProp = CSS_TO_PARSER_PROP[change.property];
         let existingClass: string | null = null;
 
@@ -465,10 +491,35 @@ export function createWriteElementRouter(config: WriteElementConfig) {
             ...parsed.color, ...parsed.spacing, ...parsed.shape,
             ...parsed.typography, ...parsed.layout, ...parsed.size,
           ];
-          const match = allParsed.find((p) => p.property === parserProp);
+          // Prefer a match with the same prefix (breakpoint), fall back to any match
+          const prefixMatch = activePrefix
+            ? allParsed.find((p) => p.property === parserProp && p.prefix === activePrefix)
+            : null;
+          const anyMatch = allParsed.find((p) => p.property === parserProp);
+          const match = prefixMatch || anyMatch;
           if (match) {
             existingClass = match.fullClass;
+            // Preserve the breakpoint prefix on the new class
+            if (activePrefix && match.prefix === activePrefix) {
+              newClass = `${activePrefix}${newClass}`;
+            }
+          } else {
+            // No direct match — check if a shorthand parent covers this property
+            const shorthandParents = SHORTHAND_PARENTS[parserProp] || [];
+            const hasShorthandParent = shorthandParents.some(
+              (parent) => allParsed.some((p) => p.property === parent)
+            );
+            if (hasShorthandParent) {
+              // Leave the shorthand class in place; add the new longhand class alongside
+              existingClass = null;
+            }
+            if (activePrefix) {
+              newClass = `${activePrefix}${newClass}`;
+            }
           }
+        } else if (activePrefix) {
+          // No existing class to replace — add with breakpoint prefix
+          newClass = `${activePrefix}${newClass}`;
         }
 
         if (existingClass) {

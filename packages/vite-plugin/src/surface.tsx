@@ -668,6 +668,83 @@ export function Surface() {
       return count > 0 ? result : null;
     }
 
+    // Known Tailwind breakpoint names sorted by min-width
+    const BREAKPOINTS: Array<{ name: string; px: number }> = [
+      { name: "sm", px: 640 },
+      { name: "md", px: 768 },
+      { name: "lg", px: 1024 },
+      { name: "xl", px: 1280 },
+      { name: "2xl", px: 1536 },
+    ];
+
+    function walkRules(
+      rules: CSSRuleList,
+      el: Element,
+      props: string[],
+      result: Record<string, string>
+    ): void {
+      for (const rule of Array.from(rules)) {
+        if (rule instanceof CSSStyleRule) {
+          try {
+            if (el.matches(rule.selectorText)) {
+              for (const prop of props) {
+                // Inline style takes precedence — skip if element has inline style for this prop
+                if ((el as HTMLElement).style.getPropertyValue(prop)) continue;
+                const val = rule.style.getPropertyValue(prop);
+                if (val) result[prop] = val.trim();
+              }
+            }
+          } catch { /* invalid selector — skip */ }
+        } else if (rule instanceof CSSMediaRule) {
+          // Only recurse if the media query is currently active
+          if (window.matchMedia(rule.conditionText).matches) {
+            walkRules(rule.cssRules, el, props, result);
+          }
+        } else if ("cssRules" in rule && (rule as any).cssRules) {
+          // CSSLayerBlockRule, CSSSupportsRule, etc.
+          walkRules((rule as any).cssRules as CSSRuleList, el, props, result);
+        }
+      }
+    }
+
+    function getAuthoredStyles(el: Element, props: string[]): Record<string, string | null> {
+      const rawResult: Record<string, string> = {};
+      for (const sheet of Array.from(document.styleSheets)) {
+        try {
+          walkRules(sheet.cssRules, el, props, rawResult);
+        } catch { /* cross-origin sheet — skip */ }
+      }
+      const out: Record<string, string | null> = {};
+      for (const prop of props) {
+        out[prop] = rawResult[prop] || null;
+      }
+      return out;
+    }
+
+    function getActiveBreakpoint(): string | null {
+      const found: Array<{ name: string; minWidth: number }> = [];
+      for (const sheet of Array.from(document.styleSheets)) {
+        try {
+          for (const rule of Array.from(sheet.cssRules)) {
+            if (!(rule instanceof CSSMediaRule)) continue;
+            // Match both Tailwind v3 (min-width: 768px) and v4 (width >= 768px)
+            const mwMatch =
+              rule.conditionText.match(/min-width:\s*([\d.]+)px/) ||
+              rule.conditionText.match(/width\s*>=\s*([\d.]+)px/);
+            if (!mwMatch) continue;
+            const minWidth = parseFloat(mwMatch[1]);
+            if (!window.matchMedia(rule.conditionText).matches) continue;
+            const bp = BREAKPOINTS.find((b) => Math.abs(b.px - minWidth) < 1);
+            if (bp && !found.some((f) => f.name === bp.name)) {
+              found.push({ name: bp.name, minWidth });
+            }
+          }
+        } catch { /* cross-origin — skip */ }
+      }
+      if (found.length === 0) return null;
+      return found.sort((a, b) => b.minWidth - a.minWidth)[0].name;
+    }
+
     function extractElementData(el: Element) {
       const computed = getComputedStyle(el);
       const rect = el.getBoundingClientRect();
@@ -768,6 +845,9 @@ export function Surface() {
         }
       }
 
+      const authoredStyles = getAuthoredStyles(el, relevantProps);
+      const activeBreakpoint = getActiveBreakpoint();
+
       return {
         tag: el.tagName.toLowerCase(),
         className: (el.getAttribute("class") || "").trim(),
@@ -786,6 +866,8 @@ export function Surface() {
         componentName,
         packageName,
         fiberProps,
+        authoredStyles,
+        activeBreakpoint,
       };
     }
 

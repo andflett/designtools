@@ -88,20 +88,22 @@ export function TokenEditor({
               const fgValue = fgToken
                 ? theme === "dark" && fgToken.darkValue ? fgToken.darkValue : fgToken.lightValue
                 : null;
+              const tokenId = token.name.replace(/^--/, "");
               return (
-                <ColorInput
-                  key={token.name}
-                  color={value}
-                  label={token.name.replace(/^--/, "")}
-                  tabs="custom"
-                  tokenName={token.name}
-                  contrastToken={fgValue ? { name: fgTokenName, value: fgValue } : null}
-                  onChange={(v) => onPreviewToken(token.name, v)}
-                  onSave={(oklchValue) => {
-                    saveToken(cssFilePath, token.name, oklchValue, selector);
-                    onClearTokenPreview();
-                  }}
-                />
+                <div key={token.name} data-testid={`token-row-${tokenId}`}>
+                  <ColorInput
+                    color={value}
+                    label={tokenId}
+                    tabs="custom"
+                    tokenName={token.name}
+                    contrastToken={fgValue ? { name: fgTokenName, value: fgValue } : null}
+                    onChange={(v) => onPreviewToken(token.name, v)}
+                    onSave={(oklchValue) => {
+                      saveToken(cssFilePath, token.name, oklchValue, selector);
+                      onClearTokenPreview();
+                    }}
+                  />
+                </div>
               );
             })}
           </div>
@@ -126,20 +128,22 @@ export function TokenEditor({
                       const fgValue = fgToken
                         ? theme === "dark" && fgToken.darkValue ? fgToken.darkValue : fgToken.lightValue
                         : null;
+                      const tokenId = token.name.replace(/^--/, "");
                       return (
-                        <ColorInput
-                          key={token.name}
-                          color={value}
-                          label={token.name.replace(/^--/, "")}
-                          tabs="custom"
-                          tokenName={token.name}
-                          contrastToken={fgValue ? { name: fgTokenName, value: fgValue } : null}
-                          onChange={(v) => onPreviewToken(token.name, v)}
-                          onSave={(oklchValue) => {
-                            saveToken(cssFilePath, token.name, oklchValue, selector);
-                            onClearTokenPreview();
-                          }}
-                        />
+                        <div key={token.name} data-testid={`token-row-${tokenId}`}>
+                          <ColorInput
+                            color={value}
+                            label={tokenId}
+                            tabs="custom"
+                            tokenName={token.name}
+                            contrastToken={fgValue ? { name: fgTokenName, value: fgValue } : null}
+                            onChange={(v) => onPreviewToken(token.name, v)}
+                            onSave={(oklchValue) => {
+                              saveToken(cssFilePath, token.name, oklchValue, selector);
+                              onClearTokenPreview();
+                            }}
+                          />
+                        </div>
                       );
                     })}
                 </div>
@@ -151,8 +155,8 @@ export function TokenEditor({
         )}
       </Section>
 
-      {/* Spacing — always visible */}
-      <Section title="Spacing" count={spacingDefs.length} defaultCollapsed>
+      {/* Spacing — only for Tailwind projects (base multiplier) */}
+      {stylingType.startsWith("tailwind") && <Section title="Spacing" count={spacingDefs.length} defaultCollapsed>
         {spacingDefs.length > 0 ? (
           <SpacingScale
             spacingDefs={spacingDefs}
@@ -163,7 +167,7 @@ export function TokenEditor({
         ) : (
           <EmptyState message="No spacing tokens found in your CSS." />
         )}
-      </Section>
+      </Section>}
 
       {/* Shadows — always visible */}
       <Section title="Shadows" count={shadowData?.shadows?.length || 0} defaultCollapsed>
@@ -370,7 +374,6 @@ function SpacingScale({
 }) {
   // Find the base --spacing token (Tailwind v4 pattern)
   const baseToken = spacingDefs.find((s: any) => s.isBase);
-  const otherTokens = spacingDefs.filter((s: any) => !s.isBase);
   const baseVal = baseToken?.value || null;
   const parsed = baseVal ? parseSpacingBase(baseVal) : null;
   const selector = theme === "dark" ? ".dark" : (stylingType === "tailwind-v4" ? "@theme" : ":root");
@@ -390,21 +393,6 @@ function SpacingScale({
             icon={SpaceBetweenHorizontallyIcon}
             onSave={(value) => saveSpacing(cssFilePath, baseToken.cssVariable, value, selector)}
           />
-        </div>
-      )}
-
-      {/* Other non-base spacing tokens */}
-      {otherTokens.length > 0 && (
-        <div className="px-4 mb-2 grid grid-cols-2 gap-1.5">
-          {otherTokens.map((token: any) => (
-            <TokenScrubRow
-              key={token.name}
-              token={token}
-              theme={theme}
-              icon={SpaceBetweenHorizontallyIcon}
-              onSave={(value) => saveSpacing(cssFilePath, token.cssVariable, value, selector)}
-            />
-          ))}
         </div>
       )}
 

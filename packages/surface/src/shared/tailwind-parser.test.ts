@@ -8,6 +8,7 @@ import {
   isArbitraryValue,
   unwrapArbitrary,
   wrapArbitrary,
+  extractBracketValue,
 } from "./tailwind-parser.js";
 
 describe("parseClasses", () => {
@@ -176,6 +177,79 @@ describe("buildClass", () => {
 
   it("builds display class directly", () => {
     expect(buildClass("display", "flex")).toBe("flex");
+  });
+});
+
+describe("extractBracketValue", () => {
+  it("extracts simple bracket value", () => {
+    expect(extractBracketValue("p-[20px]", 2)).toBe("20px");
+  });
+
+  it("extracts bracket value with nested parens (CSS function)", () => {
+    expect(extractBracketValue("text-[clamp(14px,2vw,24px)]", 5)).toBe("clamp(14px,2vw,24px)");
+  });
+
+  it("extracts calc() value", () => {
+    expect(extractBracketValue("w-[calc(100%-2rem)]", 2)).toBe("calc(100%-2rem)");
+  });
+
+  it("returns null when no opening bracket", () => {
+    expect(extractBracketValue("p-4", 2)).toBeNull();
+  });
+
+  it("returns null when bracket is not at the prefix end", () => {
+    expect(extractBracketValue("rounded-[8px]", 8)).toBe("8px");
+  });
+});
+
+describe("parseClasses — CSS function arbitrary values", () => {
+  it("parses text-[clamp(14px,2vw,24px)] as fontSize", () => {
+    const result = parseClasses("text-[clamp(14px,2vw,24px)]");
+    expect(result.typography).toHaveLength(1);
+    expect(result.typography[0]).toMatchObject({
+      property: "fontSize",
+      value: "[clamp(14px,2vw,24px)]",
+      fullClass: "text-[clamp(14px,2vw,24px)]",
+    });
+  });
+
+  it("parses w-[calc(100%-2rem)] as width", () => {
+    const result = parseClasses("w-[calc(100%-2rem)]");
+    expect(result.size).toHaveLength(1);
+    expect(result.size[0]).toMatchObject({
+      property: "width",
+      value: "[calc(100%-2rem)]",
+      fullClass: "w-[calc(100%-2rem)]",
+    });
+  });
+
+  it("parses md:text-[clamp(14px,2vw,24px)] with prefix", () => {
+    const result = parseClasses("md:text-[clamp(14px,2vw,24px)]");
+    expect(result.typography).toHaveLength(1);
+    expect(result.typography[0]).toMatchObject({
+      property: "fontSize",
+      value: "[clamp(14px,2vw,24px)]",
+      prefix: "md:",
+      fullClass: "md:text-[clamp(14px,2vw,24px)]",
+    });
+  });
+
+  it("parses p-[clamp(8px,2vw,16px)] as padding", () => {
+    const result = parseClasses("p-[clamp(8px,2vw,16px)]");
+    expect(result.spacing).toHaveLength(1);
+    expect(result.spacing[0]).toMatchObject({
+      property: "padding",
+      value: "[clamp(8px,2vw,16px)]",
+    });
+  });
+
+  it("parses min-w-[min(50%,300px)] as minWidth", () => {
+    const result = parseClasses("min-w-[min(50%,300px)]");
+    expect(result.size).toHaveLength(1);
+    expect(result.size[0]).toMatchObject({
+      property: "minWidth",
+      value: "[min(50%,300px)]",
+    });
   });
 });
 

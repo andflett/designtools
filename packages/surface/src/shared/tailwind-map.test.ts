@@ -83,6 +83,28 @@ describe("computedToTailwindClass", () => {
       expect(computedToTailwindClass("unknown-css-prop", "foo")).toBeNull();
     });
   });
+
+  describe("CSS function values — underscore escaping", () => {
+    it("escapes spaces in CSS function values with underscores", () => {
+      const result = computedToTailwindClass("font-size", "clamp(14px, 2vw, 24px)");
+      expect(result).toEqual({ tailwindClass: "text-[clamp(14px,_2vw,_24px)]", exact: false });
+    });
+
+    it("escapes spaces in calc() values", () => {
+      const result = computedToTailwindClass("width", "calc(100% - 2rem)");
+      expect(result).toEqual({ tailwindClass: "w-[calc(100%_-_2rem)]", exact: false });
+    });
+
+    it("escapes spaces in padding with CSS function", () => {
+      const result = computedToTailwindClass("padding-top", "clamp(8px, 1vw, 16px)");
+      expect(result).toEqual({ tailwindClass: "pt-[clamp(8px,_1vw,_16px)]", exact: false });
+    });
+
+    it("does not escape values without spaces", () => {
+      const result = computedToTailwindClass("font-size", "clamp(14px,2vw,24px)");
+      expect(result).toEqual({ tailwindClass: "text-[clamp(14px,2vw,24px)]", exact: false });
+    });
+  });
 });
 
 describe("uniformBoxToTailwind", () => {

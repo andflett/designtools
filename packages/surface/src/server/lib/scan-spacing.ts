@@ -134,15 +134,15 @@ function classifySpacingToken(
     return null;
   }
 
-  // Match --spacing or --spacing-*
-  if (cleanName === "spacing" || cleanName.startsWith("spacing-")) {
+  // Only match --spacing exactly (the base multiplier), not --spacing-* variants
+  if (cleanName === "spacing") {
     return {
       name: cleanName,
       value,
       source: "custom",
       isOverridden: false,
       cssVariable: name.startsWith("--") ? name : `--${name}`,
-      isBase: cleanName === "spacing",
+      isBase: true,
     };
   }
 

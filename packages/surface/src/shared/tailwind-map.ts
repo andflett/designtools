@@ -386,7 +386,8 @@ export function computedToTailwindClass(
       return { tailwindClass: `${prefix}-${scaleVal}`, exact: true };
     }
     if (prefix && computedValue !== "auto" && computedValue !== "none") {
-      return { tailwindClass: `${prefix}-[${computedValue}]`, exact: false };
+      const safeValue = computedValue.replace(/ /g, "_");
+      return { tailwindClass: `${prefix}-[${safeValue}]`, exact: false };
     }
   }
 
@@ -403,13 +404,15 @@ export function computedToTailwindClass(
     }
     const prefix = CSS_TO_TW_PREFIX[cssProp];
     if (prefix && computedValue !== "0px") {
-      return { tailwindClass: `${prefix}-[${computedValue}]`, exact: false };
+      const safeValue = computedValue.replace(/ /g, "_");
+      return { tailwindClass: `${prefix}-[${safeValue}]`, exact: false };
     }
   }
 
   const prefix = CSS_TO_TW_PREFIX[cssProp];
   if (prefix) {
-    return { tailwindClass: `${prefix}-[${computedValue}]`, exact: false };
+    const safeValue = computedValue.replace(/ /g, "_");
+    return { tailwindClass: `${prefix}-[${safeValue}]`, exact: false };
   }
 
   return null;

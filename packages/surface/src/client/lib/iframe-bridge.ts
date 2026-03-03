@@ -28,6 +28,8 @@ interface RawElementData {
   componentName?: string | null;
   packageName?: string | null;
   fiberProps?: Record<string, string | number | boolean> | null;
+  authoredStyles?: Record<string, string | null>;
+  activeBreakpoint?: string | null;
 }
 
 /** Normalize raw ElementData into SelectedElementData */
@@ -56,6 +58,8 @@ function normalizeElementData(data: RawElementData | SelectedElementData): Selec
     componentName: raw.componentName || null,
     packageName: raw.packageName || null,
     fiberProps: raw.fiberProps || null,
+    authored: raw.authoredStyles ?? {},
+    activeBreakpoint: raw.activeBreakpoint ?? null,
   };
 }
 

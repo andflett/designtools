@@ -139,6 +139,7 @@ export function ToolChrome({
               onChange={(e) => setUrlInput(e.target.value)}
               className="studio-address-input"
               placeholder="/"
+              data-testid="address-bar-input"
             />
             <div className="studio-address-sep" />
             <BreakpointSelect
@@ -178,6 +179,8 @@ export function ToolChrome({
                 <button
                   onClick={onToggleSelectionMode}
                   className={`studio-toolbar-btn p-2 ${selectionMode ? "active" : ""}`}
+                  data-testid="selection-mode-btn"
+                  data-active={selectionMode}
                 >
                   <CursorArrowIcon height={15} width={15} />
                 </button>
@@ -192,6 +195,7 @@ export function ToolChrome({
                 onClick={handleRescan}
                 className="studio-toolbar-btn p-2"
                 disabled={rescanning}
+                data-testid="rescan-btn"
               >
                 <ReloadIcon height={15} width={15} />
               </button>

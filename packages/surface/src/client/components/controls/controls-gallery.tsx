@@ -86,6 +86,9 @@ function mockProp(overrides: Partial<UnifiedProperty>): UnifiedProperty {
     tokenMatch: null,
     hasValue: true,
     flexGridOnly: false,
+    authoredValue: null,
+    isFunction: false,
+    functionName: null,
     ...overrides,
   };
 }
