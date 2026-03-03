@@ -40,6 +40,24 @@ export default function RootLayout({
             >
               Blog
             </a>
+            <a
+              href="/profile"
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              Profile
+            </a>
+            <a
+              href="/team"
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              Team
+            </a>
+            <a
+              href="/projects"
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              Projects
+            </a>
           </div>
         </nav>
         <main>{children}</main>

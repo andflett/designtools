@@ -26,7 +26,7 @@ const tiers: Tier[] = [
     number: "01",
     title: "Tokens",
     description:
-      "Edit design tokens visually — colors, spacing, typography. Changes write to CSS custom properties with live preview and contrast checking.",
+      "Edit design tokens visually. The editor understands your design system, and builds an interface using your naming conventions.",
     screenshot: tokensSrc,
   },
   {
@@ -40,15 +40,16 @@ const tiers: Tier[] = [
     number: "03",
     title: "Instances",
     description:
-      "Override specific component usages. Swap variants, add class overrides, or adjust props in place.",
+      "Override specific component instances. Swap variants, add class overrides, or adjust props in place.",
     screenshot: instanceSrc,
   },
   {
     number: "04",
     title: "Isolate",
     description:
-      "Preview every variant combination of a component in a single view. Pin or expand dimensions to focus on exactly the states you care about — all updating live as you edit.",
+      "Preview every variant combination of a component in a single view. Pin dimensions to focus on exactly the states you care about, all updating live as you edit.",
     screenshot: isolateSrc,
+    imgClass: "!object-left"
   },
   {
     number: "05",
@@ -84,10 +85,10 @@ export function ThreeTiers() {
           usage, and navigate your tree. All writing back to source.
         </p>
 
-        <div className="grid grid-cols-3 max-md:grid-cols-1 gap-6">
+        <div className="grid grid-cols-3 max-md:grid-cols-1 gap-8">
           {tiers.map((tier, i) => (
             <Reveal key={tier.number} delay={i * 0.08}>
-              <div className="rounded-lg border border-edge bg-page h-full flex flex-col overflow-hidden hover:border-edge/80 hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-all">
+              <div className="rounded-lg bg-page h-full flex flex-col overflow-hidden hover:border-edge/80 hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-all">
                 {/* Screenshot slot */}
                 <div className="screenshot-slot h-[240px] overflow-hidden">
                   {tier.screenshot && (
@@ -101,7 +102,7 @@ export function ThreeTiers() {
                   )}
                 </div>
 
-                <div className="p-6 pt-5 flex flex-col flex-1 border-t border-edge-subtle">
+                <div className="p-6 pt-5 flex flex-col flex-1 border border-edge border-t-0 rounded-b-lg ">
                   <div className="flex items-center gap-2.5 mb-2">
                     <span className="inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold font-mono text-ink3 bg-muted border border-edge-subtle">
                       {tier.number}
