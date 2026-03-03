@@ -32,7 +32,11 @@ export const CSS_PROP_TO_TW_PREFIX: Record<string, string> = {
   "row-gap": "gap-y",
   "column-gap": "gap-x",
   "width": "w",
+  "min-width": "min-w",
+  "max-width": "max-w",
   "height": "h",
+  "min-height": "min-h",
+  "max-height": "max-h",
   "border-top-left-radius": "rounded-tl",
   "border-top-right-radius": "rounded-tr",
   "border-bottom-right-radius": "rounded-br",
@@ -59,7 +63,11 @@ export const CSS_PROP_TO_TW_SCALE: Record<string, { scale: readonly string[]; pr
   "margin-bottom": { scale: SPACING_SCALE, prefix: "mb" },
   "margin-left": { scale: SPACING_SCALE, prefix: "ml" },
   "width": { scale: SPACING_SCALE, prefix: "w" },
+  "min-width": { scale: SPACING_SCALE, prefix: "min-w" },
+  "max-width": { scale: SPACING_SCALE, prefix: "max-w" },
   "height": { scale: SPACING_SCALE, prefix: "h" },
+  "min-height": { scale: SPACING_SCALE, prefix: "min-h" },
+  "max-height": { scale: SPACING_SCALE, prefix: "max-h" },
 };
 
 /** Theme-aware scale maps. Returns per-scale arrays, falling back to defaults when theme is null or a scale is empty. */
@@ -106,7 +114,11 @@ export function getTwScales(theme: ResolvedTailwindTheme | null | undefined): Tw
     "margin-bottom": { scale: spacing, prefix: "mb" },
     "margin-left": { scale: spacing, prefix: "ml" },
     "width": { scale: spacing, prefix: "w" },
+    "min-width": { scale: spacing, prefix: "min-w" },
+    "max-width": { scale: spacing, prefix: "max-w" },
     "height": { scale: spacing, prefix: "h" },
+    "min-height": { scale: spacing, prefix: "min-h" },
+    "max-height": { scale: spacing, prefix: "max-h" },
   };
 
   return { spacing, fontSize, fontWeight, lineHeight, letterSpacing, borderRadius, borderWidth, opacity, propToScale };

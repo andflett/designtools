@@ -25,6 +25,12 @@ import {
 } from "@radix-ui/react-icons";
 import {
   Maximize,
+  ArrowRight,
+  ArrowDown,
+  ArrowLeft,
+  ArrowUp,
+  WrapText,
+  AlignJustify,
 } from "lucide-react";
 import { ColorInput } from "./controls/color-input.js";
 import type { UnifiedProperty } from "../lib/computed-styles.js";
@@ -556,6 +562,24 @@ function PropLabel({ label, prefix }: { label: string; prefix?: string }) {
   );
 }
 
+// Lucide icon wrappers for SegmentedIcons (which passes style with width/height)
+const lc = (Icon: typeof ArrowRight) =>
+  function LucideWrap({ style }: { style?: React.CSSProperties }) {
+    return <Icon size={style?.width ?? 14} strokeWidth={1.5} style={style} />;
+  };
+
+const DIRECTION_OPTIONS = [
+  { value: "flex-row", icon: lc(ArrowRight), label: "Row" },
+  { value: "flex-col", icon: lc(ArrowDown), label: "Column" },
+  { value: "flex-row-reverse", icon: lc(ArrowLeft), label: "Row Rev" },
+  { value: "flex-col-reverse", icon: lc(ArrowUp), label: "Col Rev" },
+];
+
+const WRAP_OPTIONS = [
+  { value: "flex-nowrap", icon: lc(AlignJustify), label: "No Wrap" },
+  { value: "flex-wrap", icon: lc(WrapText), label: "Wrap" },
+];
+
 const DISPLAY_OPTIONS = [
   { value: "flex", icon: RowsIcon, label: "Flex" },
   { value: "grid", icon: GridIcon, label: "Grid" },
@@ -585,54 +609,36 @@ function LayoutRows({
   properties: ParsedProperty[];
   onClassChange: (oldClass: string, newClass: string) => void;
 }) {
-  const displayProp = properties.find((p) => p.property === "display");
-  const alignProp = properties.find((p) => p.property === "alignItems");
-  const justifyProp = properties.find((p) => p.property === "justifyContent");
-  const otherProps = properties.filter(
-    (p) => !["display", "alignItems", "justifyContent"].includes(p.property)
-  );
+  const segmentedProps: { property: string; label: string; options: { value: string; icon?: React.ComponentType<{ style?: React.CSSProperties }>; label: string }[] }[] = [
+    { property: "display", label: "Display", options: DISPLAY_OPTIONS },
+    { property: "flexDirection", label: "Direction", options: DIRECTION_OPTIONS },
+    { property: "flexWrap", label: "Wrap", options: WRAP_OPTIONS },
+    { property: "alignItems", label: "Alignment", options: ALIGN_OPTIONS },
+    { property: "justifyContent", label: "Justify", options: JUSTIFY_OPTIONS },
+  ];
+
+  const handledKeys = new Set(segmentedProps.map((s) => s.property));
+  const otherProps = properties.filter((p) => !handledKeys.has(p.property));
 
   return (
     <>
-      {displayProp && (
-        <div>
-          <PropLabel label="Display" prefix={displayProp.prefix} />
-          <SegmentedIcons
-            options={DISPLAY_OPTIONS}
-            value={displayProp.value}
-            onChange={(v) => {
-              const newClass = buildClass(displayProp.property, v, displayProp.prefix);
-              onClassChange(displayProp.fullClass, newClass);
-            }}
-          />
-        </div>
-      )}
-      {alignProp && (
-        <div>
-          <PropLabel label="Alignment" prefix={alignProp.prefix} />
-          <SegmentedIcons
-            options={ALIGN_OPTIONS}
-            value={alignProp.value}
-            onChange={(v) => {
-              const newClass = buildClass(alignProp.property, v, alignProp.prefix);
-              onClassChange(alignProp.fullClass, newClass);
-            }}
-          />
-        </div>
-      )}
-      {justifyProp && (
-        <div>
-          <PropLabel label="Justify" prefix={justifyProp.prefix} />
-          <SegmentedIcons
-            options={JUSTIFY_OPTIONS}
-            value={justifyProp.value}
-            onChange={(v) => {
-              const newClass = buildClass(justifyProp.property, v, justifyProp.prefix);
-              onClassChange(justifyProp.fullClass, newClass);
-            }}
-          />
-        </div>
-      )}
+      {segmentedProps.map(({ property, label, options }) => {
+        const prop = properties.find((p) => p.property === property);
+        if (!prop) return null;
+        return (
+          <div key={property}>
+            <PropLabel label={label} prefix={prop.prefix} />
+            <SegmentedIcons
+              options={options}
+              value={prop.value}
+              onChange={(v) => {
+                const newClass = buildClass(prop.property, v, prop.prefix);
+                onClassChange(prop.fullClass, newClass);
+              }}
+            />
+          </div>
+        );
+      })}
       {otherProps.map((prop) => (
         <PropertyRow key={prop.fullClass} prop={prop} onClassChange={onClassChange} />
       ))}

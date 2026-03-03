@@ -46,7 +46,7 @@ import {
   BoxIcon,
   LayoutIcon,
 } from "@radix-ui/react-icons";
-import { Crosshair, Pin } from "lucide-react";
+import { Crosshair, Pin, ArrowRight, ArrowDown, ArrowLeft, ArrowUp, WrapText, AlignJustify } from "lucide-react";
 import {
   buildUnifiedProperties,
   getUniformBoxValue,
@@ -451,6 +451,24 @@ const POSITION_OPTIONS = [
   { value: "sticky", icon: StickyIcon, label: "Sticky", tooltip: "Sticky — toggles between relative and fixed" },
 ];
 
+// Lucide icon wrapper for SegmentedIcons (passes style with width/height)
+const lc = (Icon: typeof ArrowRight) =>
+  function LucideWrap({ style }: { style?: React.CSSProperties }) {
+    return <Icon size={style?.width ?? 14} strokeWidth={1.5} style={style} />;
+  };
+
+const DIRECTION_OPTIONS = [
+  { value: "row", icon: lc(ArrowRight), label: "Row", tooltip: "Row — items flow horizontally" },
+  { value: "column", icon: lc(ArrowDown), label: "Column", tooltip: "Column — items flow vertically" },
+  { value: "row-reverse", icon: lc(ArrowLeft), label: "Row Rev", tooltip: "Row Reverse — items flow right to left" },
+  { value: "column-reverse", icon: lc(ArrowUp), label: "Col Rev", tooltip: "Column Reverse — items flow bottom to top" },
+];
+
+const WRAP_OPTIONS = [
+  { value: "nowrap", icon: lc(AlignJustify), label: "No Wrap", tooltip: "No Wrap — all items on one line" },
+  { value: "wrap", icon: lc(WrapText), label: "Wrap", tooltip: "Wrap — items wrap to next line" },
+];
+
 function LayoutSection({
   properties,
   displayValue,
@@ -468,18 +486,21 @@ function LayoutSection({
   onCommitClass: (c: string, oldClass?: string) => void;
   onCommitStyle?: (cssProp: string, cssValue: string) => void;
 }) {
+  const segmentedKeys = new Set(["display", "position", "align-items", "justify-content", "flex-direction", "flex-wrap"]);
   const displayProp = properties.find((p) => p.cssProperty === "display");
   const positionProp = properties.find((p) => p.cssProperty === "position");
+  const directionProp = properties.find((p) => p.cssProperty === "flex-direction");
+  const wrapProp = properties.find((p) => p.cssProperty === "flex-wrap");
   const alignProp = properties.find((p) => p.cssProperty === "align-items");
   const justifyProp = properties.find((p) => p.cssProperty === "justify-content");
   const otherProps = properties.filter(
-    (p) => !["display", "position", "align-items", "justify-content"].includes(p.cssProperty) && p.hasValue && !p.flexGridOnly
+    (p) => !segmentedKeys.has(p.cssProperty) && p.hasValue && !p.flexGridOnly
   );
   const flexGridActiveProps = properties.filter(
-    (p) => !["display", "position", "align-items", "justify-content"].includes(p.cssProperty) && p.hasValue && p.flexGridOnly
+    (p) => !segmentedKeys.has(p.cssProperty) && p.hasValue && p.flexGridOnly
   );
   const flexGridAddableProps = properties.filter(
-    (p) => !["display", "position", "align-items", "justify-content"].includes(p.cssProperty) && !p.hasValue && p.flexGridOnly
+    (p) => !segmentedKeys.has(p.cssProperty) && !p.hasValue && p.flexGridOnly
   );
 
   const isFlexGrid = displayValue.includes("flex") || displayValue.includes("grid");
@@ -517,6 +538,26 @@ function LayoutSection({
             options={POSITION_OPTIONS}
             value={positionProp.computedValue}
             onChange={(v) => handleSegmentedChange("position", v)}
+          />
+        </div>
+      )}
+      {isFlexGrid && directionProp && (
+        <div>
+          <PropLabel label="Direction" inherited={directionProp.inherited} />
+          <SegmentedIcons
+            options={DIRECTION_OPTIONS}
+            value={directionProp.computedValue}
+            onChange={(v) => handleSegmentedChange("flex-direction", v)}
+          />
+        </div>
+      )}
+      {isFlexGrid && wrapProp && (
+        <div>
+          <PropLabel label="Wrap" inherited={wrapProp.inherited} />
+          <SegmentedIcons
+            options={WRAP_OPTIONS}
+            value={wrapProp.computedValue}
+            onChange={(v) => handleSegmentedChange("flex-wrap", v)}
           />
         </div>
       )}
@@ -1396,7 +1437,9 @@ function UnifiedControl({
   }
 
   // 3. CSS function value — show authored value, not resolved computed
-  if (prop.isFunction && prop.authoredValue) {
+  // Skip for Tailwind-claimed properties: calc() is generated output (e.g. calc(0.25rem * 10)
+  // for h-10), not user-authored. Let it fall through to the Tailwind scale input instead.
+  if (prop.isFunction && prop.authoredValue && !prop.tailwindValue) {
     return (
       <FunctionRawInput
         prop={prop}
