@@ -27,6 +27,8 @@ export function getKeywordOptions(property: string): string[] {
       return ["none", "uppercase", "lowercase", "capitalize"];
     case "text-decoration":
       return ["none", "underline", "overline", "line-through"];
+    case "border-style":
+      return ["none", "solid", "dashed", "dotted", "double", "groove", "ridge", "inset", "outset"];
     case "white-space":
       return ["normal", "nowrap", "pre", "pre-wrap", "pre-line"];
     default:

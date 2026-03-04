@@ -19,6 +19,44 @@ interface PreviewCombination {
   props: Record<string, string>;
 }
 
+/**
+ * Extract CSS custom properties from :root / * / html rules in the document's stylesheets.
+ * Returns {name, value}[] for all --* properties found on global selectors.
+ */
+function extractCssCustomProperties(): { name: string; value: string }[] {
+  const props: { name: string; value: string }[] = [];
+  const seen = new Set<string>();
+
+  try {
+    for (const sheet of document.styleSheets) {
+      try {
+        const rules = sheet.cssRules;
+        for (let i = 0; i < rules.length; i++) {
+          const rule = rules[i];
+          if (!(rule instanceof CSSStyleRule)) continue;
+          const sel = rule.selectorText.trim();
+          if (sel !== ":root" && sel !== "*" && sel !== "html" && sel !== ":root, :host") continue;
+
+          for (let j = 0; j < rule.style.length; j++) {
+            const name = rule.style[j];
+            if (!name.startsWith("--")) continue;
+            if (seen.has(name)) continue;
+            seen.add(name);
+            const value = rule.style.getPropertyValue(name).trim();
+            if (value) props.push({ name, value });
+          }
+        }
+      } catch {
+        // CORS — skip cross-origin stylesheets
+      }
+    }
+  } catch {
+    // No stylesheets accessible
+  }
+
+  return props;
+}
+
 export function Surface() {
   const stateRef = useRef({
     selectionMode: false,
@@ -157,9 +195,6 @@ export function Surface() {
     // IDs of overlay elements to skip during tree building
     const overlayIds = new Set(["tool-highlight", "tool-tooltip", "tool-selected", "surface-token-preview"]);
 
-    // Semantic HTML elements shown as structural landmarks
-    const semanticTags = new Set(["header", "main", "nav", "section", "article", "footer", "aside"]);
-
     // Tags to skip even if authored — document-level elements and void
     // elements that aren't meaningful to designers
     const skipTags = new Set([
@@ -272,9 +307,18 @@ export function Surface() {
      * Filters to: user-defined components, data-slot components, semantic HTML.
      */
     function buildComponentTree(rootEl: Element): TreeNode[] {
-      const fiber = getFiber(rootEl);
+      // Try to get fiber from the root element or its first few children
+      // (React attaches fibers to the container like #root, not body)
+      let fiber = getFiber(rootEl);
       if (!fiber) {
-        // Fallback: data-slot-only tree via DOM walk
+        for (const child of Array.from(rootEl.children)) {
+          fiber = getFiber(child);
+          if (fiber) break;
+        }
+      }
+
+      if (!fiber) {
+        // Fallback: DOM walk (no fiber access)
         return buildDataSlotTree(rootEl);
       }
 
@@ -362,30 +406,13 @@ export function Surface() {
         };
       }
 
-      // Show semantic HTML landmarks — always show these as structural markers
-      if (semanticTags.has(tag)) {
-        const children: TreeNode[] = [];
-        if (fiber.child) walkFiber(fiber.child, children, scope);
-        const text = el ? getDirectText(el) : "";
-        return {
-          id: el ? getDomPath(el) : "",
-          name: `<${tag}>`,
-          type: "element",
-          dataSlot: null,
-          source: el?.getAttribute("data-source") || null,
-          scope,
-          textContent: text,
-          children,
-        };
-      }
-
-      // Show authored elements — data-source is added by our Babel transform
-      // to every JSX element, so its presence proves this was deliberately
-      // written in user code. Skip document/void tags that aren't meaningful.
-      // In "components" mode, skip generic elements to reduce noise (only
-      // data-slot components and semantic landmarks show). In "dom" mode,
-      // show all authored elements.
-      if (currentTreeMode === "dom" && el?.hasAttribute("data-source") && !skipTags.has(tag)) {
+      // Show authored elements with data-source.
+      // In "dom" mode: show everything (except skipTags).
+      // In "components" mode: show all meaningful elements, only skip
+      // generic containers (div, span) which are noise wrapper elements.
+      // Show all authored elements (have data-source from our Babel transform).
+      // The client-side page-explorer handles collapsing nested div chains.
+      if (el?.hasAttribute("data-source") && !skipTags.has(tag)) {
         const children: TreeNode[] = [];
         if (fiber.child) walkFiber(fiber.child, children, scope);
         const text = el ? getDirectText(el) : "";
@@ -554,36 +581,32 @@ export function Surface() {
           textContent: getDirectText(el),
           children,
         });
-      } else if (semanticTags.has(tag)) {
+      } else if (el.hasAttribute("data-source") && !skipTags.has(tag)) {
+        // Show all authored elements — client-side handles chain collapsing
         const children: TreeNode[] = [];
         for (const child of Array.from(el.children)) {
           walkDomForSlots(child, children, scope);
         }
-        if (children.length > 0 || getDirectText(el)) {
-          siblings.push({
-            id: getDomPath(el),
-            name: `<${tag}>`,
-            type: "element",
-            dataSlot: null,
-            source: el.getAttribute("data-source") || null,
-            scope,
-            textContent: getDirectText(el),
-            children,
-          });
-        }
+        const text = getDirectText(el);
+        siblings.push({
+          id: getDomPath(el),
+          name: `<${tag}>`,
+          type: "element",
+          dataSlot: null,
+          source: el.getAttribute("data-source") || null,
+          scope,
+          textContent: text,
+          children,
+        });
       } else {
-        // Skip this element, but walk its children
+        // No data-source or skipTag — walk children transparently
         for (const child of Array.from(el.children)) {
           walkDomForSlots(child, siblings, scope);
         }
       }
     }
 
-    // Current tree mode — stored so MutationObserver re-sends use the same mode
-    let currentTreeMode: "components" | "dom" = "components";
-
-    function sendComponentTree(mode?: "components" | "dom") {
-      if (mode) currentTreeMode = mode;
+    function sendComponentTree() {
       const tree = buildComponentTree(document.body);
       window.parent.postMessage({ type: "tool:componentTree", tree }, "*");
     }
@@ -677,6 +700,16 @@ export function Surface() {
       { name: "2xl", px: 1536 },
     ];
 
+    /** Map longhand CSS properties to their shorthand parent */
+    const LONGHAND_TO_SHORTHAND: Record<string, string> = {
+      "padding-top": "padding", "padding-right": "padding",
+      "padding-bottom": "padding", "padding-left": "padding",
+      "margin-top": "margin", "margin-right": "margin",
+      "margin-bottom": "margin", "margin-left": "margin",
+      "border-top-width": "border-width", "border-right-width": "border-width",
+      "border-bottom-width": "border-width", "border-left-width": "border-width",
+    };
+
     function walkRules(
       rules: CSSRuleList,
       el: Element,
@@ -690,7 +723,12 @@ export function Surface() {
               for (const prop of props) {
                 // Inline style takes precedence — skip if element has inline style for this prop
                 if ((el as HTMLElement).style.getPropertyValue(prop)) continue;
-                const val = rule.style.getPropertyValue(prop);
+                let val = rule.style.getPropertyValue(prop);
+                // If longhand not found, check the shorthand (e.g. padding → padding-top)
+                if (!val) {
+                  const shorthand = LONGHAND_TO_SHORTHAND[prop];
+                  if (shorthand) val = rule.style.getPropertyValue(shorthand);
+                }
                 if (val) result[prop] = val.trim();
               }
             }
@@ -1078,7 +1116,7 @@ export function Surface() {
           }
           break;
         case "tool:requestComponentTree":
-          sendComponentTree((msg as any).mode || "components");
+          sendComponentTree();
           break;
         case "tool:highlightByTreeId": {
           const id = msg.id as string;
@@ -1199,6 +1237,12 @@ export function Surface() {
     // Notify editor that we're ready
     window.parent.postMessage({ type: "tool:injectedReady" }, "*");
     notifyPathChanged();
+
+    // Send CSS custom properties for non-Tailwind projects (scale discovery)
+    const cssProps = extractCssCustomProperties();
+    if (cssProps.length > 0) {
+      window.parent.postMessage({ type: "tool:cssCustomProperties", properties: cssProps }, "*");
+    }
 
     // --- Cleanup ---
     return () => {

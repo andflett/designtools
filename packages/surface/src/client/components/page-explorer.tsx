@@ -17,10 +17,9 @@ import {
   Component1Icon,
   BoxIcon,
   InfoCircledIcon,
-  LayersIcon,
 } from "@radix-ui/react-icons";
 import type { ComponentTreeNode } from "../../shared/protocol.js";
-import { ChevronsDownUp, ChevronsUpDown, ListTree, Package } from "lucide-react";
+import { ChevronsDownUp, ChevronsUpDown, Package } from "lucide-react";
 import { Tooltip } from "./tooltip.js";
 
 interface PageExplorerProps {
@@ -29,8 +28,6 @@ interface PageExplorerProps {
   onSelect: (id: string) => void;
   onHover: (id: string) => void;
   onHoverEnd: () => void;
-  treeMode: "components" | "dom";
-  onTreeModeChange: (mode: "components" | "dom") => void;
 }
 
 export function PageExplorer({
@@ -39,8 +36,6 @@ export function PageExplorer({
   onSelect,
   onHover,
   onHoverEnd,
-  treeMode,
-  onTreeModeChange,
 }: PageExplorerProps) {
   const [filter, setFilter] = useState("");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -74,28 +69,17 @@ export function PageExplorer({
     }
   }, [selectedId, tree]);
 
-  // Detect collapsible chains — only reset when treeMode changes.
+  // Detect collapsible chains on first tree load.
   // Tree updates from MutationObserver should NOT reset user's expand/collapse choices.
-  const prevTreeModeRef = useRef(treeMode);
+  const chainsInitialized = useRef(false);
   useEffect(() => {
     if (tree.length === 0) return;
-    const modeChanged = prevTreeModeRef.current !== treeMode;
-    prevTreeModeRef.current = treeMode;
-
-    if (modeChanged) {
-      // Mode changed — re-detect and reset collapsed state
-      const chainIds = new Set<string>();
-      if (treeMode === "components") {
-        collectChainRootIds(tree, chainIds);
-      }
-      setCollapsedChainIds(chainIds);
-    } else if (collapsedChainIds.size === 0 && treeMode === "components") {
-      // First tree load in components mode — auto-collapse chains
-      const chainIds = new Set<string>();
-      collectChainRootIds(tree, chainIds);
-      if (chainIds.size > 0) setCollapsedChainIds(chainIds);
-    }
-  }, [tree, treeMode]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (chainsInitialized.current) return;
+    chainsInitialized.current = true;
+    const chainIds = new Set<string>();
+    collectChainRootIds(tree, chainIds);
+    if (chainIds.size > 0) setCollapsedChainIds(chainIds);
+  }, [tree]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-expand chains containing the selected node
   useEffect(() => {
@@ -174,11 +158,6 @@ export function PageExplorer({
 
   const isEmpty = tree.length === 0 || (filter && layoutNodes.length === 0 && pageNodes.length === 0 && allNodes.length === 0);
 
-  const isDomMode = treeMode === "dom";
-  const toggleDomMode = useCallback(() => {
-    onTreeModeChange(isDomMode ? "components" : "dom");
-  }, [isDomMode, onTreeModeChange]);
-
   return (
     <div
       className="flex flex-col h-full"
@@ -201,8 +180,6 @@ export function PageExplorer({
                 label="Layout"
                 expanded={layoutExpanded}
                 onToggle={() => setLayoutExpanded(!layoutExpanded)}
-                isDomMode={isDomMode}
-                onToggleDomMode={toggleDomMode}
               >
                 {layoutNodes.map((node) => (
                   <TreeNodeItem
@@ -221,8 +198,6 @@ export function PageExplorer({
                 label="Page"
                 expanded={pageExpanded}
                 onToggle={() => setPageExpanded(!pageExpanded)}
-                isDomMode={isDomMode}
-                onToggleDomMode={toggleDomMode}
                 flex
               >
                 {pageNodes.map((node) => (
@@ -237,34 +212,12 @@ export function PageExplorer({
             )}
           </>
         ) : (
-          /* No scope data — render flat tree with toggle */
+          /* No scope data — render flat tree */
           <div className="flex flex-col flex-1 min-h-0">
             <div
               className="flex items-center gap-1.5 pl-2 pr-3 py-2 shrink-0"
               style={{ borderBottom: "1px solid var(--studio-border-subtle)" }}
             >
-              <Tooltip
-                content={isDomMode ? "Show components only" : "Show all elements"}
-                side="bottom"
-              >
-                <button
-                  className="studio-icon-btn"
-                  style={{
-                    width: 20,
-                    height: 20,
-                    borderRadius: 3,
-                    color: isDomMode ? "var(--studio-accent)" : undefined,
-                    opacity: isDomMode ? 1 : 0.5,
-                  }}
-                  onClick={toggleDomMode}
-                >
-                  {isDomMode ? (
-                    <ListTree style={{ width: 13, height: 13 }} strokeWidth={1.5} />
-                  ) : (
-                    <LayersIcon style={{ width: 13, height: 13 }} />
-                  )}
-                </button>
-              </Tooltip>
               <span
                 className="text-[10px] font-semibold uppercase tracking-wide"
                 style={{ color: "var(--studio-text-muted)" }}
@@ -299,8 +252,6 @@ function ScopeSection({
   alwaysExpanded,
   explainer,
   flex,
-  isDomMode,
-  onToggleDomMode,
   children,
 }: {
   label: string;
@@ -310,10 +261,6 @@ function ScopeSection({
   explainer?: string;
   /** If true, section grows to fill remaining space (use for the last/main section) */
   flex?: boolean;
-  /** Whether DOM view is active */
-  isDomMode?: boolean;
-  /** Toggle DOM view on/off */
-  onToggleDomMode?: () => void;
   children: React.ReactNode;
 }) {
   const isExpanded = alwaysExpanded || expanded;
@@ -338,32 +285,6 @@ function ScopeSection({
         }}
         onClick={alwaysExpanded ? undefined : onToggle}
       >
-        {onToggleDomMode && (
-          <Tooltip
-            content={isDomMode ? "Show components only" : "Show all elements"}
-            side="bottom"
-          >
-            <button
-              className="studio-icon-btn"
-              style={{
-                width: 20,
-                height: 20,
-                borderRadius: 3,
-                color: isDomMode ? "var(--studio-accent)" : undefined
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleDomMode();
-              }}
-            >
-              {isDomMode ? (
-                <ListTree style={{ width: 13, height: 13 }} strokeWidth={2} />
-              ) : (
-                <LayersIcon style={{ width: 13, height: 13 }} />
-              )}
-            </button>
-          </Tooltip>
-        )}
         <span
           className="flex-1 text-[10px] font-semibold uppercase tracking-wide"
           style={{ color: "var(--studio-text-muted)" }}

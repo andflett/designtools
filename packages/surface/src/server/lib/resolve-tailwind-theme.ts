@@ -1,20 +1,22 @@
 /**
- * Resolve Tailwind theme scales from project config (v3) or @theme CSS blocks (v4).
- * Returns null on failure — callers fall back to hardcoded defaults.
+ * Resolve Tailwind theme scales from project config (v3) or design system API (v4).
+ * Returns null on failure — callers fall back to empty scales (no dropdowns).
  */
 
 import fs from "fs/promises";
 import path from "path";
 import { createRequire } from "module";
-import type { ResolvedTailwindTheme, ScaleEntry } from "../../shared/tailwind-theme.js";
+import type { ResolvedTailwindTheme, ScaleEntry, ThemeScaleKey } from "../../shared/tailwind-theme.js";
+import { SPACING_SCALE } from "../../shared/tailwind-parser.js";
 
 // ---------------------------------------------------------------------------
-// Tailwind v4: parse @theme blocks from CSS files
+// Tailwind v4: use @tailwindcss/node's __unstable__loadDesignSystem API
 // ---------------------------------------------------------------------------
 
-/** Variable prefix → theme scale name */
-const V4_PREFIX_MAP: Record<string, keyof ResolvedTailwindTheme> = {
+/** Variable prefix → theme scale name (v4 uses these CSS variable prefixes) */
+const V4_PREFIX_MAP: Record<string, ThemeScaleKey> = {
   "--spacing": "spacing",
+  "--text": "fontSize",
   "--font-size": "fontSize",
   "--font-weight": "fontWeight",
   "--leading": "lineHeight",
@@ -27,7 +29,162 @@ const V4_PREFIX_MAP: Record<string, keyof ResolvedTailwindTheme> = {
 };
 
 /**
- * Extract @theme blocks from CSS text and parse variable declarations.
+ * Classify a CSS variable name into a theme scale and extract the key.
+ * Returns null if the variable doesn't match any known scale prefix.
+ */
+function classifyVar(name: string): { scale: ThemeScaleKey; key: string } | null {
+  // Sort prefixes longest-first so --letter-spacing matches before --letter, --font-size before --font
+  const prefixes = Object.keys(V4_PREFIX_MAP).sort((a, b) => b.length - a.length);
+  for (const prefix of prefixes) {
+    if (name.startsWith(prefix + "-")) {
+      const key = name.slice(prefix.length + 1);
+      return { scale: V4_PREFIX_MAP[prefix], key };
+    }
+  }
+  return null;
+}
+
+/**
+ * Check if a theme entry is a companion entry that should be filtered out.
+ * E.g. --text-sm--line-height is a companion to --text-sm.
+ */
+function isCompanionEntry(name: string): boolean {
+  return /--[^-]+--.+--/.test(name) || name.includes("--line-height") || name.includes("--letter-spacing");
+}
+
+/**
+ * Check if a variable name should be skipped (not a scale entry).
+ */
+function shouldSkipEntry(name: string): boolean {
+  // Skip --text-shadow-* (multi-value shadow, not a dimension)
+  if (name.startsWith("--text-shadow")) return true;
+  // Skip companion entries like --text-sm--line-height
+  if (isCompanionEntry(name)) return true;
+  return false;
+}
+
+/**
+ * Generate spacing scale entries from a base spacing unit.
+ * In v4, --spacing is a single base value (e.g. 0.25rem) and individual
+ * spacing values are computed as multiples (p-4 = calc(var(--spacing) * 4)).
+ */
+function generateSpacingFromBase(baseValue: string): ScaleEntry[] {
+  const match = baseValue.match(/^([\d.]+)(rem|px|em)$/);
+  if (!match) return [];
+
+  const base = parseFloat(match[1]);
+  const unit = match[2];
+
+  const entries: ScaleEntry[] = [];
+  for (const key of SPACING_SCALE) {
+    if (key === "px") {
+      entries.push({ key: "px", value: "1px" });
+      continue;
+    }
+    const multiplier = parseFloat(key);
+    if (isNaN(multiplier)) continue;
+    const value = base * multiplier;
+    const formatted = `${parseFloat(value.toFixed(4))}${unit}`;
+    entries.push({ key, value: formatted });
+  }
+  return entries;
+}
+
+export async function resolveTailwindV4Theme(
+  projectRoot: string,
+  cssFiles: string[],
+): Promise<ResolvedTailwindTheme | null> {
+  // Try the __unstable__loadDesignSystem API first (full theme resolution)
+  const apiResult = await resolveTailwindV4ViaAPI(projectRoot, cssFiles);
+  if (apiResult) return apiResult;
+
+  // Fall back to manual @theme block parsing
+  return resolveTailwindV4ViaParser(projectRoot, cssFiles);
+}
+
+/**
+ * Use @tailwindcss/node's __unstable__loadDesignSystem to get the full resolved theme.
+ * This is the same API Tailwind IntelliSense uses — returns all defaults + user overrides,
+ * no tree-shaking.
+ */
+async function resolveTailwindV4ViaAPI(
+  projectRoot: string,
+  cssFiles: string[],
+): Promise<ResolvedTailwindTheme | null> {
+  try {
+    const require = createRequire(path.join(projectRoot, "package.json"));
+
+    let loadDesignSystem: (css: string, opts: { base: string }) => Promise<any>;
+    try {
+      const twNode = require("@tailwindcss/node");
+      loadDesignSystem = twNode.__unstable__loadDesignSystem;
+      if (typeof loadDesignSystem !== "function") return null;
+    } catch {
+      // @tailwindcss/node not available — not a v4 project or doesn't have it
+      return null;
+    }
+
+    // Read the first CSS entry file
+    const cssFile = cssFiles[0];
+    if (!cssFile) return null;
+
+    const fullPath = path.isAbsolute(cssFile)
+      ? cssFile
+      : path.join(projectRoot, cssFile);
+    const css = await fs.readFile(fullPath, "utf-8");
+
+    const designSystem = await loadDesignSystem(css, { base: projectRoot });
+    if (!designSystem?.theme?.entries) return null;
+
+    const entries: [string, { value: string }][] = designSystem.theme.entries();
+
+    const theme: ResolvedTailwindTheme = {
+      spacing: [],
+      fontSize: [],
+      fontWeight: [],
+      lineHeight: [],
+      letterSpacing: [],
+      borderRadius: [],
+      borderWidth: [],
+      opacity: [],
+    };
+
+    let spacingBase: string | null = null;
+    let hasAnyScale = false;
+
+    for (const [name, entry] of entries) {
+      const value = typeof entry === "object" && entry !== null ? entry.value : String(entry);
+
+      // Check for --spacing base unit (single value, not --spacing-*)
+      if (name === "--spacing") {
+        spacingBase = value;
+        continue;
+      }
+
+      if (shouldSkipEntry(name)) continue;
+
+      const classified = classifyVar(name);
+      if (classified) {
+        theme[classified.scale].push({ key: classified.key, value });
+        hasAnyScale = true;
+      }
+    }
+
+    // Generate spacing from base unit if no explicit spacing entries were found
+    if (spacingBase && theme.spacing.length === 0) {
+      theme.spacing = generateSpacingFromBase(spacingBase);
+      if (theme.spacing.length > 0) hasAnyScale = true;
+    }
+
+    return hasAnyScale ? theme : null;
+  } catch (err) {
+    console.warn("[resolve-theme] v4 API resolution failed:", (err as Error).message);
+    return null;
+  }
+}
+
+/**
+ * Fallback: Extract @theme blocks from CSS text and parse variable declarations.
  * Handles `@theme { ... }` and `@theme inline { ... }`.
  */
 function parseThemeBlocks(css: string): Map<string, string> {
@@ -59,25 +216,7 @@ function parseThemeBlocks(css: string): Map<string, string> {
   return vars;
 }
 
-/**
- * Classify a CSS variable name into a theme scale and extract the key.
- * Returns null if the variable doesn't match any known scale prefix.
- */
-function classifyVar(name: string): { scale: keyof ResolvedTailwindTheme; key: string } | null {
-  // Sort prefixes longest-first so --letter-spacing matches before --letter
-  const prefixes = Object.keys(V4_PREFIX_MAP).sort((a, b) => b.length - a.length);
-  for (const prefix of prefixes) {
-    if (name.startsWith(prefix + "-")) {
-      const key = name.slice(prefix.length + 1);
-      // Skip color-like variables (they have nested dashes like --spacing-color-red)
-      // but keep compound keys like "2xl"
-      return { scale: V4_PREFIX_MAP[prefix], key };
-    }
-  }
-  return null;
-}
-
-export async function resolveTailwindV4Theme(
+async function resolveTailwindV4ViaParser(
   projectRoot: string,
   cssFiles: string[],
 ): Promise<ResolvedTailwindTheme | null> {
@@ -112,14 +251,29 @@ export async function resolveTailwindV4Theme(
       opacity: [],
     };
 
+    let spacingBase: string | null = null;
     let hasAnyScale = false;
 
     for (const [name, value] of allVars) {
+      // Check for --spacing base unit
+      if (name === "--spacing") {
+        spacingBase = value;
+        continue;
+      }
+
+      if (shouldSkipEntry(name)) continue;
+
       const classified = classifyVar(name);
       if (classified) {
         theme[classified.scale].push({ key: classified.key, value });
         hasAnyScale = true;
       }
+    }
+
+    // Generate spacing from base unit if no explicit spacing entries
+    if (spacingBase && theme.spacing.length === 0) {
+      theme.spacing = generateSpacingFromBase(spacingBase);
+      if (theme.spacing.length > 0) hasAnyScale = true;
     }
 
     return hasAnyScale ? theme : null;
@@ -134,7 +288,7 @@ export async function resolveTailwindV4Theme(
 // ---------------------------------------------------------------------------
 
 /** Default Tailwind v3 theme values for common scales */
-const V3_SCALE_KEYS: Record<string, keyof ResolvedTailwindTheme> = {
+const V3_SCALE_KEYS: Record<string, ThemeScaleKey> = {
   spacing: "spacing",
   fontSize: "fontSize",
   fontWeight: "fontWeight",

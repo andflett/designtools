@@ -21,15 +21,6 @@
   --gradient-1: linear-gradient(to right, #3b82f6 0%, #8b5cf6 100%);
   --gradient-2: linear-gradient(to bottom right, rgb(245 183 59) 0%, #8b5cf6 100%);
 
-  /* Spacing scale — 8px base grid */
-  --spacing-xs: 0.25rem;
-  --spacing-sm: 0.5rem;
-  --spacing-md: 1rem;
-  --spacing-lg: 1.5rem;
-  --spacing-xl: 2rem;
-  --spacing-2xl: 3rem;
-  --spacing-3xl: 4rem;
-
   /* Font sizes */
   --font-size-xs: 0.75rem;
   --font-size-sm: 0.875rem;

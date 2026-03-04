@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   findCssRule,
   writeCssProperty,
+  writeCssPropertyWithCleanup,
   findCssModuleImports,
   resolveModuleClassNames,
 } from "./write-css-rule.js";
@@ -88,6 +89,91 @@ describe("writeCssProperty", () => {
     expect(result).not.toBeNull();
     expect(result).toContain("color: red;");
     expect(result).toContain("background: url(http://example.com);");
+  });
+});
+
+describe("writeCssProperty — shorthand/longhand cleanup", () => {
+  it("writing shorthand padding removes existing longhands", () => {
+    const css = `.card {\n  padding-top: 10px;\n  padding-right: 20px;\n  padding-bottom: 10px;\n  padding-left: 20px;\n}`;
+    const result = writeCssProperty(css, ".card", "padding", "16px");
+    expect(result).not.toBeNull();
+    expect(result).toContain("padding: 16px;");
+    expect(result).not.toContain("padding-top");
+    expect(result).not.toContain("padding-right");
+    expect(result).not.toContain("padding-bottom");
+    expect(result).not.toContain("padding-left");
+  });
+
+  it("writing longhand padding-top removes existing shorthand padding", () => {
+    const css = `.card {\n  padding: 16px;\n  color: red;\n}`;
+    const result = writeCssProperty(css, ".card", "padding-top", "8px");
+    expect(result).not.toBeNull();
+    expect(result).toContain("padding-top: 8px;");
+    expect(result).not.toContain("padding: 16px");
+    expect(result).toContain("color: red;");
+  });
+
+  it("writing shorthand margin removes existing longhands", () => {
+    const css = `.card {\n  margin-top: 10px;\n  margin-bottom: 20px;\n}`;
+    const result = writeCssProperty(css, ".card", "margin", "0");
+    expect(result).not.toBeNull();
+    expect(result).toContain("margin: 0;");
+    expect(result).not.toContain("margin-top");
+    expect(result).not.toContain("margin-bottom");
+  });
+
+  it("writing shorthand border-width removes existing longhands", () => {
+    const css = `.card {\n  border-top-width: 1px;\n  border-bottom-width: 2px;\n}`;
+    const result = writeCssProperty(css, ".card", "border-width", "1px");
+    expect(result).not.toBeNull();
+    expect(result).toContain("border-width: 1px;");
+    expect(result).not.toContain("border-top-width");
+    expect(result).not.toContain("border-bottom-width");
+  });
+
+  it("writing shorthand border-radius removes existing longhands", () => {
+    const css = `.card {\n  border-top-left-radius: 4px;\n  border-bottom-right-radius: 8px;\n}`;
+    const result = writeCssProperty(css, ".card", "border-radius", "12px");
+    expect(result).not.toBeNull();
+    expect(result).toContain("border-radius: 12px;");
+    expect(result).not.toContain("border-top-left-radius");
+    expect(result).not.toContain("border-bottom-right-radius");
+  });
+});
+
+describe("writeCssPropertyWithCleanup — border-style auto-set", () => {
+  it("writing border-width auto-adds border-style: solid when missing", () => {
+    const css = `.card {\n  color: red;\n}`;
+    const result = writeCssPropertyWithCleanup(css, ".card", "border-width", "1px");
+    expect(result).not.toBeNull();
+    expect(result).toContain("border-width: 1px;");
+    expect(result).toContain("border-style: solid;");
+  });
+
+  it("writing border-width does NOT add border-style when already present", () => {
+    const css = `.card {\n  border-style: dashed;\n  color: red;\n}`;
+    const result = writeCssPropertyWithCleanup(css, ".card", "border-width", "2px");
+    expect(result).not.toBeNull();
+    expect(result).toContain("border-width: 2px;");
+    expect(result).toContain("border-style: dashed;");
+    // Should not have a second border-style declaration
+    expect(result!.match(/border-style/g)?.length).toBe(1);
+  });
+
+  it("writing border-top-width auto-adds border-style: solid when missing", () => {
+    const css = `.card {\n  color: red;\n}`;
+    const result = writeCssPropertyWithCleanup(css, ".card", "border-top-width", "1px");
+    expect(result).not.toBeNull();
+    expect(result).toContain("border-top-width: 1px;");
+    expect(result).toContain("border-style: solid;");
+  });
+
+  it("writing non-border property does NOT add border-style", () => {
+    const css = `.card {\n  color: red;\n}`;
+    const result = writeCssPropertyWithCleanup(css, ".card", "padding", "16px");
+    expect(result).not.toBeNull();
+    expect(result).toContain("padding: 16px;");
+    expect(result).not.toContain("border-style");
   });
 });
 

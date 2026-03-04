@@ -31,6 +31,7 @@ import {
   LetterSpacingIcon,
   CornersIcon,
   BorderWidthIcon,
+  BorderStyleIcon,
   EyeNoneIcon,
   TextAlignLeftIcon,
   TextAlignCenterIcon,
@@ -57,14 +58,6 @@ import {
   computedToTailwindClass,
   uniformRadiusToTailwind,
 } from "../../shared/tailwind-map.js";
-import {
-  FONT_SIZE_SCALE,
-  FONT_WEIGHT_SCALE,
-  LINE_HEIGHT_SCALE,
-  LETTER_SPACING_SCALE,
-  RADIUS_SCALE,
-  BORDER_WIDTH_SCALE,
-} from "../../shared/tailwind-parser.js";
 import type { ResolvedTailwindTheme } from "../../shared/tailwind-theme.js";
 import { getTwScales, type TwScales } from "./controls/tailwind-maps.js";
 import { Tooltip } from "./tooltip.js";
@@ -84,10 +77,28 @@ import {
   type ShadowItem,
   type GradientItem,
   CSS_PROP_TO_TW_PREFIX,
-  CSS_PROP_TO_TW_SCALE,
 } from "./controls/index.js";
 import { ColorInput } from "./controls/color-input.js";
 import { useTokens, useShadows, useGradients } from "../lib/scan-hooks.js";
+
+/**
+ * Extract the token key from an authored `var(--prefix-key)` reference.
+ * E.g. `extractVarTokenKey("var(--space-xl)", "--space")` → `"xl"`.
+ * Returns null if the authored value doesn't match the expected pattern.
+ */
+function extractVarTokenKey(
+  authoredValue: string | null | undefined,
+  varPrefix: string | null | undefined,
+): string | null {
+  if (!authoredValue || !varPrefix) return null;
+  const match = authoredValue.match(/var\(\s*(--[\w-]+)\s*[,)]/);
+  if (!match) return null;
+  const varName = match[1];
+  if (varName.startsWith(varPrefix + "-")) {
+    return varName.slice(varPrefix.length + 1);
+  }
+  return null;
+}
 
 interface ComputedPropertyPanelProps {
   tag: string;
@@ -163,7 +174,11 @@ export function ComputedPropertyPanel({
   }
 
   const displayValue = computedStyles["display"] || "block";
-  const twScales = getTwScales(tailwindTheme);
+  const isCssMode = !!onCommitStyle;
+  // In CSS mode, only show scales if they came from CSS variables (has varPrefixes)
+  const twScales = isCssMode
+    ? (tailwindTheme?.varPrefixes ? getTwScales(tailwindTheme) : undefined)
+    : getTwScales(tailwindTheme);
 
   // In read-only mode, replace callbacks with no-ops
   const effectivePreview = isReadOnly ? () => {} : onPreviewInlineStyle;
@@ -312,6 +327,7 @@ function UnifiedSection({
               onCommitClass={onCommitClass}
               onCommitStyle={onCommitStyle}
               spacingScale={twScales?.spacing}
+              spacingVarPrefix={twScales?.propToScale?.["padding-top"]?.varPrefix}
               tailwindTheme={tailwindTheme}
             />
           ) : category === "border" ? (
@@ -700,6 +716,7 @@ function SpacingSection({
   onCommitClass,
   onCommitStyle,
   spacingScale,
+  spacingVarPrefix,
   tailwindTheme,
 }: {
   properties: UnifiedProperty[];
@@ -710,6 +727,7 @@ function SpacingSection({
   onCommitClass: (c: string, oldClass?: string) => void;
   onCommitStyle?: (cssProp: string, cssValue: string) => void;
   spacingScale?: readonly string[];
+  spacingVarPrefix?: string;
   tailwindTheme?: ResolvedTailwindTheme | null;
 }) {
   const activeProps = properties.filter((p) => p.hasValue);
@@ -730,6 +748,7 @@ function SpacingSection({
           onCommitClass={onCommitClass}
           onCommitStyle={onCommitStyle}
           spacingScale={spacingScale}
+          spacingVarPrefix={spacingVarPrefix}
           tailwindTheme={tailwindTheme}
         />
       )}
@@ -745,6 +764,7 @@ function SpacingSection({
           onCommitClass={onCommitClass}
           onCommitStyle={onCommitStyle}
           spacingScale={spacingScale}
+          spacingVarPrefix={spacingVarPrefix}
           tailwindTheme={tailwindTheme}
         />
       )}
@@ -808,7 +828,20 @@ function TypographySection({
   twScales?: TwScales;
   tailwindTheme?: ResolvedTailwindTheme | null;
 }) {
+  const isCssMode = !!onCommitStyle;
   const findProp = (cssProp: string) => properties.find((p) => p.cssProperty === cssProp);
+  /**
+   * Get display value for a property:
+   * - Tailwind mode: return tailwindValue (e.g. "text-lg")
+   * - CSS mode: extract token key from authored var() reference (e.g. "xl" from "var(--text-xl)")
+   */
+  const displayVal = (p: UnifiedProperty | undefined, cssProp?: string) => {
+    if (!p) return null;
+    if (!isCssMode) return p.tailwindValue ?? null;
+    // In CSS mode, try to extract token key from authored var() reference
+    const vp = cssProp ? twScales?.propToScale?.[cssProp]?.varPrefix : null;
+    return extractVarTokenKey(p.authoredValue, vp);
+  };
 
   const fontFamily = findProp("font-family");
   const fontSize = findProp("font-size");
@@ -846,10 +879,10 @@ function TypographySection({
           <PropLabel label="Font Family" inherited={fontFamily.inherited} />
           <ScaleInput
             icon={FontFamilyIcon}
-            value={fontFamily.tailwindValue || fontFamily.computedValue}
+            value={displayVal(fontFamily, "font-family") || fontFamily.computedValue}
             computedValue={fontFamily.computedValue}
             currentClass={fontFamily.fullClass}
-            scale={FONT_FAMILY_SCALE}
+            scale={twScales ? FONT_FAMILY_SCALE : []}
             prefix="font"
             cssProp="font-family"
             onPreview={(v) => onPreviewInlineStyle("font-family", v)}
@@ -867,15 +900,16 @@ function TypographySection({
               <PropLabel label="Size" inherited={fontSize.inherited} />
               <ScaleInput
                 icon={FontSizeIcon}
-                value={fontSize.tailwindValue || fontSize.computedValue}
+                value={displayVal(fontSize, "font-size") || fontSize.computedValue}
                 computedValue={fontSize.computedValue}
                 currentClass={fontSize.fullClass}
-                scale={(twScales?.fontSize ?? FONT_SIZE_SCALE) as string[]}
+                scale={(twScales?.fontSize ?? []) as string[]}
                 prefix="text"
                 cssProp="font-size"
                 onPreview={(v) => onPreviewInlineStyle("font-size", v)}
                 onCommitClass={onCommitClass}
                 onCommitStyle={onCommitStyle ? (v) => onCommitStyle("font-size", v) : undefined}
+                varPrefix={twScales?.propToScale?.["font-size"]?.varPrefix}
               />
             </div>
           )}
@@ -884,15 +918,16 @@ function TypographySection({
               <PropLabel label="Weight" inherited={fontWeight.inherited} />
               <ScaleInput
                 icon={FontBoldIcon}
-                value={fontWeight.tailwindValue || fontWeight.computedValue}
+                value={displayVal(fontWeight, "font-weight") || fontWeight.computedValue}
                 computedValue={fontWeight.computedValue}
                 currentClass={fontWeight.fullClass}
-                scale={(twScales?.fontWeight ?? FONT_WEIGHT_SCALE) as string[]}
+                scale={(twScales?.fontWeight ?? []) as string[]}
                 prefix="font"
                 cssProp="font-weight"
                 onPreview={(v) => onPreviewInlineStyle("font-weight", v)}
                 onCommitClass={onCommitClass}
                 onCommitStyle={onCommitStyle ? (v) => onCommitStyle("font-weight", v) : undefined}
+                varPrefix={twScales?.propToScale?.["font-weight"]?.varPrefix}
               />
             </div>
           )}
@@ -907,15 +942,16 @@ function TypographySection({
               <PropLabel label="Leading" inherited={lineHeight.inherited} />
               <ScaleInput
                 icon={LineHeightIcon}
-                value={lineHeight.tailwindValue || lineHeight.computedValue}
+                value={displayVal(lineHeight, "line-height") || lineHeight.computedValue}
                 computedValue={lineHeight.computedValue}
                 currentClass={lineHeight.fullClass}
-                scale={(twScales?.lineHeight ?? LINE_HEIGHT_SCALE) as string[]}
+                scale={(twScales?.lineHeight ?? []) as string[]}
                 prefix="leading"
                 cssProp="line-height"
                 onPreview={(v) => onPreviewInlineStyle("line-height", v)}
                 onCommitClass={onCommitClass}
                 onCommitStyle={onCommitStyle ? (v) => onCommitStyle("line-height", v) : undefined}
+                varPrefix={twScales?.propToScale?.["line-height"]?.varPrefix}
               />
             </div>
           )}
@@ -924,15 +960,16 @@ function TypographySection({
               <PropLabel label="Tracking" inherited={letterSpacing.inherited} />
               <ScaleInput
                 icon={LetterSpacingIcon}
-                value={letterSpacing.tailwindValue || letterSpacing.computedValue}
+                value={displayVal(letterSpacing, "letter-spacing") || letterSpacing.computedValue}
                 computedValue={letterSpacing.computedValue}
                 currentClass={letterSpacing.fullClass}
-                scale={(twScales?.letterSpacing ?? LETTER_SPACING_SCALE) as string[]}
+                scale={(twScales?.letterSpacing ?? []) as string[]}
                 prefix="tracking"
                 cssProp="letter-spacing"
                 onPreview={(v) => onPreviewInlineStyle("letter-spacing", v)}
                 onCommitClass={onCommitClass}
                 onCommitStyle={onCommitStyle ? (v) => onCommitStyle("letter-spacing", v) : undefined}
+                varPrefix={twScales?.propToScale?.["letter-spacing"]?.varPrefix}
               />
             </div>
           )}
@@ -1031,8 +1068,9 @@ function BorderSection({
   const allRadiusProps = properties.filter((p) => p.cssProperty.includes("radius"));
   const radiusProps = active.filter((p) => p.cssProperty.includes("radius"));
   const widthProps = active.filter((p) => p.cssProperty.includes("width"));
+  const borderStyleProp = properties.find((p) => p.cssProperty === "border-style");
   const otherProps = active.filter(
-    (p) => !p.cssProperty.includes("radius") && !p.cssProperty.includes("width")
+    (p) => !p.cssProperty.includes("radius") && !p.cssProperty.includes("width") && p.cssProperty !== "border-style"
   );
 
   const uniformBorderWidth = getUniformBoxValue(computedStyles, "border-width");
@@ -1056,7 +1094,7 @@ function BorderSection({
           <ScaleInput
             icon={BorderWidthIcon}
             value={
-              widthProps[0]?.tailwindValue ||
+              (!onCommitStyle ? widthProps[0]?.tailwindValue : null) ||
               (!uniformBorderWidth ||
               uniformBorderWidth === "0px" ||
               uniformBorderWidth === "0"
@@ -1065,7 +1103,7 @@ function BorderSection({
             }
             computedValue={uniformBorderWidth || "0px"}
             currentClass={widthProps[0]?.fullClass || null}
-            scale={(twScales?.borderWidth ?? BORDER_WIDTH_SCALE) as string[]}
+            scale={(twScales?.borderWidth ?? []) as string[]}
             prefix="border"
             cssProp="border-width"
             onPreview={(v) => onPreviewInlineStyle("border-width", v)}
@@ -1075,6 +1113,7 @@ function BorderSection({
               onCommitClass(fixedClass, oldClass);
             }}
             onCommitStyle={onCommitStyle ? (v) => onCommitStyle("border-width", v) : undefined}
+            varPrefix={twScales?.propToScale?.["border-width"]?.varPrefix}
           />
         ) : (
           widthProps.map((prop) => (
@@ -1090,6 +1129,29 @@ function BorderSection({
           ))
         )}
       </div>
+
+      {borderStyleProp && (() => {
+        // Resolve var(--tw-border-style) and similar CSS variable references to the computed value
+        const resolvedValue = borderStyleProp.computedValue || "none";
+        // Show "—" when border-width is effectively 0 (the style is just a Tailwind default)
+        const hasBorder = uniformBorderWidth && uniformBorderWidth !== "0px" && uniformBorderWidth !== "0";
+        const displayValue = hasBorder ? resolvedValue : "—";
+        const styleProp: UnifiedProperty = {
+          ...borderStyleProp,
+          computedValue: displayValue,
+        };
+        return (
+          <div>
+            <PropLabel label="Style" />
+            <KeywordControl
+              prop={styleProp}
+              onPreviewInlineStyle={onPreviewInlineStyle}
+              onCommitClass={onCommitClass}
+              onCommitStyle={onCommitStyle}
+            />
+          </div>
+        );
+      })()}
 
       {otherProps.map((prop) => (
         <UnifiedControl
@@ -1487,11 +1549,16 @@ function UnifiedControl({
   }
 
   // 4. Tailwind scale → ScaleInput
-  const twScale = (twScales?.propToScale ?? CSS_PROP_TO_TW_SCALE)[prop.cssProperty];
+  const twScale = twScales?.propToScale?.[prop.cssProperty];
   if (twScale) {
+    // In CSS mode (has varPrefix): extract token key from authored var() reference
+    // In Tailwind mode: use reverse-mapped class name
+    const tokenKey = twScale.varPrefix
+      ? extractVarTokenKey(prop.authoredValue, twScale.varPrefix)
+      : prop.tailwindValue;
     // Show "—" for zero/default computed values when no explicit class exists
-    const isZeroDefault = !prop.tailwindValue && (prop.computedValue === "0px" || prop.computedValue === "0");
-    const displayValue = isZeroDefault ? "—" : (prop.tailwindValue || prop.computedValue);
+    const isZeroDefault = !tokenKey && (prop.computedValue === "0px" || prop.computedValue === "0");
+    const displayValue = isZeroDefault ? "—" : (tokenKey || prop.computedValue);
     return (
       <div>
         <PropLabel label={prop.label} inherited={prop.inherited} />
@@ -1506,6 +1573,7 @@ function UnifiedControl({
           onPreview={(v) => onPreviewInlineStyle(prop.cssProperty, v)}
           onCommitClass={onCommitClass}
           onCommitStyle={onCommitStyle ? (v) => onCommitStyle(prop.cssProperty, v) : undefined}
+          varPrefix={twScale.varPrefix}
         />
       </div>
     );

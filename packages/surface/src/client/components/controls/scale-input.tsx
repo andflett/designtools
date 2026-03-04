@@ -18,6 +18,7 @@ export function ScaleInput({
   onCommitClass,
   onCommitValue,
   onCommitStyle,
+  varPrefix,
 }: {
   icon?: React.ComponentType<{ style?: React.CSSProperties }>;
   label?: string;
@@ -35,14 +36,17 @@ export function ScaleInput({
   onCommitValue?: (v: string) => void;
   /** CSS mode: commit raw CSS property/value instead of Tailwind classes */
   onCommitStyle?: (cssValue: string) => void;
+  /** CSS variable prefix for var() reference writes in CSS mode (e.g. "--space") */
+  varPrefix?: string;
 }) {
   // Strip prefix from value if present (e.g. "text-base" → "base", "font-bold" → "bold")
   const normalizedValue = value.startsWith(prefix + "-")
     ? value.slice(prefix.length + 1)
     : value;
-  const isInScale = scale.includes(normalizedValue);
+  const emptyScale = scale.length === 0;
+  const isInScale = !emptyScale && scale.includes(normalizedValue);
   const isDash = normalizedValue === "—" || normalizedValue === "";
-  const [arbitraryMode, setArbitraryMode] = useState(!isInScale && !isDash && normalizedValue !== "0" && normalizedValue !== "0px");
+  const [arbitraryMode, setArbitraryMode] = useState(emptyScale || (!isInScale && !isDash && normalizedValue !== "0" && normalizedValue !== "0px"));
   const [draft, setDraft] = useState(arbitraryMode ? computedValue : normalizedValue);
   const [focused, setFocused] = useState(false);
   // Track what class we last wrote so subsequent changes replace the correct one
@@ -83,9 +87,13 @@ export function ScaleInput({
       return;
     }
     if (onCommitStyle) {
-      // CSS mode: convert scale label to CSS value via computedToTailwindClass reverse
-      // or just commit the raw value — the scale labels ARE the CSS values for most props
-      onCommitStyle(selected);
+      if (varPrefix) {
+        // CSS variable scale: write var(--space-sm) reference
+        onCommitStyle(`var(${varPrefix}-${selected})`);
+      } else {
+        // Plain CSS mode: commit the raw value
+        onCommitStyle(selected);
+      }
       return;
     }
     const newClass = `${prefix}-${selected}`;
@@ -253,21 +261,23 @@ export function ScaleInput({
         />
       )}
 
-      <Tooltip content={arbitraryMode ? "Custom CSS value — click to use token scale" : "Token scale — click to enter custom CSS value"} side="bottom">
-        <button
-          onClick={() => {
-            setArbitraryMode(!arbitraryMode);
-            if (!arbitraryMode) setDraft(computedValue);
-          }}
-          className={`studio-scale-toggle${arbitraryMode ? " active" : ""}`}
-          data-testid={`scale-toggle-${cssProp}`}
-        >
-          {arbitraryMode
-            ? <CodeIcon style={{ width: 12, height: 12 }} />
-            : <TokensIcon style={{ width: 12, height: 12 }} />
-          }
-        </button>
-      </Tooltip>
+      {!emptyScale && (
+        <Tooltip content={arbitraryMode ? "Custom CSS value — click to use token scale" : "Token scale — click to enter custom CSS value"} side="bottom">
+          <button
+            onClick={() => {
+              setArbitraryMode(!arbitraryMode);
+              if (!arbitraryMode) setDraft(computedValue);
+            }}
+            className={`studio-scale-toggle${arbitraryMode ? " active" : ""}`}
+            data-testid={`scale-toggle-${cssProp}`}
+          >
+            {arbitraryMode
+              ? <CodeIcon style={{ width: 12, height: 12 }} />
+              : <TokensIcon style={{ width: 12, height: 12 }} />
+            }
+          </button>
+        </Tooltip>
+      )}
     </div>
   );
 }

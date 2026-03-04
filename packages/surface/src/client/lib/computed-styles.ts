@@ -117,6 +117,7 @@ const PROP_DEFS: PropDef[] = [
   { property: "border-right-width", label: "Right", category: "border", controlType: "length" },
   { property: "border-bottom-width", label: "Bottom", category: "border", controlType: "length" },
   { property: "border-left-width", label: "Left", category: "border", controlType: "length" },
+  { property: "border-style", label: "Style", category: "border", controlType: "keyword", alwaysShow: true },
   { property: "border-color", label: "Color", category: "border", controlType: "color", alwaysShow: true },
   { property: "border-top-left-radius", label: "TL", category: "border", controlType: "length", alwaysShow: true },
   { property: "border-top-right-radius", label: "TR", category: "border", controlType: "length", alwaysShow: true },

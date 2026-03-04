@@ -73,7 +73,8 @@ export type IframeToEditor =
   | { type: "tool:elementSelected"; data: SelectedElementData }
   | { type: "tool:pathChanged"; path: string }
   | { type: "tool:componentTree"; tree: ComponentTreeNode[] }
-  | { type: "tool:previewReady"; cellCount: number };
+  | { type: "tool:previewReady"; cellCount: number }
+  | { type: "tool:cssCustomProperties"; properties: { name: string; value: string }[] };
 
 // Messages from editor -> target app iframe
 export type EditorToIframe =
@@ -86,7 +87,7 @@ export type EditorToIframe =
   | { type: "tool:revertInlineStyles" }
   | { type: "tool:reselectElement" }
   | { type: "tool:setTheme"; theme: "light" | "dark" }
-  | { type: "tool:requestComponentTree"; mode?: "components" | "dom" }
+  | { type: "tool:requestComponentTree" }
   | { type: "tool:highlightByTreeId"; id: string }
   | { type: "tool:clearHighlight" }
   | { type: "tool:selectByTreeId"; id: string }

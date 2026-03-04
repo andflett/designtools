@@ -1,9 +1,10 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Component1Icon } from "@radix-ui/react-icons";
 import { PanelLeft } from "lucide-react";
 import type { SelectedElementData, ComponentTreeNode, PreviewCombination } from "../shared/protocol.js";
 import type { ComponentEntry } from "../server/lib/scan-components.js";
 import type { ResolvedTailwindTheme } from "../shared/tailwind-theme.js";
+import { classifyCssProperties } from "../shared/css-scale-classifier.js";
 import { usePostMessage } from "./lib/use-postmessage.js";
 import { ToolChrome } from "./components/tool-chrome.js";
 import { EditorPanel } from "./components/editor-panel.js";
@@ -46,11 +47,11 @@ function findInTree(nodes: ComponentTreeNode[], domPath: string): string | null 
 
 export function App() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const treeModeRef = useRef<"components" | "dom">("components");
   const [targetUrl, setTargetUrl] = useState("");
   const [stylingType, setStylingType] = useState("");
   const [projectName, setProjectName] = useState("");
   const [tailwindTheme, setTailwindTheme] = useState<ResolvedTailwindTheme | null>(null);
+  const [iframeCssTheme, setIframeCssTheme] = useState<ResolvedTailwindTheme | null>(null);
   const [selectedElement, setSelectedElement] = useState<SelectedElementData | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
@@ -61,11 +62,6 @@ export function App() {
   const [bootDone, setBootDone] = useState(!SHOW_BOOT_SCREEN);
 
   const [componentTree, setComponentTree] = useState<ComponentTreeNode[]>([]);
-  const [treeMode, setTreeMode] = useState<"components" | "dom">(() => {
-    const stored = localStorage.getItem("surface:treeMode");
-    return stored === "dom" ? "dom" : "components";
-  });
-  treeModeRef.current = treeMode;
   const [usagePanelOpen, setUsagePanelOpen] = useState(false);
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
   const [leftPanelWidth, setLeftPanelWidth] = useState(250);
@@ -110,7 +106,7 @@ export function App() {
               "*"
             );
             iframeRef.current.contentWindow?.postMessage(
-              { type: "tool:requestComponentTree", mode: treeModeRef.current },
+              { type: "tool:requestComponentTree" },
               "*"
             );
             setSelectionMode(true);
@@ -124,7 +120,7 @@ export function App() {
           // Request updated component tree after navigation
           if (iframeRef.current) {
             iframeRef.current.contentWindow?.postMessage(
-              { type: "tool:requestComponentTree", mode: treeModeRef.current },
+              { type: "tool:requestComponentTree" },
               "*"
             );
           }
@@ -132,6 +128,11 @@ export function App() {
         case "tool:componentTree":
           setComponentTree(msg.tree);
           break;
+        case "tool:cssCustomProperties": {
+          const classified = classifyCssProperties(msg.properties);
+          setIframeCssTheme(classified);
+          break;
+        }
       }
     },
     []
@@ -196,13 +197,6 @@ export function App() {
     setIframePath(route);
   }, []);
 
-  const handleTreeModeChange = useCallback((mode: "components" | "dom") => {
-    setTreeMode(mode);
-    treeModeRef.current = mode;
-    localStorage.setItem("surface:treeMode", mode);
-    send({ type: "tool:requestComponentTree", mode });
-  }, [send]);
-
   const handleTreeSelect = useCallback((id: string) => {
     send({ type: "tool:selectByTreeId", id });
   }, [send]);
@@ -247,6 +241,12 @@ export function App() {
       defaultChildren: isolationComponent.name,
     });
   }, [isolationComponent, send]);
+
+  // Server-resolved theme (v3/v4) takes priority, then iframe-derived theme (CSS vars)
+  const effectiveTheme = useMemo(
+    () => tailwindTheme ?? iframeCssTheme ?? null,
+    [tailwindTheme, iframeCssTheme],
+  );
 
   const handleLeftPanelDragStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -365,7 +365,7 @@ export function App() {
           <div className="flex items-start justify-between">
             <div className="flex gap-0 flex-col">
               <span
-                className="flex-1 text-[10px] font-semibold uppercase tracking-wide pl-1"
+                className="flex-1 text-[10px] font-semibold uppercase tracking-wide"
                 style={{ color: "var(--studio-text-muted)" }}
               >
                 {projectName || "Explorer"}
@@ -402,8 +402,6 @@ export function App() {
           onSelect={handleTreeSelect}
           onHover={handleTreeHover}
           onHoverEnd={handleTreeHoverEnd}
-          treeMode={treeMode}
-          onTreeModeChange={handleTreeModeChange}
         />
       </div>
       {leftPanelDragHandle}
@@ -416,7 +414,7 @@ export function App() {
       theme={theme}
       iframePath={iframePath}
       stylingType={stylingType}
-      tailwindTheme={tailwindTheme}
+      tailwindTheme={effectiveTheme}
       onPreviewToken={handlePreviewToken}
       onClearTokenPreview={handleClearTokenPreview}
       onPreviewShadow={handlePreviewShadow}

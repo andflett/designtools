@@ -21,8 +21,22 @@ import {
   uniformBoxToTailwind,
   axisBoxToTailwind,
 } from "../../../shared/tailwind-map.js";
-import { SPACING_SCALE } from "../../../shared/tailwind-parser.js";
 import type { ResolvedTailwindTheme } from "../../../shared/tailwind-theme.js";
+
+/** Extract token key from an authored `var(--prefix-key)` reference. */
+function extractVarTokenKey(
+  authoredValue: string | null | undefined,
+  varPrefix: string | null | undefined,
+): string | null {
+  if (!authoredValue || !varPrefix) return null;
+  const match = authoredValue.match(/var\(\s*(--[\w-]+)\s*[,)]/);
+  if (!match) return null;
+  const varName = match[1];
+  if (varName.startsWith(varPrefix + "-")) {
+    return varName.slice(varPrefix.length + 1);
+  }
+  return null;
+}
 
 /** Wrap a lucide icon so it matches the `{ style? }` signature ScaleInput expects. */
 const wrapLucide = (Icon: typeof PanelTopDashed) =>
@@ -52,6 +66,7 @@ export function BoxSpacingControl({
   onCommitClass,
   onCommitStyle,
   spacingScale,
+  spacingVarPrefix,
   tailwindTheme,
 }: {
   /** "padding" or "margin" */
@@ -64,18 +79,31 @@ export function BoxSpacingControl({
   onCommitClass: (c: string, oldClass?: string) => void;
   onCommitStyle?: (cssProp: string, cssValue: string) => void;
   spacingScale?: readonly string[];
+  /** CSS variable prefix for var() reference writes (e.g. "--space") */
+  spacingVarPrefix?: string;
   tailwindTheme?: ResolvedTailwindTheme | null;
 }) {
   const [expanded, setExpanded] = useState(false);
 
   const twShort = box === "padding" ? "p" : "m"; // p, m
+  const isCssMode = !!onCommitStyle;
   const uniform = getUniformBoxValue(computedStyles, box);
   const axis = !uniform ? getAxisBoxValues(computedStyles, box) : null;
-  const scale = (spacingScale ?? SPACING_SCALE) as string[];
+  const scale = (spacingScale ?? []) as string[];
+
+  /** Get the display value for a property:
+   *  - Tailwind mode: return tailwindValue (reverse-mapped class name)
+   *  - CSS mode: extract token key from authored var() reference */
+  const getTwVal = (p: UnifiedProperty | undefined) => {
+    if (!p) return null;
+    if (!isCssMode) return p.tailwindValue ?? null;
+    // In CSS mode, extract token key from authored var() reference
+    return extractVarTokenKey(p.authoredValue, spacingVarPrefix);
+  };
 
   const formatVal = (p: UnifiedProperty) => {
     const v = p.computedValue;
-    if (!p.tailwindValue && (v === "0px" || v === "0")) return "—";
+    if (!getTwVal(p) && (v === "0px" || v === "0")) return "—";
     return v;
   };
 
@@ -107,7 +135,7 @@ export function BoxSpacingControl({
         uniform ? (
           <ScaleInput
             icon={Icon}
-            value={activeProps[0]?.tailwindValue || (uniform === "0px" || uniform === "0" ? "—" : uniform)}
+            value={getTwVal(activeProps[0]) || (uniform === "0px" || uniform === "0" ? "—" : uniform)}
             computedValue={uniform || "0"}
             currentClass={activeProps[0]?.fullClass || null}
             scale={scale}
@@ -126,14 +154,15 @@ export function BoxSpacingControl({
                 else onCommitClass(`${twShort}-[${v.trim()}]`);
               }
             }}
+            varPrefix={spacingVarPrefix}
           />
         ) : axis ? (
           (() => {
             // Look up Tailwind scale values from activeProps for axis display
             const xProp = findProp(`${box}-left`);
             const yProp = findProp(`${box}-top`);
-            const xTwVal = xProp?.tailwindValue;
-            const yTwVal = yProp?.tailwindValue;
+            const xTwVal = getTwVal(xProp);
+            const yTwVal = getTwVal(yProp);
             const xIsZero = axis.x === "0px" || axis.x === "0";
             const yIsZero = axis.y === "0px" || axis.y === "0";
             return (
@@ -166,6 +195,7 @@ export function BoxSpacingControl({
                       else onCommitClass(`${twShort}x-[${v.trim()}]`);
                     }
                   }}
+                  varPrefix={spacingVarPrefix}
                 />
                 <ScaleInput
                   icon={AxisYIcon}
@@ -195,6 +225,7 @@ export function BoxSpacingControl({
                       else onCommitClass(`${twShort}y-[${v.trim()}]`);
                     }
                   }}
+                  varPrefix={spacingVarPrefix}
                 />
               </div>
             );
@@ -228,7 +259,7 @@ export function BoxSpacingControl({
                 key={cssProp}
                 icon={SIDE_ICONS[side]}
                 label={sideLabel}
-                value={prop?.tailwindValue || (cv === "0px" || cv === "0" ? "—" : cv)}
+                value={getTwVal(prop) || (cv === "0px" || cv === "0" ? "—" : cv)}
                 computedValue={cv}
                 currentClass={prop?.fullClass || null}
                 scale={scale}
@@ -237,6 +268,7 @@ export function BoxSpacingControl({
                 onPreview={(v) => onPreviewInlineStyle(cssProp, v)}
                 onCommitClass={onCommitClass}
                 onCommitStyle={onCommitStyle ? (v) => onCommitStyle(cssProp, v) : undefined}
+                varPrefix={spacingVarPrefix}
               />
             );
           })}

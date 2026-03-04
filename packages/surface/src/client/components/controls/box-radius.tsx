@@ -12,7 +12,6 @@ import {
   getUniformBoxValue,
   type UnifiedProperty,
 } from "../../lib/computed-styles.js";
-import { RADIUS_SCALE } from "../../../shared/tailwind-parser.js";
 
 const CORNERS = [
   { side: "top-left", label: "TL", prefix: "rounded-tl", cssProp: "border-top-left-radius", icon: CornerTopLeftIcon },
@@ -66,7 +65,7 @@ export function BoxRadiusControl({
           }
           computedValue={uniform || "0"}
           currentClass={activeProps[0]?.fullClass || null}
-          scale={(radiusScale ?? RADIUS_SCALE) as string[]}
+          scale={(radiusScale ?? []) as string[]}
           prefix="rounded"
           cssProp="border-radius"
           onPreview={(v) => onPreviewInlineStyle("border-radius", v)}
@@ -85,7 +84,7 @@ export function BoxRadiusControl({
                 value={prop?.tailwindValue || (cv === "0px" || cv === "0" ? "—" : cv)}
                 computedValue={cv}
                 currentClass={prop?.fullClass || null}
-                scale={(radiusScale ?? RADIUS_SCALE) as string[]}
+                scale={(radiusScale ?? []) as string[]}
                 prefix={prefix}
                 cssProp={cssProp}
                 onPreview={(v) => onPreviewInlineStyle(cssProp, v)}

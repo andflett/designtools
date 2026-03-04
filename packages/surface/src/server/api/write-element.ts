@@ -21,7 +21,7 @@ import { findElementAtSource, findComponentAtSource } from "../lib/find-element.
 import { computedToTailwindClass } from "../../shared/tailwind-map.js";
 import type { ResolvedTailwindTheme } from "../../shared/tailwind-theme.js";
 import { parseClasses } from "../../shared/tailwind-parser.js";
-import { writeCssProperty, findCssRule, findCssModuleImports, resolveModuleClassNames } from "../lib/write-css-rule.js";
+import { writeCssPropertyWithCleanup, findCssRule, findCssModuleImports, resolveModuleClassNames } from "../lib/write-css-rule.js";
 
 interface WriteElementConfig {
   projectRoot: string;
@@ -366,7 +366,7 @@ export function createWriteElementRouter(config: WriteElementConfig) {
                 );
                 try {
                   let css = await fs.readFile(cssPath, "utf-8");
-                  const result = writeCssProperty(css, `.${className}`, cssProp, cssValue);
+                  const result = writeCssPropertyWithCleanup(css, `.${className}`, cssProp, cssValue);
                   if (result) {
                     await fs.writeFile(cssPath, result, "utf-8");
                     written = true;
@@ -395,7 +395,7 @@ export function createWriteElementRouter(config: WriteElementConfig) {
                     try {
                       let css = await fs.readFile(cssPath, "utf-8");
                       if (findCssRule(css, `.${cls}`)) {
-                        const result = writeCssProperty(css, `.${cls}`, cssProp, cssValue);
+                        const result = writeCssPropertyWithCleanup(css, `.${cls}`, cssProp, cssValue);
                         if (result) {
                           await fs.writeFile(cssPath, result, "utf-8");
                           written = true;

@@ -36,6 +36,36 @@ export function findCssRule(css: string, selector: string): CssRuleLocation | nu
 }
 
 /**
+ * Map of CSS shorthand properties to their longhands.
+ * Used to clean up conflicts when writing one or the other.
+ */
+const SHORTHAND_LONGHANDS: Record<string, string[]> = {
+  padding: ["padding-top", "padding-right", "padding-bottom", "padding-left"],
+  margin: ["margin-top", "margin-right", "margin-bottom", "margin-left"],
+  "border-width": ["border-top-width", "border-right-width", "border-bottom-width", "border-left-width"],
+  "border-radius": ["border-top-left-radius", "border-top-right-radius", "border-bottom-right-radius", "border-bottom-left-radius"],
+};
+
+/** Inverse map: longhand → shorthand parent */
+const LONGHAND_TO_SHORTHAND: Record<string, string> = {};
+for (const [shorthand, longhands] of Object.entries(SHORTHAND_LONGHANDS)) {
+  for (const lh of longhands) {
+    LONGHAND_TO_SHORTHAND[lh] = shorthand;
+  }
+}
+
+/**
+ * Remove a CSS declaration from a block string.
+ * Returns the block with the property line removed.
+ */
+function removeCssProperty(block: string, property: string): string {
+  const escaped = property.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // Match the full declaration line including leading whitespace and trailing semicolon + newline
+  const regex = new RegExp(`\\n?[ \\t]*${escaped}\\s*:[^;]*;[ \\t]*`, "g");
+  return block.replace(regex, "");
+}
+
+/**
  * Write a CSS property/value into an existing rule.
  * If the property already exists, replace its value. Otherwise append it.
  * Returns the modified CSS string, or null if the selector was not found.
@@ -63,7 +93,53 @@ export function writeCssProperty(
     block = block.trimEnd() + `\n${indent}${property}: ${value};\n`;
   }
 
+  // Shorthand/longhand cleanup: remove conflicting declarations
+  const longhands = SHORTHAND_LONGHANDS[property];
+  if (longhands) {
+    // Writing a shorthand — remove all its longhands
+    for (const lh of longhands) {
+      block = removeCssProperty(block, lh);
+    }
+  }
+  const parentShorthand = LONGHAND_TO_SHORTHAND[property];
+  if (parentShorthand) {
+    // Writing a longhand — remove the shorthand
+    block = removeCssProperty(block, parentShorthand);
+  }
+
   return css.slice(0, loc.openBrace + 1) + block + css.slice(loc.blockEnd - 1);
+}
+
+/**
+ * Write a CSS property with smart behavior:
+ * - Cleans up shorthand/longhand conflicts (via writeCssProperty)
+ * - Auto-adds `border-style: solid` when writing border-width and no border-style exists
+ */
+export function writeCssPropertyWithCleanup(
+  css: string,
+  selector: string,
+  property: string,
+  value: string,
+): string | null {
+  let result = writeCssProperty(css, selector, property, value);
+  if (!result) return null;
+
+  // Auto-add border-style: solid when setting border-width on an element with no border-style
+  const isBorderWidth = property === "border-width" ||
+    property === "border-top-width" || property === "border-right-width" ||
+    property === "border-bottom-width" || property === "border-left-width";
+
+  if (isBorderWidth) {
+    const loc = findCssRule(result, selector);
+    if (loc) {
+      const block = result.slice(loc.openBrace + 1, loc.blockEnd - 1);
+      if (!/border-style\s*:/.test(block)) {
+        result = writeCssProperty(result, selector, "border-style", "solid");
+      }
+    }
+  }
+
+  return result;
 }
 
 /**

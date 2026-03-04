@@ -102,7 +102,7 @@ export function ToolChrome({
     <div className="flex flex-col h-screen">
       {/* Toolbar */}
       <div
-        className="flex items-center h-11 pl-3.5 pr-4 gap-3 border-b shrink-0"
+        className="flex items-center h-11 pl-2.5 pr-4 gap-3 border-b shrink-0"
         style={{
           background: "var(--studio-surface)",
           borderColor: "var(--studio-border)",

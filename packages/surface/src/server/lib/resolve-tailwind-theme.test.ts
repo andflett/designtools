@@ -4,8 +4,9 @@ import fs from "fs/promises";
 import os from "os";
 import { resolveTailwindV4Theme } from "./resolve-tailwind-theme.js";
 
-// We test the v4 adapter directly since it's pure CSS parsing (no external deps).
-// The v3 adapter requires tailwindcss/resolveConfig which is project-dependent.
+// These tests exercise the @theme block fallback parser (no @tailwindcss/node needed).
+// The __unstable__loadDesignSystem API path is tested implicitly when @tailwindcss/node
+// is available in the project — it's tried first and falls back to the parser.
 
 describe("resolveTailwindV4Theme", () => {
   let tmpDir: string;
@@ -281,6 +282,99 @@ describe("resolveTailwindV4Theme", () => {
     expect(result!.spacing).toEqual([
       { key: "sm", value: "4px" },
       { key: "md", value: "8px" },
+    ]);
+  });
+
+  it("parses --text-* variables as fontSize (v4 convention)", async () => {
+    await writeCss("globals.css", `
+      @theme {
+        --text-sm: 0.875rem;
+        --text-base: 1rem;
+        --text-lg: 1.125rem;
+      }
+    `);
+    const result = await resolveTailwindV4Theme(tmpDir, ["globals.css"]);
+    expect(result).not.toBeNull();
+    expect(result!.fontSize).toEqual([
+      { key: "sm", value: "0.875rem" },
+      { key: "base", value: "1rem" },
+      { key: "lg", value: "1.125rem" },
+    ]);
+  });
+
+  it("filters out --text-*--line-height companion entries", async () => {
+    await writeCss("globals.css", `
+      @theme {
+        --text-sm: 0.875rem;
+        --text-sm--line-height: 1.25rem;
+        --text-base: 1rem;
+        --text-base--line-height: 1.5rem;
+      }
+    `);
+    const result = await resolveTailwindV4Theme(tmpDir, ["globals.css"]);
+    expect(result).not.toBeNull();
+    // Only the main text entries, not the --line-height companions
+    expect(result!.fontSize).toEqual([
+      { key: "sm", value: "0.875rem" },
+      { key: "base", value: "1rem" },
+    ]);
+  });
+
+  it("filters out --text-shadow-* entries", async () => {
+    await writeCss("globals.css", `
+      @theme {
+        --text-sm: 0.875rem;
+        --text-base: 1rem;
+        --text-shadow-sm: 0 1px 2px rgba(0,0,0,0.1);
+      }
+    `);
+    const result = await resolveTailwindV4Theme(tmpDir, ["globals.css"]);
+    expect(result).not.toBeNull();
+    expect(result!.fontSize).toEqual([
+      { key: "sm", value: "0.875rem" },
+      { key: "base", value: "1rem" },
+    ]);
+  });
+
+  it("generates spacing from --spacing base unit", async () => {
+    await writeCss("globals.css", `
+      @theme {
+        --spacing: 0.25rem;
+        --font-size-body: 1rem;
+      }
+    `);
+    const result = await resolveTailwindV4Theme(tmpDir, ["globals.css"]);
+    expect(result).not.toBeNull();
+    // Should generate spacing scale from the 0.25rem base
+    expect(result!.spacing.length).toBeGreaterThan(10);
+    // Check specific entries: "4" → 0.25 * 4 = 1rem
+    const four = result!.spacing.find((e) => e.key === "4");
+    expect(four).toBeDefined();
+    expect(four!.value).toBe("1rem");
+    // "px" → 1px
+    const px = result!.spacing.find((e) => e.key === "px");
+    expect(px).toBeDefined();
+    expect(px!.value).toBe("1px");
+    // "0" → 0rem
+    const zero = result!.spacing.find((e) => e.key === "0");
+    expect(zero).toBeDefined();
+    expect(zero!.value).toBe("0rem");
+  });
+
+  it("prefers explicit spacing entries over base unit generation", async () => {
+    await writeCss("globals.css", `
+      @theme {
+        --spacing: 0.25rem;
+        --spacing-sm: 4px;
+        --spacing-lg: 16px;
+      }
+    `);
+    const result = await resolveTailwindV4Theme(tmpDir, ["globals.css"]);
+    expect(result).not.toBeNull();
+    // Explicit entries should be used, not generated ones
+    expect(result!.spacing).toEqual([
+      { key: "sm", value: "4px" },
+      { key: "lg", value: "16px" },
     ]);
   });
 });

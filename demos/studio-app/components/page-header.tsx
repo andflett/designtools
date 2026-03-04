@@ -14,7 +14,7 @@ export function PageHeader({
   return (
     <header data-slot="page-header" className="flex items-start justify-between">
       <hgroup>
-        <h1 data-slot="page-title" className="text-xl font-bold tracking-tight">
+        <h1 data-slot="page-title" className="text-xl font-bold tracking-tight border-[1px]">
           {title}
           {tag && <Badge variant="muted" size="sm" className="ml-2 align-middle">{tag}</Badge>}
         </h1>
