@@ -5,6 +5,7 @@ const stylingRows = [
   { name: "CSS Variables", versions: "Custom properties", status: "stable" },
   { name: "Plain CSS", versions: "Stylesheets", status: "stable" },
   { name: "CSS Modules", versions: ".module.css", status: "stable" },
+  { name: "Scoped Styles", versions: "Astro / Svelte", status: "stable" },
   { name: "Sass / SCSS", versions: "$variables", status: "planned" },
 ];
 
@@ -12,6 +13,7 @@ const frameworkRows = [
   { name: "Next.js", versions: "App + Pages router", status: "stable" },
   { name: "Vite + React", versions: "via plugin", status: "stable" },
   { name: "Astro", versions: "Islands", status: "stable" },
+  { name: "SvelteKit", versions: "Svelte 5", status: "stable" },
   { name: "Remix", versions: "Vite-based", status: "stable" },
   { name: "Vue / Nuxt", versions: "SFC templates", status: "next" },
 ];
