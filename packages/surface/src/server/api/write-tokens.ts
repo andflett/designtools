@@ -32,7 +32,66 @@ export function createTokensRouter(projectRoot: string) {
     }
   });
 
+  // Delete a token from a CSS block
+  router.post("/delete", async (req, res) => {
+    try {
+      const { filePath, token, selector } = req.body as {
+        filePath: string;
+        token: string;     // e.g. "--color-primary"
+        selector: string;  // ":root", ".dark", or "@theme"
+      };
+
+      const fullPath = safePath(projectRoot, filePath);
+      let css = await fs.readFile(fullPath, "utf-8");
+
+      css = deleteTokenFromBlock(css, selector, token);
+
+      await fs.writeFile(fullPath, css, "utf-8");
+
+      const tokens = await rescanTokens(projectRoot);
+      res.json({ ok: true, filePath, token, tokens });
+    } catch (err: any) {
+      console.error("Token delete error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   return router;
+}
+
+/** Delete a token line from the appropriate CSS block. */
+function deleteTokenFromBlock(
+  css: string,
+  selector: string,
+  token: string
+): string {
+  let blockRegex: RegExp;
+  if (selector === "@theme") {
+    blockRegex = /@theme\s*(?:inline\s*)?\{/;
+  } else {
+    const selectorEscaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    blockRegex = new RegExp(`${selectorEscaped}\\s*\\{`);
+  }
+
+  const match = css.match(blockRegex);
+  if (!match) return css;
+
+  const blockStart = match.index!;
+  const openBrace = css.indexOf("{", blockStart);
+  let depth = 1;
+  let pos = openBrace + 1;
+  while (depth > 0 && pos < css.length) {
+    if (css[pos] === "{") depth++;
+    if (css[pos] === "}") depth--;
+    pos++;
+  }
+  const blockEnd = pos;
+
+  let block = css.slice(openBrace + 1, blockEnd - 1);
+  const tokenEscaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  block = block.replace(new RegExp(`\\n?\\s*${tokenEscaped}\\s*:[^;]+;`, "g"), "");
+
+  return css.slice(0, openBrace + 1) + block + css.slice(blockEnd - 1);
 }
 
 /** Extract a top-level selector block from CSS, returning its open/close positions. */

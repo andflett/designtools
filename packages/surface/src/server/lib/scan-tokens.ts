@@ -31,9 +31,11 @@ export async function scanTokens(
 
   const rootTokens = parseBlock(css, ":root");
   const darkTokens = parseBlock(css, ".dark");
+  const themeTokens = parseBlock(css, "@theme");
 
   const tokenMap = new Map<string, TokenDefinition>();
 
+  // Merge :root and @theme tokens (both count as "light" values)
   for (const [name, value] of rootTokens) {
     const def: TokenDefinition = {
       name,
@@ -44,6 +46,19 @@ export async function scanTokens(
       colorFormat: detectColorFormat(value),
     };
     tokenMap.set(name, def);
+  }
+
+  for (const [name, value] of themeTokens) {
+    if (!tokenMap.has(name)) {
+      tokenMap.set(name, {
+        name,
+        category: categorizeToken(name, value),
+        group: getTokenGroup(name),
+        lightValue: value,
+        darkValue: darkTokens.get(name) || "",
+        colorFormat: detectColorFormat(value),
+      });
+    }
   }
 
   for (const [name, value] of darkTokens) {
@@ -73,7 +88,7 @@ export function parseBlock(css: string, selector: string): Map<string, string> {
   const tokens = new Map<string, string>();
 
   const selectorEscaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const blockStart = css.search(new RegExp(`${selectorEscaped}\\s*\\{`));
+  const blockStart = css.search(new RegExp(`${selectorEscaped}[^{]*\\{`));
   if (blockStart === -1) return tokens;
 
   const openBrace = css.indexOf("{", blockStart);

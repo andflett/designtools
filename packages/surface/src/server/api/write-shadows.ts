@@ -94,6 +94,30 @@ export function createShadowsRouter(projectRoot: string) {
     }
   });
 
+  // Delete a shadow variable from a CSS block
+  router.post("/delete", async (req, res) => {
+    try {
+      const { filePath, variableName, selector } = req.body as {
+        filePath: string;
+        variableName: string;
+        selector: string;
+      };
+
+      const fullPath = safePath(projectRoot, filePath);
+      let css = await fs.readFile(fullPath, "utf-8");
+
+      css = deleteShadowFromBlock(css, selector, variableName);
+
+      await fs.writeFile(fullPath, css, "utf-8");
+
+      const shadows = await rescanShadows(projectRoot);
+      res.json({ ok: true, filePath, variableName, shadows });
+    } catch (err: any) {
+      console.error("Shadow delete error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Write a shadow to a W3C Design Token file
   router.post("/design-token", async (req, res) => {
     try {
@@ -284,4 +308,38 @@ function addShadowToScss(
 ): string {
   const line = `${variableName}: ${value};\n`;
   return scss.endsWith("\n") ? scss + line : scss + "\n" + line;
+}
+
+function deleteShadowFromBlock(
+  css: string,
+  selector: string,
+  variableName: string
+): string {
+  let blockRegex: RegExp;
+  if (selector === "@theme") {
+    blockRegex = /@theme\s*(?:inline\s*)?\{/;
+  } else {
+    const selectorEscaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    blockRegex = new RegExp(`${selectorEscaped}\\s*\\{`);
+  }
+
+  const match = css.match(blockRegex);
+  if (!match) return css;
+
+  const blockStart = match.index!;
+  const openBrace = css.indexOf("{", blockStart);
+  let depth = 1;
+  let pos = openBrace + 1;
+  while (depth > 0 && pos < css.length) {
+    if (css[pos] === "{") depth++;
+    if (css[pos] === "}") depth--;
+    pos++;
+  }
+  const blockEnd = pos;
+
+  let block = css.slice(openBrace + 1, blockEnd - 1);
+  const varEscaped = variableName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  block = block.replace(new RegExp(`\\n?\\s*${varEscaped}\\s*:[^;]+;`, "g"), "");
+
+  return css.slice(0, openBrace + 1) + block + css.slice(blockEnd - 1);
 }

@@ -15,7 +15,7 @@ import {
 import { ShadowList } from "./shadow-list.js";
 import { ColorInput, ColorInputSwatch } from "./controls/color-input.js";
 import { useTokens, useShadows, useBorders, useGradients, useSpacing, useStyling } from "../lib/scan-hooks.js";
-import { saveToken, saveGradient, saveBorder, saveSpacing } from "../lib/scan-actions.js";
+import { saveToken, saveGradient, saveBorder, saveSpacing, createToken, deleteToken, deleteBorder } from "../lib/scan-actions.js";
 import { SPACING_SCALE } from "../../shared/tailwind-parser.js";
 
 interface TokenEditorProps {
@@ -64,7 +64,10 @@ export function TokenEditor({
   const spacingDefs = spacingData?.spacing || [];
 
   const borderColorTokens = tokens.filter((t) =>
-    t.category === "color" && ["--border", "--input", "--ring"].includes(t.name)
+    t.category === "color" && (
+      ["--border", "--input", "--ring"].includes(t.name) ||
+      t.name.startsWith("--border-color")
+    )
   );
 
   const radiusBorders = borderData?.borders?.filter((b: any) => b.kind === "radius") || [];
@@ -112,47 +115,15 @@ export function TokenEditor({
 
       {/* Colors — always visible */}
       <Section title="Colors" count={colorTokenGroups.reduce((sum, [_, g]) => sum + (g as any[]).filter(t => t.category === "color").length, 0)} defaultCollapsed>
-        {colorTokenGroups.length > 0 ? (
-          <div className="studio-tree">
-            {colorTokenGroups.map(([groupName, groupTokens]) => (
-              <SubSection key={groupName} title={groupName} count={(groupTokens as any[]).filter(t => t.category === "color").length}>
-                <div className="flex flex-col gap-1.5 pb-1">
-                  {(groupTokens as any[])
-                    .filter((t) => t.category === "color")
-                    .map((token: any) => {
-                      const value = theme === "dark" && token.darkValue ? token.darkValue : token.lightValue;
-                      const fgTokenName = token.name.endsWith("-foreground")
-                        ? token.name.replace("-foreground", "")
-                        : `${token.name}-foreground`;
-                      const fgToken = tokens.find((t: any) => t.name === fgTokenName);
-                      const fgValue = fgToken
-                        ? theme === "dark" && fgToken.darkValue ? fgToken.darkValue : fgToken.lightValue
-                        : null;
-                      const tokenId = token.name.replace(/^--/, "");
-                      return (
-                        <div key={token.name} data-testid={`token-row-${tokenId}`}>
-                          <ColorInput
-                            color={value}
-                            label={tokenId}
-                            tabs="custom"
-                            tokenName={token.name}
-                            contrastToken={fgValue ? { name: fgTokenName, value: fgValue } : null}
-                            onChange={(v) => onPreviewToken(token.name, v)}
-                            onSave={(oklchValue) => {
-                              saveToken(cssFilePath, token.name, oklchValue, selector);
-                              onClearTokenPreview();
-                            }}
-                          />
-                        </div>
-                      );
-                    })}
-                </div>
-              </SubSection>
-            ))}
-          </div>
-        ) : (
-          <EmptyState message="No color tokens found in your CSS." />
-        )}
+        <ColorsSection
+          colorTokenGroups={colorTokenGroups}
+          tokens={tokens}
+          theme={theme}
+          cssFilePath={cssFilePath}
+          selector={selector}
+          onPreviewToken={onPreviewToken}
+          onClearTokenPreview={onClearTokenPreview}
+        />
       </Section>
 
       {/* Spacing — only for Tailwind projects (base multiplier) */}
@@ -298,6 +269,135 @@ function EmptyState({ message }: { message: string }) {
       style={{ color: "var(--studio-text-dimmed)" }}
     >
       {message}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// suggestNextName — convention-aware auto-naming for new tokens
+// ---------------------------------------------------------------------------
+
+export function suggestNextName(existingNames: string[], fallbackPrefix: string): string {
+  if (existingNames.length === 0) return `${fallbackPrefix}-1`;
+
+  // Strip -- prefix from names
+  const stripped = existingNames.map((n) => n.replace(/^--/, ""));
+
+  // Check if names end with numbers (e.g. space-1, space-2)
+  const numericEndings = stripped
+    .map((n) => {
+      const m = n.match(/-(\d+)$/);
+      return m ? parseInt(m[1]) : null;
+    })
+    .filter((n): n is number => n !== null);
+
+  if (numericEndings.length > 0) {
+    // Strip numeric suffix to find the base prefix
+    const bases = stripped.map((n) => n.replace(/-\d+$/, ""));
+    let prefix = bases[0];
+    for (let i = 1; i < bases.length; i++) {
+      while (bases[i].indexOf(prefix) !== 0 && prefix.length > 0) {
+        prefix = prefix.slice(0, -1);
+      }
+    }
+    prefix = prefix.replace(/-$/, "");
+    if (!prefix) prefix = fallbackPrefix;
+
+    const maxNum = Math.max(...numericEndings);
+    return `${prefix}-${maxNum + 1}`;
+  }
+
+  // Find common prefix among all names
+  let prefix = stripped[0];
+  for (let i = 1; i < stripped.length; i++) {
+    while (stripped[i].indexOf(prefix) !== 0 && prefix.length > 0) {
+      prefix = prefix.slice(0, -1);
+    }
+  }
+  // Trim trailing dash from prefix
+  prefix = prefix.replace(/-$/, "");
+  if (!prefix) prefix = fallbackPrefix;
+
+  // T-shirt sizes or semantic names — suggest prefix with trailing dash for user to complete
+  return `${prefix}-`;
+}
+
+// ---------------------------------------------------------------------------
+// TokenCreator — shared inline creator for new tokens
+// ---------------------------------------------------------------------------
+
+function TokenCreator({
+  fallbackPrefix,
+  existingNames,
+  children,
+  onSave,
+  onCancel,
+}: {
+  fallbackPrefix: string;
+  existingNames: string[];
+  children: (value: string, setValue: (v: string) => void) => React.ReactNode;
+  onSave: (name: string, value: string) => void;
+  onCancel: () => void;
+}) {
+  const suggestedName = suggestNextName(existingNames, fallbackPrefix);
+  const [name, setName] = useState(suggestedName);
+  const [value, setValue] = useState("");
+
+  const handleSave = () => {
+    const cleanName = name.replace(/^--/, "").replace(/[^a-z0-9-]/g, "-").replace(/-+$/, "");
+    if (!cleanName) return;
+    onSave(cleanName, value);
+  };
+
+  return (
+    <div
+      className="rounded-lg p-3"
+      style={{
+        background: "var(--studio-input-bg)",
+        border: "1px solid var(--studio-border-subtle)",
+      }}
+    >
+      <div className="flex items-center gap-2 mb-3">
+        <label className="text-[10px] shrink-0" style={{ color: "var(--studio-text-dimmed)" }}>Name</label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="studio-input-sm flex-1"
+          placeholder={`${fallbackPrefix}-name`}
+          autoFocus
+        />
+      </div>
+      <div className="mb-3">
+        {children(value, setValue)}
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={handleSave}
+          className="flex items-center gap-1 px-3 py-1.5 rounded text-[10px] font-medium"
+          style={{
+            background: "var(--studio-accent)",
+            color: "white",
+            border: "none",
+            cursor: "pointer",
+          }}
+        >
+          <CheckIcon style={{ width: 10, height: 10 }} />
+          Save
+        </button>
+        <button
+          onClick={onCancel}
+          className="flex items-center gap-1 px-3 py-1.5 rounded text-[10px]"
+          style={{
+            background: "transparent",
+            color: "var(--studio-text-dimmed)",
+            border: "1px solid var(--studio-border-subtle)",
+            cursor: "pointer",
+          }}
+        >
+          Cancel
+        </button>
+      </div>
     </div>
   );
 }
@@ -546,6 +646,7 @@ function TokenScaleStrip({
   tokens,
   kind,
   onSave,
+  onDelete,
   step,
   min,
   maxDecimals,
@@ -553,6 +654,7 @@ function TokenScaleStrip({
   tokens: { name: string; value: string }[];
   kind: "radius" | "width";
   onSave: (token: any, value: string) => void;
+  onDelete?: (token: any) => void;
   step?: number;
   min?: number;
   maxDecimals?: number;
@@ -580,7 +682,7 @@ function TokenScaleStrip({
           : (props: { style?: React.CSSProperties }) => <WidthPreviewIcon {...props} value={token.value} />;
 
         return (
-          <div key={token.name} className="flex items-center gap-1.5">
+          <div key={token.name} className="group/scale flex items-center gap-1.5">
             <span
               className="text-[10px] font-mono truncate shrink-0"
               style={{ color: "var(--studio-text-dimmed)", width: 96 }}
@@ -595,10 +697,155 @@ function TokenScaleStrip({
               min={min}
               maxDecimals={maxDecimals}
             />
+            {onDelete && (
+              <button
+                onClick={() => onDelete(token)}
+                className="opacity-0 group-hover/scale:opacity-100 transition-opacity"
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "var(--studio-text-dimmed)",
+                  padding: 2,
+                  display: "flex",
+                  flexShrink: 0,
+                }}
+                title="Delete"
+              >
+                <TrashIcon style={{ width: 10, height: 10 }} />
+              </button>
+            )}
           </div>
         );
       })}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Colors Section — with add & delete
+// ---------------------------------------------------------------------------
+
+function ColorsSection({
+  colorTokenGroups,
+  tokens,
+  theme,
+  cssFilePath,
+  selector,
+  onPreviewToken,
+  onClearTokenPreview,
+}: {
+  colorTokenGroups: [string, any[]][];
+  tokens: any[];
+  theme: "light" | "dark";
+  cssFilePath: string;
+  selector: string;
+  onPreviewToken: (token: string, value: string) => void;
+  onClearTokenPreview: () => void;
+}) {
+  const [creating, setCreating] = useState(false);
+  const allColorNames = tokens.filter((t) => t.category === "color").map((t) => t.name);
+
+  return (
+    <>
+      {colorTokenGroups.length > 0 ? (
+        <div className="studio-tree">
+          {colorTokenGroups.map(([groupName, groupTokens]) => (
+            <SubSection key={groupName} title={groupName} count={(groupTokens as any[]).filter(t => t.category === "color").length}>
+              <div className="flex flex-col gap-1.5 pb-1">
+                {(groupTokens as any[])
+                  .filter((t) => t.category === "color")
+                  .map((token: any) => {
+                    const value = theme === "dark" && token.darkValue ? token.darkValue : token.lightValue;
+                    const fgTokenName = token.name.endsWith("-foreground")
+                      ? token.name.replace("-foreground", "")
+                      : `${token.name}-foreground`;
+                    const fgToken = tokens.find((t: any) => t.name === fgTokenName);
+                    const fgValue = fgToken
+                      ? theme === "dark" && fgToken.darkValue ? fgToken.darkValue : fgToken.lightValue
+                      : null;
+                    const tokenId = token.name.replace(/^--/, "");
+                    return (
+                      <div key={token.name} className="group/token flex items-center gap-1" data-testid={`token-row-${tokenId}`}>
+                        <div className="flex-1 min-w-0">
+                          <ColorInput
+                            color={value}
+                            label={tokenId}
+                            tabs="custom"
+                            tokenName={token.name}
+                            contrastToken={fgValue ? { name: fgTokenName, value: fgValue } : null}
+                            onChange={(v) => onPreviewToken(token.name, v)}
+                            onSave={(oklchValue) => {
+                              saveToken(cssFilePath, token.name, oklchValue, selector);
+                              onClearTokenPreview();
+                            }}
+                          />
+                        </div>
+                        <button
+                          onClick={() => deleteToken(cssFilePath, token.name, selector)}
+                          className="opacity-0 group-hover/token:opacity-100 transition-opacity"
+                          style={{
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            color: "var(--studio-text-dimmed)",
+                            padding: 2,
+                            display: "flex",
+                            flexShrink: 0,
+                          }}
+                          title="Delete token"
+                        >
+                          <TrashIcon style={{ width: 10, height: 10 }} />
+                        </button>
+                      </div>
+                    );
+                  })}
+              </div>
+            </SubSection>
+          ))}
+        </div>
+      ) : null}
+
+      {/* Add color */}
+      <div className="px-4 pt-1">
+        {creating ? (
+          <TokenCreator
+            fallbackPrefix="color"
+            existingNames={allColorNames}
+            onSave={(name, value) => {
+              createToken(cssFilePath, `--${name}`, value || "oklch(0.5 0.15 250)", selector);
+              setCreating(false);
+            }}
+            onCancel={() => setCreating(false)}
+          >
+            {(value, setValue) => (
+              <ColorInput
+                color={value || "oklch(0.5 0.15 250)"}
+                label="Value"
+                tabs="custom"
+                onChange={(v) => setValue(v)}
+                onSave={(v) => setValue(v)}
+              />
+            )}
+          </TokenCreator>
+        ) : (
+          <button
+            onClick={() => setCreating(true)}
+            className="studio-addable-row w-full"
+            style={{ justifyContent: "center", gap: 6 }}
+          >
+            <PlusIcon style={{ width: 12, height: 12 }} />
+            <span className="text-[11px]" style={{ color: "var(--studio-text-dimmed)" }}>
+              Add color
+            </span>
+          </button>
+        )}
+      </div>
+
+      {colorTokenGroups.length === 0 && !creating && (
+        <EmptyState message="No color tokens found in your CSS." />
+      )}
+    </>
   );
 }
 
@@ -617,10 +864,7 @@ function RadiiSection({
   cssFilePath: string;
   stylingType: string;
 }) {
-  if (borders.length === 0) {
-    return <EmptyState message="No radius tokens found." />;
-  }
-
+  const [creating, setCreating] = useState(false);
   const selector = theme === "dark" ? ".dark" : (stylingType === "tailwind-v4" ? "@theme" : ":root");
 
   const handleSave = async (border: any, newValue: string) => {
@@ -630,16 +874,70 @@ function RadiiSection({
     await saveBorder(endpoint, { filePath: cssFilePath, variableName, value: newValue, selector });
   };
 
+  const handleDelete = async (border: any) => {
+    const variableName = border.cssVariable || `--${border.name}`;
+    await deleteBorder(cssFilePath, variableName, selector);
+  };
+
   return (
     <div className="px-4 pb-2">
-      <TokenScaleStrip
-        tokens={borders}
-        kind="radius"
-        onSave={handleSave}
-        step={0.025}
-        min={0}
-        maxDecimals={3}
-      />
+      {borders.length > 0 && (
+        <TokenScaleStrip
+          tokens={borders}
+          kind="radius"
+          onSave={handleSave}
+          onDelete={handleDelete}
+          step={0.025}
+          min={0}
+          maxDecimals={3}
+        />
+      )}
+
+      {/* Add radius */}
+      <div className="pt-1">
+        {creating ? (
+          <TokenCreator
+            fallbackPrefix="radius"
+            existingNames={borders.map((b) => b.name)}
+            onSave={(name, value) => {
+              saveBorder("/api/gradients/create", {
+                filePath: cssFilePath,
+                variableName: `--${name}`,
+                value: value || "0.5rem",
+                selector,
+              });
+              setCreating(false);
+            }}
+            onCancel={() => setCreating(false)}
+          >
+            {(value, setValue) => (
+              <ScrubInput
+                icon={(props) => <RadiusPreviewIcon {...props} value={value || "0.5rem"} />}
+                value={value || "0.5rem"}
+                onCommit={setValue}
+                step={0.025}
+                min={0}
+                maxDecimals={3}
+              />
+            )}
+          </TokenCreator>
+        ) : (
+          <button
+            onClick={() => setCreating(true)}
+            className="studio-addable-row w-full"
+            style={{ justifyContent: "center", gap: 6 }}
+          >
+            <PlusIcon style={{ width: 12, height: 12 }} />
+            <span className="text-[11px]" style={{ color: "var(--studio-text-dimmed)" }}>
+              Add radius
+            </span>
+          </button>
+        )}
+      </div>
+
+      {borders.length === 0 && !creating && (
+        <EmptyState message="No radius tokens found." />
+      )}
     </div>
   );
 }
@@ -667,12 +965,8 @@ function BordersSection({
   onPreviewToken: (token: string, value: string) => void;
   onClearPreview: () => void;
 }) {
-  const hasContent = widthBorders.length > 0 || borderColorTokens.length > 0;
-
-  if (!hasContent) {
-    return <EmptyState message="No border tokens found." />;
-  }
-
+  const [creatingWidth, setCreatingWidth] = useState(false);
+  const [creatingColor, setCreatingColor] = useState(false);
   const selector = theme === "dark" ? ".dark" : (stylingType === "tailwind-v4" ? "@theme" : ":root");
 
   const handleSave = async (border: any, newValue: string) => {
@@ -682,53 +976,156 @@ function BordersSection({
     await saveBorder(endpoint, { filePath: cssFilePath, variableName, value: newValue, selector });
   };
 
+  const handleDeleteWidth = async (border: any) => {
+    const variableName = border.cssVariable || `--${border.name}`;
+    await deleteBorder(cssFilePath, variableName, selector);
+  };
+
   return (
     <div className="flex flex-col gap-3 pb-2">
       {/* Border Width subsection */}
-      {widthBorders.length > 0 && (
-        <div className="px-4">
+      <div className="px-4">
+        {widthBorders.length > 0 && (
           <TokenScaleStrip
             tokens={widthBorders}
             kind="width"
             onSave={handleSave}
+            onDelete={handleDeleteWidth}
             min={0}
           />
+        )}
+
+        {/* Add border width */}
+        <div className="pt-1">
+          {creatingWidth ? (
+            <TokenCreator
+              fallbackPrefix="border-width"
+              existingNames={widthBorders.map((b) => b.name)}
+              onSave={(name, value) => {
+                saveBorder("/api/gradients/create", {
+                  filePath: cssFilePath,
+                  variableName: `--${name}`,
+                  value: value || "1px",
+                  selector,
+                });
+                setCreatingWidth(false);
+              }}
+              onCancel={() => setCreatingWidth(false)}
+            >
+              {(value, setValue) => (
+                <ScrubInput
+                  icon={(props) => <WidthPreviewIcon {...props} value={value || "1px"} />}
+                  value={value || "1px"}
+                  onCommit={setValue}
+                  min={0}
+                />
+              )}
+            </TokenCreator>
+          ) : (
+            <button
+              onClick={() => setCreatingWidth(true)}
+              className="studio-addable-row w-full"
+              style={{ justifyContent: "center", gap: 6 }}
+            >
+              <PlusIcon style={{ width: 12, height: 12 }} />
+              <span className="text-[11px]" style={{ color: "var(--studio-text-dimmed)" }}>
+                Add border width
+              </span>
+            </button>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Border Color subsection */}
-      {borderColorTokens.length > 0 && (
-        <div className="px-4">
-          <SectionLabel label="Color" />
-          <div className="flex flex-col gap-1.5">
-            {borderColorTokens.map((token: any) => {
-              const value = theme === "dark" && token.darkValue ? token.darkValue : token.lightValue;
-              const fgTokenName = token.name.endsWith("-foreground")
-                ? token.name.replace("-foreground", "")
-                : `${token.name}-foreground`;
-              const fgToken = allTokens.find((t: any) => t.name === fgTokenName);
-              const fgValue = fgToken
-                ? theme === "dark" && fgToken.darkValue ? fgToken.darkValue : fgToken.lightValue
-                : null;
-              return (
+      <div className="px-4">
+        {borderColorTokens.length > 0 && (
+          <>
+            <SectionLabel label="Color" />
+            <div className="flex flex-col gap-1.5">
+              {borderColorTokens.map((token: any) => {
+                const value = theme === "dark" && token.darkValue ? token.darkValue : token.lightValue;
+                const fgTokenName = token.name.endsWith("-foreground")
+                  ? token.name.replace("-foreground", "")
+                  : `${token.name}-foreground`;
+                const fgToken = allTokens.find((t: any) => t.name === fgTokenName);
+                const fgValue = fgToken
+                  ? theme === "dark" && fgToken.darkValue ? fgToken.darkValue : fgToken.lightValue
+                  : null;
+                return (
+                  <div key={token.name} className="group/bcolor flex items-center gap-1">
+                    <div className="flex-1 min-w-0">
+                      <ColorInput
+                        color={value}
+                        label={token.name.replace(/^--/, "")}
+                        tabs="custom"
+                        tokenName={token.name}
+                        contrastToken={fgValue ? { name: fgTokenName, value: fgValue } : null}
+                        onChange={(v) => onPreviewToken(token.name, v)}
+                        onSave={(oklchValue) => {
+                          saveToken(cssFilePath, token.name, oklchValue, selector);
+                          onClearPreview();
+                        }}
+                      />
+                    </div>
+                    <button
+                      onClick={() => deleteToken(cssFilePath, token.name, selector)}
+                      className="opacity-0 group-hover/bcolor:opacity-100 transition-opacity"
+                      style={{
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        color: "var(--studio-text-dimmed)",
+                        padding: 2,
+                        display: "flex",
+                        flexShrink: 0,
+                      }}
+                      title="Delete token"
+                    >
+                      <TrashIcon style={{ width: 10, height: 10 }} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        {/* Add border color */}
+        <div className="pt-1">
+          {creatingColor ? (
+            <TokenCreator
+              fallbackPrefix="border-color"
+              existingNames={borderColorTokens.map((t: any) => t.name)}
+              onSave={(name, value) => {
+                createToken(cssFilePath, `--${name}`, value || "oklch(0.8 0 0)", selector);
+                setCreatingColor(false);
+              }}
+              onCancel={() => setCreatingColor(false)}
+            >
+              {(value, setValue) => (
                 <ColorInput
-                  key={token.name}
-                  color={value}
-                  label={token.name.replace(/^--/, "")}
+                  color={value || "oklch(0.8 0 0)"}
+                  label="Value"
                   tabs="custom"
-                  tokenName={token.name}
-                  contrastToken={fgValue ? { name: fgTokenName, value: fgValue } : null}
-                  onChange={(v) => onPreviewToken(token.name, v)}
-                  onSave={(oklchValue) => {
-                    saveToken(cssFilePath, token.name, oklchValue, selector);
-                    onClearPreview();
-                  }}
+                  onChange={(v) => setValue(v)}
+                  onSave={(v) => setValue(v)}
                 />
-              );
-            })}
-          </div>
+              )}
+            </TokenCreator>
+          ) : (
+            <button
+              onClick={() => setCreatingColor(true)}
+              className="studio-addable-row w-full"
+              style={{ justifyContent: "center", gap: 6 }}
+            >
+              <PlusIcon style={{ width: 12, height: 12 }} />
+              <span className="text-[11px]" style={{ color: "var(--studio-text-dimmed)" }}>
+                Add border color
+              </span>
+            </button>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -5,10 +5,14 @@ import {
   Pencil1Icon,
   BookmarkIcon,
   CheckIcon,
+  PlusIcon,
+  TrashIcon,
+  Cross2Icon,
 } from "@radix-ui/react-icons";
 import { ShadowControls } from "./shadow-controls.js";
 import { ShadowPreview } from "./shadow-preview.js";
-import { saveShadow } from "../lib/scan-actions.js";
+import { saveShadow, createShadow, deleteShadow } from "../lib/scan-actions.js";
+import { suggestNextName } from "./token-editor.js";
 
 interface ShadowListProps {
   shadows: any[];
@@ -25,6 +29,14 @@ export function ShadowList({
 }: ShadowListProps) {
   const [expandedShadow, setExpandedShadow] = useState<string | null>(null);
   const [editMode, setEditMode] = useState<Record<string, "custom" | "preset">>({});
+  const [creating, setCreating] = useState(false);
+
+  const selector = stylingType === "tailwind-v4" ? "@theme" : ":root";
+
+  const handleDelete = async (shadow: any) => {
+    const variableName = shadow.cssVariable || `--${shadow.name}`;
+    await deleteShadow(cssFilePath, variableName, selector);
+  };
 
   return (
     <div>
@@ -45,12 +57,38 @@ export function ShadowList({
           cssFilePath={cssFilePath}
           stylingType={stylingType}
           onPreviewShadow={onPreviewShadow}
+          onDelete={() => handleDelete(shadow)}
         />
       ))}
 
-      {shadows.length === 0 && (
+      {/* Add shadow */}
+      <div className="px-4 pt-2">
+        {creating ? (
+          <ShadowCreator
+            existingNames={shadows.map((s: any) => s.cssVariable || `--${s.name}`)}
+            onSave={(name, value) => {
+              createShadow(cssFilePath, `--${name}`, value, selector);
+              setCreating(false);
+            }}
+            onCancel={() => setCreating(false)}
+          />
+        ) : (
+          <button
+            onClick={() => setCreating(true)}
+            className="studio-addable-row w-full"
+            style={{ justifyContent: "center", gap: 6 }}
+          >
+            <PlusIcon style={{ width: 12, height: 12 }} />
+            <span className="text-[11px]" style={{ color: "var(--studio-text-dimmed)" }}>
+              Add shadow
+            </span>
+          </button>
+        )}
+      </div>
+
+      {shadows.length === 0 && !creating && (
         <div
-          className="px-4 py-6 text-center text-[11px]"
+          className="px-4 py-4 text-center text-[11px]"
           style={{ color: "var(--studio-text-dimmed)" }}
         >
           No shadows found. Add shadow CSS variables to your global CSS file.
@@ -69,6 +107,7 @@ function ShadowRow({
   cssFilePath,
   stylingType,
   onPreviewShadow,
+  onDelete,
 }: {
   shadow: any;
   isExpanded: boolean;
@@ -78,6 +117,7 @@ function ShadowRow({
   cssFilePath: string;
   stylingType: string;
   onPreviewShadow: (variableName: string, value: string, shadowName?: string) => void;
+  onDelete: () => void;
 }) {
   const [saving, setSaving] = useState(false);
   const [currentValue, setCurrentValue] = useState(shadow.value);
@@ -116,7 +156,7 @@ function ShadowRow({
   };
 
   return (
-    <div style={{ borderTop: "1px solid var(--studio-border-subtle)" }}>
+    <div className="group/shadow" style={{ borderTop: "1px solid var(--studio-border-subtle)", position: "relative" }}>
       <button
         onClick={onToggle}
         className="studio-section-hdr"
@@ -169,6 +209,24 @@ function ShadowRow({
           </span>
         )}
       </button>
+      <button
+        onClick={(e) => { e.stopPropagation(); onDelete(); }}
+        className="opacity-0 group-hover/shadow:opacity-100 transition-opacity"
+        style={{
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          color: "var(--studio-text-dimmed)",
+          padding: "4px 8px",
+          display: "flex",
+          position: "absolute",
+          right: 4,
+          top: 4,
+        }}
+        title="Delete shadow"
+      >
+        <TrashIcon style={{ width: 10, height: 10 }} />
+      </button>
 
       {isExpanded && (
         <div className="px-4 pb-3">
@@ -211,6 +269,121 @@ function ShadowRow({
               }}
             />
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ShadowCreator({
+  existingNames,
+  onSave,
+  onCancel,
+}: {
+  existingNames: string[];
+  onSave: (name: string, value: string) => void;
+  onCancel: () => void;
+}) {
+  const suggestedName = suggestNextName(existingNames, "shadow");
+  const [name, setName] = useState(suggestedName);
+  const [mode, setMode] = useState<"custom" | "preset">("custom");
+
+  const defaultShadow = {
+    value: "0px 4px 6px -1px rgb(0 0 0 / 0.1)",
+    layers: [
+      { offsetX: "0px", offsetY: "4px", blur: "6px", spread: "-1px", color: "rgb(0 0 0 / 0.1)", inset: false },
+    ],
+  };
+
+  const handleSave = (value: string) => {
+    const cleanName = name.replace(/^--/, "").replace(/[^a-z0-9-]/g, "-").replace(/-+$/, "");
+    if (!cleanName) return;
+    onSave(cleanName, value);
+  };
+
+  return (
+    <div
+      className="rounded-lg p-3"
+      style={{
+        background: "var(--studio-input-bg)",
+        border: "1px solid var(--studio-border-subtle)",
+      }}
+    >
+      <div className="flex items-center gap-2 mb-3">
+        <label className="text-[10px] shrink-0" style={{ color: "var(--studio-text-dimmed)" }}>Name</label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="studio-input-sm flex-1"
+          placeholder="shadow-name"
+          autoFocus
+        />
+      </div>
+
+      {/* Mode toggle */}
+      <div className="studio-segmented mb-3" style={{ width: "100%" }}>
+        <button
+          onClick={() => setMode("custom")}
+          className={mode === "custom" ? "active" : ""}
+          style={{ flex: 1 }}
+        >
+          <Pencil1Icon style={{ width: 12, height: 12 }} />
+          Custom
+        </button>
+        <button
+          onClick={() => setMode("preset")}
+          className={mode === "preset" ? "active" : ""}
+          style={{ flex: 1 }}
+        >
+          <BookmarkIcon style={{ width: 12, height: 12 }} />
+          Use Preset
+        </button>
+      </div>
+
+      {mode === "custom" ? (
+        <ShadowControls
+          shadow={defaultShadow}
+          onPreview={() => {}}
+          onSave={handleSave}
+        />
+      ) : (
+        <>
+          <div className="mb-3">
+            <PresetPicker
+              currentValue=""
+              onSelect={(value) => handleSave(value)}
+            />
+          </div>
+          <button
+            onClick={onCancel}
+            className="flex items-center gap-1 px-3 py-1.5 rounded text-[10px]"
+            style={{
+              background: "transparent",
+              color: "var(--studio-text-dimmed)",
+              border: "1px solid var(--studio-border-subtle)",
+              cursor: "pointer",
+            }}
+          >
+            Cancel
+          </button>
+        </>
+      )}
+
+      {mode === "custom" && (
+        <div className="mt-2">
+          <button
+            onClick={onCancel}
+            className="flex items-center gap-1 px-3 py-1.5 rounded text-[10px]"
+            style={{
+              background: "transparent",
+              color: "var(--studio-text-dimmed)",
+              border: "1px solid var(--studio-border-subtle)",
+              cursor: "pointer",
+            }}
+          >
+            Cancel
+          </button>
         </div>
       )}
     </div>

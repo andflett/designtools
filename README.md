@@ -320,6 +320,58 @@ Then restart the dev server and surface.
 
 > `npm install` in the target project removes links. Re-run `npm link` after installing.
 
+## Testing
+
+### Unit & integration tests
+
+```bash
+npm test              # run all tests once
+npm run test:watch    # watch mode
+```
+
+### E2E tests (Playwright)
+
+E2E tests require the demo app servers to be running. You can either start them manually or let Playwright handle it.
+
+```bash
+# Run all E2E tests (starts servers automatically)
+npm run test:e2e
+
+# Run with Playwright UI
+npm run test:e2e:ui
+
+# Run a single project
+npx playwright test --project=studio
+npx playwright test --project=vite
+npx playwright test --project=css
+npx playwright test --project=css-modules
+npx playwright test --project=design-system
+
+# Run a single spec file
+npx playwright test --project=css tests/e2e/css-app/token-add-delete.spec.ts
+```
+
+| Project | Demo | What it tests |
+|---------|------|---------------|
+| `studio` | studio-app | Tailwind v4 classes, CVA component/instance editing |
+| `vite` | vite-app | Tailwind v4 class editing (Vite) |
+| `css` | css-app | Plain CSS, CSS variables, token add/delete |
+| `css-modules` | css-modules-app | CSS Modules editing |
+| `design-system` | design-system | Design token color editing |
+
+To start servers manually (useful for debugging):
+
+```bash
+# Build first
+npm run build
+
+# Start the demo (builds plugin + starts app + surface)
+npm run demo:css          # or demo:studio, demo:vite, etc.
+
+# Then run tests against the running servers
+npx playwright test --project=css
+```
+
 ## License
 
 CC BY-NC 4.0 — free to use and modify for non-commercial purposes with attribution. See [LICENSE](LICENSE) for details.

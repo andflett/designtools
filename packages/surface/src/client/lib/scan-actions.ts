@@ -70,6 +70,44 @@ export async function saveToken(
   }
 }
 
+/** Create a new token (appends to the block if not found). */
+export async function createToken(
+  cssFilePath: string,
+  token: string,
+  value: string,
+  selector: string,
+): Promise<void> {
+  // The existing /api/tokens endpoint already appends if token isn't found
+  await saveToken(cssFilePath, token, value, selector);
+}
+
+/** Delete a token from a CSS block. */
+export async function deleteToken(
+  cssFilePath: string,
+  token: string,
+  selector: string,
+): Promise<void> {
+  try {
+    const data = await postJson<{ ok: boolean; tokens?: TokenMap; error?: string }>(
+      "/api/tokens/delete",
+      { filePath: cssFilePath, token, selector },
+    );
+    if (!data.ok) {
+      console.error("Token delete failed:", data.error);
+      return;
+    }
+    if (data.tokens) {
+      scanStore.patch("tokens", data.tokens);
+    }
+  } catch (err) {
+    console.error("Token delete error:", err);
+    try {
+      const tokens = await fetchSlice<TokenMap>("tokens");
+      scanStore.patch("tokens", tokens);
+    } catch { /* best effort */ }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Shadow actions
 // ---------------------------------------------------------------------------
@@ -92,6 +130,43 @@ export async function saveShadow(
     }
   } catch (err) {
     console.error("Shadow save error:", err);
+    try {
+      const shadows = await fetchSlice<ShadowMap>("shadows");
+      scanStore.patch("shadows", shadows);
+    } catch { /* best effort */ }
+  }
+}
+
+/** Create a new shadow variable. */
+export async function createShadow(
+  cssFilePath: string,
+  variableName: string,
+  value: string,
+  selector: string,
+): Promise<void> {
+  await saveShadow("/api/shadows/create", { filePath: cssFilePath, variableName, value, selector });
+}
+
+/** Delete a shadow variable. */
+export async function deleteShadow(
+  cssFilePath: string,
+  variableName: string,
+  selector: string,
+): Promise<void> {
+  try {
+    const data = await postJson<{ ok: boolean; shadows?: ShadowMap; error?: string }>(
+      "/api/shadows/delete",
+      { filePath: cssFilePath, variableName, selector },
+    );
+    if (!data.ok) {
+      console.error("Shadow delete failed:", data.error);
+      return;
+    }
+    if (data.shadows) {
+      scanStore.patch("shadows", data.shadows);
+    }
+  } catch (err) {
+    console.error("Shadow delete error:", err);
     try {
       const shadows = await fetchSlice<ShadowMap>("shadows");
       scanStore.patch("shadows", shadows);
@@ -194,4 +269,13 @@ export async function saveBorder(
       scanStore.patch("borders", borders);
     } catch { /* best effort */ }
   }
+}
+
+/** Delete a border (radius or width) variable. Uses the gradients/delete endpoint. */
+export async function deleteBorder(
+  cssFilePath: string,
+  variableName: string,
+  selector: string,
+): Promise<void> {
+  await saveBorder("/api/gradients/delete", { filePath: cssFilePath, variableName, selector });
 }
