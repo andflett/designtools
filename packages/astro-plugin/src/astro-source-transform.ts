@@ -5,6 +5,10 @@
  *
  * Uses @astrojs/compiler's parse() + walk() to find element positions,
  * then splices attributes without reformatting (preserves exact user formatting).
+ *
+ * Also provides a `handleHotUpdate` hook (order: "pre") that patches ctx.read()
+ * so Astro's isStyleOnlyChanged() compares transformed sources on both sides,
+ * preserving CSS-only HMR for style edits.
  */
 
 import type { Plugin } from "vite";
@@ -127,6 +131,42 @@ export function createAstroSourcePlugin(): Plugin {
 
       if (modified === null) return;
       return { code: modified };
+    },
+
+    // Our load hook injects data-source attrs into the .astro source, which
+    // Astro caches as originalCode. When the file changes, Astro's
+    // isStyleOnlyChanged() compares that cached source against ctx.read()
+    // (raw disk content without attrs) — the templates always differ,
+    // breaking CSS-only HMR and forcing full reloads for every change.
+    //
+    // Fix: patch ctx.read() to return our transformed source (with attrs).
+    // This way isStyleOnlyChanged() compares apples-to-apples: both sides
+    // have our attrs, so style-only edits get CSS HMR and template changes
+    // correctly trigger reloads. Uses order: "pre" to run before Astro's
+    // handleHotUpdate which reads ctx.read().
+    handleHotUpdate: {
+      order: "pre" as const,
+      async handler(ctx) {
+        if (!ctx.file.endsWith(".astro")) return;
+        if (ctx.file.includes("node_modules")) return;
+
+        const relativePath = path.relative(root, ctx.file);
+
+        // Patch ctx.read() so Astro's isStyleOnlyChanged() compares
+        // transformed source (with data-source attrs) on both sides.
+        // Must run before Astro's handler (order: "pre") because
+        // Astro reads ctx.read() to compare against originalCode
+        // (which has our attrs from the load hook).
+        const originalRead = ctx.read;
+        let cachedRead: string | undefined;
+        ctx.read = async () => {
+          if (cachedRead !== undefined) return cachedRead;
+          const raw = await originalRead.call(ctx);
+          const transformed = await transformAstroSource(raw, relativePath);
+          cachedRead = transformed ?? raw;
+          return cachedRead;
+        };
+      },
     },
   };
 }

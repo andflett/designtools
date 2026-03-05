@@ -32,6 +32,7 @@
     "@radix-ui/react-tooltip": "^1.2.8",
     "@tailwindcss/vite": "^4.1.0",
     "@vitejs/plugin-react": "^4.4.0",
+    "@astrojs/compiler": "^2.10.0",
     "ast-types": "^0.14.2",
     "culori": "^4.0.2",
     "express": "^5.1.0",

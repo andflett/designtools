@@ -47,6 +47,8 @@ function findInTree(nodes: ComponentTreeNode[], domPath: string): string | null 
 
 export function App() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  /** Tracks the last selected element's domPath so we can re-select after iframe reload */
+  const selectedDomPathRef = useRef<string | null>(null);
   const [targetUrl, setTargetUrl] = useState("");
   const [stylingType, setStylingType] = useState("");
   const [projectName, setProjectName] = useState("");
@@ -110,10 +112,21 @@ export function App() {
               "*"
             );
             setSelectionMode(true);
+            // Re-select the previously selected element after full-page
+            // reload (e.g. Astro .astro file changes trigger a reload,
+            // which re-mounts the Surface component and loses selection).
+            const path = selectedDomPathRef.current;
+            if (path) {
+              iframeRef.current.contentWindow?.postMessage(
+                { type: "tool:selectByTreeId", id: path },
+                "*"
+              );
+            }
           }
           break;
         case "tool:elementSelected":
           setSelectedElement(msg.data);
+          selectedDomPathRef.current = msg.data.domPath;
           break;
         case "tool:pathChanged":
           setIframePath(msg.path);
@@ -149,6 +162,7 @@ export function App() {
       send({ type: "tool:exitSelectionMode" });
       send({ type: "tool:clearSelection" });
       setSelectedElement(null);
+      selectedDomPathRef.current = null;
       setUsagePanelOpen(false);
     }
   }, [selectionMode, send]);
@@ -189,6 +203,7 @@ export function App() {
 
   const handleCloseEditor = useCallback(() => {
     setSelectedElement(null);
+    selectedSourceRef.current = null;
     setUsagePanelOpen(false);
     send({ type: "tool:clearSelection" });
   }, [send]);

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { extractScopedStyles, writeScopedStyleProperty } from "./scoped-style.js";
+import { extractScopedStyles, writeScopedStyleProperty, addScopedStyleRule } from "./scoped-style.js";
+import type { SfcStyleBlock } from "./sfc-parse.js";
 
 describe("extractScopedStyles", () => {
   it("extracts a single scoped style block", () => {
@@ -167,5 +168,58 @@ const items = [1, 2, 3];
     // Template preserved exactly
     expect(result).toContain("<Component />");
     expect(result).toContain("{items.map(i => <span>{i}</span>)}");
+  });
+});
+
+describe("addScopedStyleRule", () => {
+  it("appends rule to existing style block", () => {
+    const source = `<div>hi</div>
+<style>
+  .card {
+    padding: 1rem;
+  }
+</style>`;
+    const block: SfcStyleBlock = {
+      css: "\n  .card {\n    padding: 1rem;\n  }\n",
+      startOffset: source.indexOf("\n  .card"),
+      endOffset: source.indexOf("</style>"),
+      isGlobal: false,
+    };
+    const result = addScopedStyleRule(source, block, ".new-class", "color", "red");
+    expect(result).toContain(".new-class {");
+    expect(result).toContain("color: red;");
+    expect(result).toContain(".card {"); // original preserved
+    // New rule should be inside the style block
+    const styleEnd = result.indexOf("</style>");
+    const rulePos = result.indexOf(".new-class");
+    expect(rulePos).toBeLessThan(styleEnd);
+  });
+
+  it("creates new <style> block when none exists", () => {
+    const source = `<div>hi</div>`;
+    const result = addScopedStyleRule(source, null, ".gen-class", "font-size", "2rem");
+    expect(result).toContain("<style>");
+    expect(result).toContain("</style>");
+    expect(result).toContain(".gen-class {");
+    expect(result).toContain("font-size: 2rem;");
+  });
+
+  it("creates new <style> block when only global exists", () => {
+    const source = `<div>hi</div>
+<style is:global>
+  body { margin: 0; }
+</style>`;
+    const globalBlock: SfcStyleBlock = {
+      css: "\n  body { margin: 0; }\n",
+      startOffset: 0,
+      endOffset: 0,
+      isGlobal: true,
+    };
+    const result = addScopedStyleRule(source, globalBlock, ".gen", "padding", "1rem");
+    // Should create a NEW style block, not modify the global one
+    expect(result).toContain(".gen {");
+    expect(result).toContain("padding: 1rem;");
+    // Global block should still exist
+    expect(result).toContain("body { margin: 0; }");
   });
 });

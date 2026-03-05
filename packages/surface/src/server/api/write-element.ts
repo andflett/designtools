@@ -22,7 +22,10 @@ import { computedToTailwindClass } from "../../shared/tailwind-map.js";
 import type { ResolvedTailwindTheme } from "../../shared/tailwind-theme.js";
 import { parseClasses } from "../../shared/tailwind-parser.js";
 import { writeCssPropertyWithCleanup, findCssRule, findCssModuleImports, resolveModuleClassNames } from "../lib/write-css-rule.js";
-import { writeScopedStyleProperty } from "../lib/scoped-style.js";
+import { writeScopedStyleProperty, writeScopedStylePropertyFromBlocks, addScopedStyleRule } from "../lib/scoped-style.js";
+import { parseSfc, findSfcElement } from "../lib/sfc-parse.js";
+import type { SfcElement, SfcStyleBlock } from "../lib/sfc-parse.js";
+import { generateClassName } from "../lib/generate-class.js";
 
 interface WriteElementConfig {
   projectRoot: string;
@@ -306,12 +309,14 @@ export function createWriteElementRouter(config: WriteElementConfig) {
         const fullPath = safePath(config.projectRoot, body.source.file);
         const source = await fs.readFile(fullPath, "utf-8");
 
-        // SFC files (.astro, .svelte) use class="..." — handle with string manipulation
+        // SFC files (.astro, .svelte) use class="..." — handle with AST + string splicing
         const isSFC = body.source.file.endsWith(".astro") || body.source.file.endsWith(".svelte");
         if (isSFC) {
-          const result = sfcReplaceOrAddClass(
+          const result = await sfcReplaceOrAddClass(
             source,
+            body.source.file,
             body.source.line,
+            body.source.col,
             body.type,
             body.oldClass,
             body.newClass,
@@ -321,7 +326,7 @@ export function createWriteElementRouter(config: WriteElementConfig) {
             res.json({ ok: true });
           } else {
             res.status(404).json({
-              error: `Could not find class attribute near ${body.source.file}:${body.source.line}`,
+              error: `Could not find element at ${body.source.file}:${body.source.line}:${body.source.col}`,
             });
           }
           return;
@@ -402,19 +407,20 @@ export function createWriteElementRouter(config: WriteElementConfig) {
             }
           }
 
-          // Extract class names from the element — used by steps 2, 2.5
-          // Use regex for .astro/.svelte, AST for JSX
+          // Extract class names from the element — used by style write steps
           let classes: string[] = [];
           const isSFC = body.source.file.endsWith(".astro") || body.source.file.endsWith(".svelte");
 
+          // SFC: parse with AST, JSX: parse with recast
+          let sfcElement: SfcElement | null = null;
+          let sfcStyleBlocks: SfcStyleBlock[] = [];
+
           if (isSFC) {
-            // .astro/.svelte files use class="..." (HTML syntax), extract from source near the element
-            const lines = source.split("\n");
-            const startIdx = body.source.line - 1;
-            const snippet = lines.slice(startIdx, startIdx + 5).join(" ");
-            const classMatch = snippet.match(/\bclass\s*=\s*"([^"]*)"/);
-            if (classMatch) {
-              classes = classMatch[1].split(/\s+/).filter(Boolean);
+            const parsed = await parseSfc(source, body.source.file);
+            sfcElement = findSfcElement(parsed.elements, body.source.line, body.source.col);
+            sfcStyleBlocks = parsed.styleBlocks;
+            if (sfcElement) {
+              classes = sfcElement.classes;
             }
           } else {
             const parser = await getParser();
@@ -429,99 +435,127 @@ export function createWriteElementRouter(config: WriteElementConfig) {
             }
           }
 
-          // For classless SFC elements, build descendant selectors (e.g. ".card h3")
-          // by finding the tag name and walking up to parent elements with classes
-          let tagSelectors: string[] = [];
-          if (isSFC && classes.length === 0) {
-            const lines = source.split("\n");
-            const lineIdx = body.source.line - 1;
-            const tagMatch = lines[lineIdx]?.match(/<([\w-]+)[\s>\/]/);
-            const tagName = tagMatch?.[1];
-            if (tagName) {
-              // Walk backward to find nearest parent element with classes
-              // Track nesting depth: closing tags on their own line increase depth
-              let depth = 0;
-              for (let i = lineIdx - 1; i >= 0; i--) {
-                const ln = lines[i];
-                // Count standalone closing tags (siblings that closed before us)
-                const selfContained = (ln.match(/<[\w-]+[^>]*>.*<\/[\w-]+>/g) || []).length;
-                const closes = (ln.match(/<\/[\w-]+\s*>/g) || []).length - selfContained;
-                const opens = (ln.match(/<([\w-]+)[\s>]/g) || []).length - selfContained;
-                depth += closes;
-                if (opens > 0 && depth > 0) {
-                  depth -= opens;
-                  continue;
-                }
-                if (opens > 0) {
-                  const parentClassMatch = ln.match(/class\s*=\s*"([^"]*)"/);
-                  if (parentClassMatch) {
-                    const parentClasses = parentClassMatch[1].split(/\s+/).filter(Boolean);
-                    for (const cls of parentClasses) {
-                      tagSelectors.push(`.${cls} ${tagName}`);
-                    }
-                  }
+          // Build selectors from element classes
+          const selectorsToTry: string[] = classes.map(cls => `.${cls}`);
+
+          // For SFC files, the write chain differs from JSX:
+          // 1. CSS modules (already handled above)
+          // 2. Scoped <style> for .className (before global)
+          // 3. Global project stylesheets for .className
+          // 4. Create new scoped rule (for classless elements or unmatched classes)
+          // JSX: global stylesheets → inline style fallback (unchanged)
+
+          if (isSFC) {
+            // 2. Try scoped <style> blocks first (Astro/Svelte convention)
+            if (!written && selectorsToTry.length > 0) {
+              for (const selector of selectorsToTry) {
+                const result = writeScopedStylePropertyFromBlocks(source, sfcStyleBlocks, selector, cssProp, cssValue);
+                if (result) {
+                  await fs.writeFile(fullPath, result, "utf-8");
+                  written = true;
                   break;
                 }
               }
-              // Bare tag name as last resort
-              tagSelectors.push(tagName);
             }
-          }
 
-          // Build the list of selectors to try: class-based first, then tag-based
-          const selectorsToTry: string[] = [
-            ...classes.map(cls => `.${cls}`),
-            ...tagSelectors,
-          ];
-
-          // 2. Try project stylesheets — search cssFiles for matching rules
-          if (!written && config.cssFiles.length > 0) {
-            for (const selector of selectorsToTry) {
-              for (const cssFile of config.cssFiles) {
-                const cssPath = safePath(config.projectRoot, cssFile);
-                try {
-                  let css = await fs.readFile(cssPath, "utf-8");
-                  if (findCssRule(css, selector)) {
-                    const result = writeCssPropertyWithCleanup(css, selector, cssProp, cssValue);
-                    if (result) {
-                      await fs.writeFile(cssPath, result, "utf-8");
-                      written = true;
-                      break;
+            // 3. Try project stylesheets for elements with classes
+            if (!written && config.cssFiles.length > 0 && selectorsToTry.length > 0) {
+              for (const selector of selectorsToTry) {
+                for (const cssFile of config.cssFiles) {
+                  const cssPath = safePath(config.projectRoot, cssFile);
+                  try {
+                    let css = await fs.readFile(cssPath, "utf-8");
+                    if (findCssRule(css, selector)) {
+                      const result = writeCssPropertyWithCleanup(css, selector, cssProp, cssValue);
+                      if (result) {
+                        await fs.writeFile(cssPath, result, "utf-8");
+                        written = true;
+                        break;
+                      }
                     }
-                  }
-                } catch { /* file not found — try next */ }
-              }
-              if (written) break;
-            }
-          }
-
-          // 2.5. Try scoped <style> blocks in .astro / .svelte single-file components
-          if (!written && isSFC) {
-            for (const selector of selectorsToTry) {
-              const result = writeScopedStyleProperty(source, selector, cssProp, cssValue);
-              if (result) {
-                await fs.writeFile(fullPath, result, "utf-8");
-                written = true;
-                break;
+                  } catch { /* file not found — try next */ }
+                }
+                if (written) break;
               }
             }
-          }
 
-          // 3. Fallback: write inline style on the JSX element (not supported for .astro / .svelte files)
-          if (!written && !body.source.file.endsWith(".astro") && !body.source.file.endsWith(".svelte")) {
-            const parser = await getParser();
-            const ast = parseSource(source, parser);
-            const elementPath = findElementAtSource(ast, body.source.line, body.source.col);
-            if (!elementPath) {
-              res.status(404).json({
-                error: `Element not found at ${body.source.file}:${body.source.line}:${body.source.col}`,
-              });
-              return;
+            // 4. Classless elements: generate class, add to element, create scoped rule
+            if (!written && sfcElement && classes.length === 0) {
+              const parentClasses = sfcElement.parent?.classes || [];
+              const genClass = generateClassName(
+                sfcElement.tagName, parentClasses,
+                body.source.file, body.source.line, body.source.col,
+              );
+
+              // Add class attribute to the element
+              let modified = sfcInsertClass(source, sfcElement, genClass);
+
+              // Re-parse to get updated style block offsets after class insertion
+              const reParsed = await parseSfc(modified, body.source.file);
+
+              // Try writing to an existing rule first (the class may already have a rule
+              // from a previous edit, since the generated name is deterministic)
+              const existingResult = writeScopedStylePropertyFromBlocks(
+                modified, reParsed.styleBlocks, `.${genClass}`, cssProp, cssValue,
+              );
+              if (existingResult) {
+                modified = existingResult;
+              } else {
+                const scopedBlock = reParsed.styleBlocks.find(b => !b.isGlobal) || null;
+                modified = addScopedStyleRule(modified, scopedBlock, `.${genClass}`, cssProp, cssValue);
+              }
+              await fs.writeFile(fullPath, modified, "utf-8");
+              written = true;
             }
 
-            setInlineStyleProperty(elementPath.node, cssProp, cssValue);
-            const output = printSource(ast);
-            await fs.writeFile(fullPath, output, "utf-8");
+            // 5. Elements with classes but no matching rule: create scoped rule
+            if (!written && sfcElement && classes.length > 0) {
+              const selector = `.${classes[0]}`;
+              const scopedBlock = sfcStyleBlocks.find(b => !b.isGlobal) || null;
+              const modified = addScopedStyleRule(source, scopedBlock, selector, cssProp, cssValue);
+              await fs.writeFile(fullPath, modified, "utf-8");
+              written = true;
+            }
+          } else {
+            // JSX path: global stylesheets → inline style fallback
+
+            // 2. Try project stylesheets
+            if (!written && config.cssFiles.length > 0) {
+              for (const selector of selectorsToTry) {
+                for (const cssFile of config.cssFiles) {
+                  const cssPath = safePath(config.projectRoot, cssFile);
+                  try {
+                    let css = await fs.readFile(cssPath, "utf-8");
+                    if (findCssRule(css, selector)) {
+                      const result = writeCssPropertyWithCleanup(css, selector, cssProp, cssValue);
+                      if (result) {
+                        await fs.writeFile(cssPath, result, "utf-8");
+                        written = true;
+                        break;
+                      }
+                    }
+                  } catch { /* file not found — try next */ }
+                }
+                if (written) break;
+              }
+            }
+
+            // 3. Fallback: write inline style on the JSX element
+            if (!written) {
+              const parser = await getParser();
+              const ast = parseSource(source, parser);
+              const elementPath = findElementAtSource(ast, body.source.line, body.source.col);
+              if (!elementPath) {
+                res.status(404).json({
+                  error: `Element not found at ${body.source.file}:${body.source.line}:${body.source.col}`,
+                });
+                return;
+              }
+
+              setInlineStyleProperty(elementPath.node, cssProp, cssValue);
+              const output = printSource(ast);
+              await fs.writeFile(fullPath, output, "utf-8");
+            }
           }
         }
 
@@ -701,51 +735,38 @@ function setInlineStyleProperty(openingElement: any, cssProp: string, cssValue: 
 }
 
 /**
- * Replace or add a class in an SFC file (.astro/.svelte) using string manipulation.
- * Finds class="..." near the element's source line and modifies it.
+ * Replace or add a class in an SFC file (.astro/.svelte) using AST-based parsing.
+ * Uses parseSfc() to find the exact element, then does string splicing.
  */
-function sfcReplaceOrAddClass(
+async function sfcReplaceOrAddClass(
   source: string,
+  filename: string,
   line: number,
+  col: number,
   type: "replaceClass" | "addClass",
   oldClass?: string,
   newClass?: string,
-): string | null {
+): Promise<string | null> {
   if (!newClass) return null;
 
-  const lines = source.split("\n");
-  const startIdx = line - 1;
+  const parsed = await parseSfc(source, filename);
+  const element = findSfcElement(parsed.elements, line, col);
+  if (!element) return null;
 
-  // Search a window of lines around the element for the class attribute
-  const searchStart = Math.max(0, startIdx);
-  const searchEnd = Math.min(lines.length, startIdx + 5);
-  const snippet = lines.slice(searchStart, searchEnd).join("\n");
-
-  // Calculate byte offset of the snippet within the source
-  const snippetOffset = lines.slice(0, searchStart).join("\n").length + (searchStart > 0 ? 1 : 0);
-
-  // Find class="..." in the snippet
-  const classMatch = snippet.match(/\bclass\s*=\s*"([^"]*)"/);
+  // Extract the opening tag text to find class="..." within it
+  const tagText = source.slice(element.startOffset, element.openTagEndOffset + 1);
+  const classMatch = tagText.match(/\bclass\s*=\s*"([^"]*)"/);
 
   if (!classMatch || classMatch.index == null) {
     if (type === "addClass") {
-      // No class attr found — insert class="newClass" after the tag name
-      const tagLine = lines[startIdx];
-      const tagMatch = tagLine.match(/<(\w[\w-]*)/);
-      if (tagMatch && tagMatch.index != null) {
-        const insertPos = tagMatch.index + tagMatch[0].length;
-        lines[startIdx] =
-          tagLine.slice(0, insertPos) +
-          ` class="${newClass}"` +
-          tagLine.slice(insertPos);
-        return lines.join("\n");
-      }
+      // No class attr — insert class="newClass" at the attribute insertion point
+      return sfcInsertClass(source, element, newClass);
     }
     return null;
   }
 
   const currentClasses = classMatch[1];
-  const classAttrStart = snippetOffset + classMatch.index;
+  const classAttrStart = element.startOffset + classMatch.index;
   const fullMatch = classMatch[0];
 
   if (type === "replaceClass" && oldClass) {
@@ -774,4 +795,16 @@ function sfcReplaceOrAddClass(
   }
 
   return null;
+}
+
+/**
+ * Insert a class attribute on an SFC element that has no class.
+ * Uses the AST-determined attrInsertOffset for precise placement.
+ */
+function sfcInsertClass(source: string, element: SfcElement, className: string): string {
+  return (
+    source.slice(0, element.attrInsertOffset) +
+    ` class="${className}"` +
+    source.slice(element.attrInsertOffset)
+  );
 }

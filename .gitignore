@@ -26,3 +26,5 @@ yarn-error.log*
 # claude
 CLAUDE.md
 .claude/
+
+.svelte-kit/

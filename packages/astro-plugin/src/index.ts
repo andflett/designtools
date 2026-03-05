@@ -33,13 +33,24 @@ export default function designtools(
           },
         });
 
-        // Mount Surface on every page via Astro's page script injection
+        // Mount Surface on every page via Astro's page script injection.
+        // Uses dynamic import() so the React refresh preamble stubs are set
+        // BEFORE the Surface module is loaded. Static imports are hoisted in
+        // ES modules, so they'd run before the preamble assignment.
+        // Without these stubs, full page reloads (e.g. after .astro file edits)
+        // crash with "@vitejs/plugin-react can't detect preamble".
         injectScript(
           "page",
           `
-import { Surface } from "@designtools/vite-plugin/surface";
-import { createElement } from "react";
-import { createRoot } from "react-dom/client";
+if (!window.$RefreshReg$) {
+  window.$RefreshReg$ = () => {};
+  window.$RefreshSig$ = () => (type) => type;
+}
+const [{ Surface }, { createElement }, { createRoot }] = await Promise.all([
+  import("@designtools/vite-plugin/surface"),
+  import("react"),
+  import("react-dom/client"),
+]);
 const el = document.createElement("div");
 el.id = "__designtools_surface";
 document.body.appendChild(el);

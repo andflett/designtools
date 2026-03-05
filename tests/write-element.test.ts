@@ -230,8 +230,8 @@ describe("POST /api/write-element — scoped styles (.astro)", () => {
     expect(content).toContain("font-size: 2rem;");
   });
 
-  it("prefers project stylesheet over scoped style when both match", async () => {
-    // Add a .card rule to styles.css so it matches first
+  it("prefers scoped style over project stylesheet when both match", async () => {
+    // Add a .card rule to styles.css — scoped should still win
     const stylesPath = path.join(FIXTURE_DIR, "styles.css");
     const originalCss = await fs.readFile(stylesPath, "utf-8");
     await fs.writeFile(stylesPath, originalCss + "\n.card {\n  padding: 1rem;\n}\n", "utf-8");
@@ -246,56 +246,75 @@ describe("POST /api/write-element — scoped styles (.astro)", () => {
       });
 
     expect(res.status).toBe(200);
-    // Should have written to styles.css (step 2), not the scoped block (step 2.5)
-    const css = await fs.readFile(stylesPath, "utf-8");
-    expect(css).toContain("padding: 3rem;");
-    // Scoped block should be untouched
+    // Should have written to scoped block (checked first for SFC files)
     const astro = await fs.readFile(path.join(FIXTURE_DIR, "scoped.astro"), "utf-8");
-    expect(astro).toContain("padding: 1rem;");
+    expect(astro).toContain("padding: 3rem;");
+    // Global stylesheet should be untouched
+    const css = await fs.readFile(stylesPath, "utf-8");
+    expect(css).toContain("padding: 1rem;");
   });
 });
 
-describe("POST /api/write-element — descendant selectors (.astro)", () => {
-  it("writes CSS property via descendant selector for classless element", async () => {
+describe("POST /api/write-element — classless elements (.astro)", () => {
+  it("generates class and creates scoped rule for classless element", async () => {
     const app = createApp({ stylingType: "plain-css", cssFiles: [] });
     const res = await request(app)
       .post("/api/write-element")
       .send({
         type: "cssProperty",
-        source: { file: "descendant.astro", line: 5, col: 1 },
+        source: { file: "classless.astro", line: 5, col: 2 },
         changes: [{ property: "color", value: "red" }],
       });
 
     expect(res.status).toBe(200);
-    const content = await fs.readFile(path.join(FIXTURE_DIR, "descendant.astro"), "utf-8");
-    // Should write to ".card h3" rule, not ".card"
+    const content = await fs.readFile(path.join(FIXTURE_DIR, "classless.astro"), "utf-8");
+    // Should have generated a class name and added it to the <h1>
+    expect(content).toMatch(/<h1 class="surface-hero-h1-[a-f0-9]{5}">/);
+    // Should have created a scoped rule
+    expect(content).toMatch(/\.surface-hero-h1-[a-f0-9]{5}\s*\{/);
     expect(content).toContain("color: red;");
-    // ".card h3" block should be modified, .card block should be untouched
-    expect(content).toContain(".card h3");
-    expect(content).toContain("padding: 1rem;"); // .card rule preserved
+    // Original .hero rule preserved
+    expect(content).toContain("padding: 2rem;");
   });
 
-  it("prefers project stylesheet descendant selector over scoped style", async () => {
-    // Add a .card h3 rule to styles.css
-    const stylesPath = path.join(FIXTURE_DIR, "styles.css");
-    const originalCss = await fs.readFile(stylesPath, "utf-8");
-    await fs.writeFile(stylesPath, originalCss + "\n.card h3 {\n  color: navy;\n}\n", "utf-8");
-
-    const app = createApp({ stylingType: "plain-css", cssFiles: ["styles.css"] });
+  it("creates <style> block if none exists", async () => {
+    const app = createApp({ stylingType: "plain-css", cssFiles: [] });
     const res = await request(app)
       .post("/api/write-element")
       .send({
         type: "cssProperty",
-        source: { file: "descendant.astro", line: 5, col: 1 },
-        changes: [{ property: "color", value: "green" }],
+        source: { file: "nostyle.astro", line: 5, col: 2 },
+        changes: [{ property: "font-size", value: "2rem" }],
       });
 
     expect(res.status).toBe(200);
-    const css = await fs.readFile(stylesPath, "utf-8");
-    expect(css).toContain("color: green;");
-    // Scoped block should be untouched
-    const astro = await fs.readFile(path.join(FIXTURE_DIR, "descendant.astro"), "utf-8");
-    expect(astro).toContain("color: navy;");
+    const content = await fs.readFile(path.join(FIXTURE_DIR, "nostyle.astro"), "utf-8");
+    // Should have created a <style> block
+    expect(content).toContain("<style>");
+    expect(content).toContain("</style>");
+    // Should have a generated class with the rule
+    expect(content).toMatch(/\.surface-hero-h1-[a-f0-9]{5}\s*\{/);
+    expect(content).toContain("font-size: 2rem;");
+    // Should have added class to the element
+    expect(content).toMatch(/<h1 class="surface-hero-h1-[a-f0-9]{5}">/);
+  });
+
+  it("uses existing scoped rule when element has a class", async () => {
+    // descendant.astro has <article class="card"> with .card rule in scoped style
+    const app = createApp({ stylingType: "plain-css", cssFiles: [] });
+    const res = await request(app)
+      .post("/api/write-element")
+      .send({
+        type: "cssProperty",
+        source: { file: "descendant.astro", line: 4, col: 1 },
+        changes: [{ property: "margin", value: "2rem" }],
+      });
+
+    expect(res.status).toBe(200);
+    const content = await fs.readFile(path.join(FIXTURE_DIR, "descendant.astro"), "utf-8");
+    // Should write to existing .card rule
+    expect(content).toContain("margin: 2rem;");
+    expect(content).toContain("padding: 1rem;"); // existing preserved
   });
 });
 
