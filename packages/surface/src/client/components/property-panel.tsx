@@ -22,6 +22,7 @@ import {
   FontBoldIcon,
   CornersIcon,
   ColumnSpacingIcon,
+  RowSpacingIcon,
 } from "@radix-ui/react-icons";
 import {
   Maximize,
@@ -564,8 +565,8 @@ const lc = (Icon: typeof ArrowRight) =>
   };
 
 const DIRECTION_OPTIONS = [
-  { value: "flex-row", icon: lc(ArrowRight), label: "Row" },
-  { value: "flex-col", icon: lc(ArrowDown), label: "Column" },
+  { value: "flex-row", icon: ColumnsIcon, label: "Row" },
+  { value: "flex-col", icon: RowSpacingIcon, label: "Column" },
   { value: "flex-row-reverse", icon: lc(ArrowLeft), label: "Row Rev" },
   { value: "flex-col-reverse", icon: lc(ArrowUp), label: "Col Rev" },
 ];

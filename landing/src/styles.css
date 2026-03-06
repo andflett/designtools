@@ -60,10 +60,10 @@ body {
   inset: 0;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(0, 0, 0, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 0, 0, 0.06) 1px, transparent 1px),
-    linear-gradient(rgba(0, 0, 0, 0.12) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 0, 0, 0.12) 1px, transparent 1px);
+    linear-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.03) 1px, transparent 1px),
+    linear-gradient(rgba(0, 0, 0, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.05) 1px, transparent 1px);
   background-size: 24px 24px, 24px 24px, 96px 96px, 96px 96px;
   mask-image: linear-gradient(to bottom, black 20%, transparent 85%);
   -webkit-mask-image: linear-gradient(to bottom, black 20%, transparent 85%);
@@ -136,7 +136,7 @@ body {
 
 /* Checkerboard dither — larger scale, visible pattern */
 .checker-dither {
-  background-image: url("data:image/svg+xml,%3Csvg width='8' height='8' viewBox='0 0 8 8' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='4' height='4' fill='%2309090b' fill-opacity='0.025'/%3E%3Crect x='4' y='4' width='4' height='4' fill='%2309090b' fill-opacity='0.025'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg width='8' height='8' viewBox='0 0 8 8' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='4' height='4' fill='%2309090b' fill-opacity='0.015'/%3E%3Crect x='4' y='4' width='4' height='4' fill='%2309090b' fill-opacity='0.015'/%3E%3C/svg%3E");
   background-size: 8px 8px;
 }
 

@@ -3,7 +3,8 @@ import { Tooltip } from "../tooltip.js";
 
 interface SegmentedOption {
   value: string;
-  icon?: React.ComponentType<{ style?: React.CSSProperties }>;
+  icon?: React.ComponentType<{ style?: React.CSSProperties; className?: string }>;
+  iconClassName?: string;
   label?: string;
   tooltip?: string;
 }
@@ -34,7 +35,7 @@ export function SegmentedIcons({ options, value, onChange }: SegmentedIconsProps
             style={{ flex: 1, cursor: "pointer" }}
           >
             {opt.icon ? (
-              <opt.icon style={{ width: 14, height: 14 }} />
+              <opt.icon style={{ width: 14, height: 14 }} className={opt.iconClassName} />
             ) : (
               <span style={{ fontSize: 10 }}>{opt.label || opt.value}</span>
             )}

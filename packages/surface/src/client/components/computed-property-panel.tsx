@@ -46,8 +46,9 @@ import {
   TextNoneIcon,
   BoxIcon,
   LayoutIcon,
+  TextAlignTopIcon,
 } from "@radix-ui/react-icons";
-import { Crosshair, Pin, ArrowRight, ArrowDown, ArrowLeft, ArrowUp, WrapText, AlignJustify } from "lucide-react";
+import { Crosshair, Pin, ArrowRight, ArrowDown, ArrowLeft, ArrowUp, WrapText, AlignJustify, Columns3 } from "lucide-react";
 import {
   buildUnifiedProperties,
   getUniformBoxValue,
@@ -487,15 +488,48 @@ const lc = (Icon: typeof ArrowRight) =>
   };
 
 const DIRECTION_OPTIONS = [
-  { value: "row", icon: lc(ArrowRight), label: "Row", tooltip: "Row — items flow horizontally" },
-  { value: "column", icon: lc(ArrowDown), label: "Column", tooltip: "Column — items flow vertically" },
-  { value: "row-reverse", icon: lc(ArrowLeft), label: "Row Rev", tooltip: "Row Reverse — items flow right to left" },
-  { value: "column-reverse", icon: lc(ArrowUp), label: "Col Rev", tooltip: "Column Reverse — items flow bottom to top" },
+  {
+    value: "row",
+    icon: Columns3,
+    label: "Row",
+    tooltip: "Row — items flow horizontally",
+  },
+  {
+    value: "column",
+    icon: Columns3,
+    iconClassName: "-rotate-90",
+    label: "Column",
+    tooltip: "Column — items flow vertically",
+  },
+  {
+    value: "row-reverse",
+    icon: TextAlignTopIcon,
+    iconClassName: "-rotate-90",
+    label: "Row Rev",
+    tooltip: "Row Reverse — items flow right to left",
+  },
+  {
+    value: "column-reverse",
+    icon: TextAlignTopIcon,
+    iconClassName: "relative top-[2px]",
+    label: "Col Rev",
+    tooltip: "Column Reverse — items flow bottom to top",
+  },
 ];
 
 const WRAP_OPTIONS = [
-  { value: "nowrap", icon: lc(AlignJustify), label: "No Wrap", tooltip: "No Wrap — all items on one line" },
-  { value: "wrap", icon: lc(WrapText), label: "Wrap", tooltip: "Wrap — items wrap to next line" },
+  {
+    value: "wrap",
+    icon: lc(WrapText),
+    label: "Wrap",
+    tooltip: "Wrap — items wrap to next line",
+  },
+  {
+    value: "nowrap",
+    icon: lc(AlignJustify),
+    label: "No Wrap",
+    tooltip: "No Wrap — all items on one line",
+  },
 ];
 
 function LayoutSection({
@@ -572,7 +606,10 @@ function LayoutSection({
       )}
       {isFlexGrid && directionProp && (
         <div>
-          <PropLabel label="Direction" inherited={directionProp.inherited} />
+          <PropLabel
+            label="Flex Direction"
+            inherited={directionProp.inherited}
+          />
           <SegmentedIcons
             options={DIRECTION_OPTIONS}
             value={directionProp.computedValue}
@@ -580,13 +617,16 @@ function LayoutSection({
           />
         </div>
       )}
-      {isFlexGrid && wrapProp && (
+      {isFlexGrid && justifyProp && (
         <div>
-          <PropLabel label="Wrap" inherited={wrapProp.inherited} />
+          <PropLabel
+            label="Justify Content"
+            inherited={justifyProp.inherited}
+          />
           <SegmentedIcons
-            options={WRAP_OPTIONS}
-            value={wrapProp.computedValue}
-            onChange={(v) => handleSegmentedChange("flex-wrap", v)}
+            options={JUSTIFY_OPTIONS}
+            value={justifyProp.computedValue}
+            onChange={(v) => handleSegmentedChange("justify-content", v)}
           />
         </div>
       )}
@@ -600,27 +640,28 @@ function LayoutSection({
           />
         </div>
       )}
-      {isFlexGrid && justifyProp && (
+      {isFlexGrid && wrapProp && (
         <div>
-          <PropLabel label="Justify" inherited={justifyProp.inherited} />
+          <PropLabel label="Wrap" inherited={wrapProp.inherited} />
           <SegmentedIcons
-            options={JUSTIFY_OPTIONS}
-            value={justifyProp.computedValue}
-            onChange={(v) => handleSegmentedChange("justify-content", v)}
+            options={WRAP_OPTIONS}
+            value={wrapProp.computedValue}
+            onChange={(v) => handleSegmentedChange("flex-wrap", v)}
           />
         </div>
       )}
-      {isFlexGrid && flexGridActiveProps.map((prop) => (
-        <UnifiedControl
-          key={prop.cssProperty}
-          prop={prop}
-          tokenGroups={tokenGroups}
-          onPreviewInlineStyle={onPreviewInlineStyle}
-          onRevertInlineStyles={onRevertInlineStyles}
-          onCommitClass={onCommitClass}
-          onCommitStyle={onCommitStyle}
-        />
-      ))}
+      {isFlexGrid &&
+        flexGridActiveProps.map((prop) => (
+          <UnifiedControl
+            key={prop.cssProperty}
+            prop={prop}
+            tokenGroups={tokenGroups}
+            onPreviewInlineStyle={onPreviewInlineStyle}
+            onRevertInlineStyles={onRevertInlineStyles}
+            onCommitClass={onCommitClass}
+            onCommitStyle={onCommitStyle}
+          />
+        ))}
       {isFlexGrid && flexGridAddableProps.length > 0 && (
         <AddableRows
           properties={flexGridAddableProps}
