@@ -122,62 +122,83 @@ Spacing: p-1=4px, p-2=8px, p-3=12px, p-4=16px, p-6=24px, p-8=32px.
 
 ---
 
-## Container runtime (ooda.computer)
+## Container runtime (ooda / Sprites)
 
-### Topology A — Editor runs inside the container
+### How ooda works
+
+[ooda](https://github.com/nichochar/ooda-cli) launches Claude Code on cloud dev environments powered by Sprites.dev. A Sprite is a full Linux container with your codebase, a shell, and Claude Code pre-installed and authenticated. You connect via `npx ooda-cli` from any terminal — Claude gets full TTY pass-through. Sprites expose ports via public URLs for previewing running apps.
+
+### The topology
+
+Everything runs inside the Sprite. The local machine is just a browser.
 
 ```
-┌─── Container ─────────────────────────────────┐
+┌── Your laptop ────────────────────────────────┐
 │                                               │
-│  Browser UI ←→ Surface Editor Server          │
-│                       │                       │
-│                 [mode toggle]                  │
-│                   /       \                    │
-│          Deterministic   AI Writes             │
-│          (adapter)       (prompt builder)      │
-│              │                │                │
-│          file write      claude -p "..."       │
-│              │                │                │
-│              └───── file on disk ─────┘        │
+│  Browser                                      │
+│    └── https://<sprite>:4400  (editor UI)     │
+│          └── iframes :3000   (dev server)     │
+│                                               │
+└───────────────────────────────────────────────┘
+        │
+        │  ooda port forwarding / Sprites public URLs
+        │
+┌── Sprite (cloud container) ───────────────────┐
+│                                               │
+│  npm run dev              → :3000             │
+│  npx designsurface        → :4400             │
+│  claude (interactive TTY via ooda)            │
+│                                               │
+│  Surface Editor Server (:4400)                │
+│         │                                     │
+│   [mode toggle]                               │
+│     /         \                               │
+│  Deterministic   AI Writes                    │
+│  (adapter)       (prompt builder)             │
+│     │                │                        │
+│  file write    claude -p --model sonnet "..." │
+│     │                │                        │
+│     └──── file on disk ──────┘                │
+│              │                                │
+│         HMR picks up → iframe reloads         │
 │                                               │
 │  CLAUDE.md (conventions for AI mode)          │
 └───────────────────────────────────────────────┘
 ```
 
-Everything local. Claude CLI is pre-installed in the container. No port exposure needed for the write path. The editor server spawns `claude -p` as a subprocess.
+### Why this is clean
 
-### Topology B — Local editor, container is remote
+- **No new server.** The Surface editor server (Express on :4400) already exists. AI mode adds a new code path inside the existing `/api/write-element` endpoint (or a sibling `/api/ai-write`). No separate write API, no new port.
+- **No network hops for writes.** `claude -p` is a subprocess on the same machine as the files. The editor server spawns it, waits for exit, reads stdout.
+- **No auth for the write path.** Claude CLI is already authenticated in the Sprite (ooda handles this via `ANTHROPIC_API_KEY` or OAuth). The Surface server doesn't need its own auth layer — it's all localhost inside the container.
+- **Coexists with interactive Claude.** ooda gives you a TTY session to Claude Code for conversational use. Surface spawns separate `claude -p` calls (stateless, prompt-in → edit-out). These are independent processes that just read/write files — no conflict.
+- **Port forwarding is the only requirement.** Sprites already expose ports via public URLs. The user needs :3000 (dev server, iframed) and :4400 (editor UI, opened in browser). ooda or Sprites handles this.
 
-```
-┌── Local machine ───┐      ┌─── Container ──────────────────┐
-│                    │      │                                │
-│  Surface Editor    │─────▶│  Write API (:port)             │
-│  (VS Code / app)   │◀─────│     │                          │
-│                    │      │     ├── Deterministic adapter   │
-└────────────────────┘      │     │      → file write         │
-                            │     │                          │
-                            │     └── AI mode                │
-                            │            → claude -p "..."    │
-                            │            → file write         │
-                            │                                │
-                            │  CLAUDE.md                     │
-                            └────────────────────────────────┘
+### Setup inside a Sprite
+
+```bash
+# Terminal 1 (or background)
+npm run dev                    # starts on :3000
+
+# Terminal 2 (via ooda TTY or another session)
+npx designsurface              # starts on :4400, iframes :3000
 ```
 
-The Write API is thin:
+Then open the Sprite's :4400 URL in your local browser. That's it.
 
+For a single-command setup, a project could add a script:
+
+```json
+{
+  "scripts": {
+    "surface": "npm run dev & npx designsurface --port 3000"
+  }
+}
 ```
-POST /write
-  body: { mode: "ai" | "deterministic", model?: string, prompt?: string, ...adapterPayload? }
-  → returns: { status, filesChanged: string[], summary: string }
 
-GET  /files/:path
-  → returns file content (for editor to re-read after write)
-```
+### What about local development?
 
-**Port exposure:**
-- Container platform provides a tunnel URL (e.g. `https://<id>-<port>.ooda.computer`)
-- Write API requires token auth (generated at container start, passed to local editor)
+The same topology works locally too — `npx designsurface` runs on your machine, spawns `claude -p` as a subprocess. The only difference is where Claude CLI is installed (globally on your machine vs pre-installed in the Sprite). No code changes needed to support both environments.
 
 ---
 
@@ -285,31 +306,25 @@ This is collapsed by default — most users won't need it. Power users and debug
 
 ## Implementation sequence
 
-### Phase 1 — Mode toggle + prompt builder (editor side)
+### Phase 1 — Mode toggle + prompt builder + write path
 
 1. **Add write mode state** to the editor — `"deterministic" | "ai"` toggle in the toolbar, model selector (Sonnet/Opus) visible when AI is active
 2. **Batch pending changes** — when AI mode is active, visual edits accumulate as a list of change intents (live-previewed in iframe as today). "Apply" batches them into one prompt.
 3. **Prompt builder** — assembles the structured prompt from batched changes, `data-source` locations, current values, target values, and CLAUDE.md context
-4. **Wire up `claude -p --model <model>`** — editor server spawns Claude CLI with the prompt. Captures stdout for the change summary.
+4. **Wire up `claude -p --model <model>`** — editor server spawns Claude CLI with the prompt as a subprocess. Captures stdout for the change summary. This works identically whether the server runs locally or inside a Sprite — it's always a local subprocess call.
 5. **Loading overlay** — covers the iframe while Claude is working. Shows model name and a spinner.
 6. **HMR pickup** — after Claude exits, dev server HMR reloads the iframe. Editor re-scans `data-source` attributes.
 7. **Change summary** — parse Claude's stdout summary, verify against actual file diff, display in a summary bar with Undo and View Diff actions.
 
-Deterministic mode is completely unchanged. The toggle just determines which code path runs when the user commits.
+Deterministic mode is completely unchanged. The toggle just determines which code path runs when the user commits. No separate "container integration" phase — the editor server already runs next to the files and Claude CLI in both local and Sprite environments.
 
-### Phase 2 — Container integration
+### Phase 2 — Polish
 
-8. **Write API server** — thin HTTP layer that accepts write requests (including model choice) from a remote editor, dispatches to either mode, returns change summary
-9. **Auth** — token-based, generated at container start
-10. **Port exposure** — configure for ooda.computer tunnel
-
-### Phase 3 — Polish
-
-11. **Undo button** — one-click revert for AI writes (`git checkout -- <files>`)
-12. **Write log** — session-level history of all writes (mode, model, prompt, files changed, timestamp) for multi-step undo
-13. **Prompt preview panel** — expandable, collapsed by default. Shows assembled prompt, context files, CLAUDE.md sections, model. For debugging and power users.
-14. **CLAUDE.md scaffolding** — helper to generate an initial CLAUDE.md from detected project stack
-15. **Prompt tuning** — iterate on prompt structure based on real-world accuracy across stacks
+8. **Undo button** — one-click revert for AI writes (`git checkout -- <files>`)
+9. **Write log** — session-level history of all writes (mode, model, prompt, files changed, timestamp) for multi-step undo
+10. **Prompt preview panel** — expandable, collapsed by default. Shows assembled prompt, context files, CLAUDE.md sections, model. For debugging and power users.
+11. **CLAUDE.md scaffolding** — helper to generate an initial CLAUDE.md from detected project stack
+12. **Prompt tuning** — iterate on prompt structure based on real-world accuracy across stacks
 
 ---
 
