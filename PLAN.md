@@ -116,7 +116,7 @@ Surface ships defaults for supported styling systems. The UI shows which one was
 
 **Layer 3 — Project** (user-authored via UI)
 
-The project's own conventions. This is where teams encode decisions that are specific to their codebase:
+The project's own conventions. This is where teams encode decisions that are specific to their codebase. It's a free-text field — the user can be as detailed or as brief as they like:
 
 ```markdown
 # Project conventions
@@ -126,6 +126,14 @@ Color tokens live in globals.css — prefer those over raw values.
 Don't touch variant definitions unless explicitly asked.
 Components live in src/components/, kebab-case filenames.
 ```
+
+Or, if the project already has conventions captured in `CLAUDE.md`, Layer 3 can simply reference it:
+
+```markdown
+Follow conventions in CLAUDE.md
+```
+
+This works because `claude -p` automatically reads the project's `CLAUDE.md` — Surface doesn't need to inline its contents. Layer 3 is supplementary to whatever the user already has there. Teams that have invested in their `CLAUDE.md` get that value for free in AI writes.
 
 Created and edited through the Surface UI. This is the layer that makes AI writes feel like they were written by someone on the team, not a generic model.
 
@@ -209,18 +217,15 @@ The prompt is surgical because the visual editor built it — not because the us
 
 ### Relationship to CLAUDE.md
 
-Surface **never reads or writes the project's `CLAUDE.md`**. That file belongs to the user and may already contain instructions for interactive Claude Code sessions, CI workflows, or other tooling. Overwriting or appending to it would be hostile in someone else's repo.
+Surface **never reads or writes the project's `CLAUDE.md`**. That file belongs to the user and may already contain instructions for interactive Claude Code sessions, CI workflows, or other tooling.
 
-Instead, Surface owns the entire prompt. The instruction builder reads `.surface/instructions.json`, composes all three layers, and passes the fully assembled prompt to `claude -p`. Claude CLI doesn't need to discover or read any files — it receives a complete prompt with all context already inlined.
+However, `claude -p` automatically reads `CLAUDE.md` on every invocation — Surface doesn't need to do anything special for this. This means:
 
-If users want their interactive Claude Code sessions to also be aware of Surface's instruction layers (e.g. so `claude` in the terminal follows the same conventions), they can add a reference in their own `CLAUDE.md`:
+- **Surface's instruction layers are supplementary.** Layers 1-2 add visual-editing-specific guidance (precise edits, styling system conventions). Layer 3 adds project-specific context. All of this stacks on top of whatever's already in `CLAUDE.md`.
+- **Users who've invested in `CLAUDE.md` get that value for free.** Their existing coding conventions, architectural decisions, and project context automatically inform AI writes without any duplication.
+- **Layer 3 can be minimal.** If `CLAUDE.md` already covers project conventions, Layer 3 might just say "Follow conventions in CLAUDE.md" — or add only the visual-editing-specific bits that `CLAUDE.md` doesn't cover.
 
-```markdown
-## Design editing
-See .surface/instructions.json for visual editing conventions used by Surface.
-```
-
-But that's their choice, not something Surface does automatically.
+Surface owns Layers 1-2 and the `[CHANGE]` block. `CLAUDE.md` provides the ambient project context. They compose naturally because `claude -p` sees both.
 
 ---
 
