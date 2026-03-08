@@ -10,6 +10,8 @@ import { createShadowsRouter } from "./api/write-shadows.js";
 import { createGradientsRouter } from "./api/write-gradients.js";
 import { createScanRouter } from "./lib/scanner.js";
 import { createInstructionsRouter } from "./api/instructions.js";
+import { createClassifyElementRouter } from "./api/classify-element.js";
+import { createComponentStylesRouter } from "./api/component-styles.js";
 import { ensureSurfaceInstructions } from "./lib/instruction-builder.js";
 import type { FrameworkInfo } from "./lib/detect-framework.js";
 import type { StylingSystem } from "./lib/detect-styling.js";
@@ -19,6 +21,8 @@ import { resolveTailwindV3Theme, resolveTailwindV4Theme } from "./lib/resolve-ta
 export interface ServerConfig {
   targetPort: number;
   toolPort: number;
+  /** Full URL override for the target app (e.g. remote dev server). Overrides targetPort for iframe src. */
+  targetUrl?: string;
   projectRoot: string;
   stylingType: string;
   /** Pre-detected framework info from CLI (avoids re-detection in scanner). */
@@ -45,7 +49,7 @@ export async function createServer(config: ServerConfig) {
   // API: config endpoint for the client SPA
   app.get("/api/config", (_req, res) => {
     res.json({
-      targetUrl: `http://localhost:${config.targetPort}`,
+      targetUrl: config.targetUrl || `http://localhost:${config.targetPort}`,
       stylingType: config.stylingType,
       projectRoot: config.projectRoot,
       tailwindTheme,
@@ -75,6 +79,12 @@ export async function createServer(config: ServerConfig) {
 
   // API: write gradient changes
   app.use("/api/gradients", createGradientsRouter(config.projectRoot));
+
+  // API: classify element at source coordinates
+  app.use("/api/classify-element", createClassifyElementRouter(config.projectRoot));
+
+  // API: authored styles on element at source coordinates
+  app.use("/api/component-styles", createComponentStylesRouter(config.projectRoot));
 
   // API: open file in the user's editor
   app.get("/api/open-file", (req, res) => {

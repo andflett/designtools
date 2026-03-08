@@ -67,7 +67,7 @@ export function BoxSpacingControl({
   onCommitStyle,
   spacingScale,
   spacingVarPrefix,
-  tailwindTheme,
+  theme,
 }: {
   /** "padding" or "margin" */
   box: "padding" | "margin";
@@ -81,7 +81,7 @@ export function BoxSpacingControl({
   spacingScale?: readonly string[];
   /** CSS variable prefix for var() reference writes (e.g. "--space") */
   spacingVarPrefix?: string;
-  tailwindTheme?: ResolvedTailwindTheme | null;
+  theme?: ResolvedTailwindTheme | null;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -145,11 +145,11 @@ export function BoxSpacingControl({
             onCommitClass={onCommitClass}
             onCommitStyle={onCommitStyle ? (v) => onCommitStyle(box, v) : undefined}
             onCommitValue={onCommitStyle ? undefined : (v) => {
-              const match = uniformBoxToTailwind(box, v, tailwindTheme);
+              const match = uniformBoxToTailwind(box, v, theme);
               if (match) {
                 onCommitClass(match.tailwindClass);
               } else {
-                const mapped = computedToTailwindClass(box, v, tailwindTheme);
+                const mapped = computedToTailwindClass(box, v, theme);
                 if (mapped) onCommitClass(mapped.tailwindClass);
                 else onCommitClass(`${twShort}-[${v.trim()}]`);
               }
@@ -186,11 +186,11 @@ export function BoxSpacingControl({
                     onCommitStyle(`${box}-right`, v);
                   } : undefined}
                   onCommitValue={onCommitStyle ? undefined : (v) => {
-                    const { xClass } = axisBoxToTailwind(box, v, axis.y, tailwindTheme);
+                    const { xClass } = axisBoxToTailwind(box, v, axis.y, theme);
                     if (xClass) {
                       onCommitClass(xClass.tailwindClass);
                     } else {
-                      const mapped = computedToTailwindClass(`${box}-left`, v, tailwindTheme);
+                      const mapped = computedToTailwindClass(`${box}-left`, v, theme);
                       if (mapped) onCommitClass(mapped.tailwindClass);
                       else onCommitClass(`${twShort}x-[${v.trim()}]`);
                     }
@@ -216,11 +216,11 @@ export function BoxSpacingControl({
                     onCommitStyle(`${box}-bottom`, v);
                   } : undefined}
                   onCommitValue={onCommitStyle ? undefined : (v) => {
-                    const { yClass } = axisBoxToTailwind(box, axis.x, v, tailwindTheme);
+                    const { yClass } = axisBoxToTailwind(box, axis.x, v, theme);
                     if (yClass) {
                       onCommitClass(yClass.tailwindClass);
                     } else {
-                      const mapped = computedToTailwindClass(`${box}-top`, v, tailwindTheme);
+                      const mapped = computedToTailwindClass(`${box}-top`, v, theme);
                       if (mapped) onCommitClass(mapped.tailwindClass);
                       else onCommitClass(`${twShort}y-[${v.trim()}]`);
                     }
@@ -240,7 +240,7 @@ export function BoxSpacingControl({
               if (onCommitStyle) {
                 onCommitStyle(box, v);
               } else {
-                const match = uniformBoxToTailwind(box, v, tailwindTheme);
+                const match = uniformBoxToTailwind(box, v, theme);
                 if (match) onCommitClass(match.tailwindClass);
               }
             }}

@@ -58,7 +58,7 @@ import {
   uniformRadiusToTailwind,
 } from "../../shared/tailwind-map.js";
 import type { ResolvedTailwindTheme } from "../../shared/tailwind-theme.js";
-import { getTwScales, type TwScales } from "./controls/tailwind-maps.js";
+import { getThemeScales, type TwScales } from "./controls/tailwind-maps.js";
 import { Tooltip } from "./tooltip.js";
 import {
   ScrubInput,
@@ -129,7 +129,7 @@ interface ComputedPropertyPanelProps {
   onCommitClass: (tailwindClass: string, oldClass?: string) => void;
   /** CSS mode: commit raw CSS property/value instead of Tailwind classes */
   onCommitStyle?: (cssProp: string, cssValue: string) => void;
-  tailwindTheme?: ResolvedTailwindTheme | null;
+  theme?: ResolvedTailwindTheme | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -149,7 +149,7 @@ export function ComputedPropertyPanel({
   onRevertInlineStyles,
   onCommitClass,
   onCommitStyle,
-  tailwindTheme,
+  theme,
 }: ComputedPropertyPanelProps) {
   const tokenData = useTokens();
   const shadowData = useShadows();
@@ -188,8 +188,8 @@ export function ComputedPropertyPanel({
   const isCssMode = !!onCommitStyle;
   // In CSS mode, only show scales if they came from CSS variables (has varPrefixes)
   const twScales = isCssMode
-    ? (tailwindTheme?.varPrefixes ? getTwScales(tailwindTheme) : undefined)
-    : getTwScales(tailwindTheme);
+    ? (theme?.varPrefixes ? getThemeScales(theme) : undefined)
+    : getThemeScales(theme);
 
   // In read-only mode, replace callbacks with no-ops
   const effectivePreview = isReadOnly ? () => {} : onPreviewInlineStyle;
@@ -255,7 +255,7 @@ export function ComputedPropertyPanel({
           onRevertInlineStyles={effectiveRevert}
           onCommitClass={effectiveCommitClass}
           onCommitStyle={effectiveCommitStyle}
-          tailwindTheme={tailwindTheme}
+          theme={theme}
           twScales={twScales}
         />
       ))}
@@ -283,7 +283,7 @@ function UnifiedSection({
   onRevertInlineStyles,
   onCommitClass,
   onCommitStyle,
-  tailwindTheme,
+  theme,
   twScales,
 }: {
   category: ComputedCategory;
@@ -300,7 +300,7 @@ function UnifiedSection({
   onRevertInlineStyles: () => void;
   onCommitClass: (c: string, oldClass?: string) => void;
   onCommitStyle?: (cssProp: string, cssValue: string) => void;
-  tailwindTheme?: ResolvedTailwindTheme | null;
+  theme?: ResolvedTailwindTheme | null;
   twScales?: TwScales;
 }) {
   const [collapsed, setCollapsed] = useState(true);
@@ -347,7 +347,7 @@ function UnifiedSection({
               onCommitStyle={onCommitStyle}
               spacingScale={twScales?.spacing}
               spacingVarPrefix={twScales?.propToScale?.["padding-top"]?.varPrefix}
-              tailwindTheme={tailwindTheme}
+              theme={theme}
             />
           ) : category === "border" ? (
             <BorderSection
@@ -359,7 +359,7 @@ function UnifiedSection({
               onCommitClass={onCommitClass}
               onCommitStyle={onCommitStyle}
               twScales={twScales}
-              tailwindTheme={tailwindTheme}
+              theme={theme}
             />
           ) : category === "size" ? (
             <SizeSection
@@ -380,7 +380,7 @@ function UnifiedSection({
               onCommitClass={onCommitClass}
               onCommitStyle={onCommitStyle}
               twScales={twScales}
-              tailwindTheme={tailwindTheme}
+              theme={theme}
             />
           ) : category === "effects" ? (
             <EffectsSection
@@ -777,7 +777,7 @@ function SpacingSection({
   onCommitStyle,
   spacingScale,
   spacingVarPrefix,
-  tailwindTheme,
+  theme,
 }: {
   properties: UnifiedProperty[];
   computedStyles: Record<string, string>;
@@ -788,7 +788,7 @@ function SpacingSection({
   onCommitStyle?: (cssProp: string, cssValue: string) => void;
   spacingScale?: readonly string[];
   spacingVarPrefix?: string;
-  tailwindTheme?: ResolvedTailwindTheme | null;
+  theme?: ResolvedTailwindTheme | null;
 }) {
   const activeProps = properties.filter((p) => p.hasValue);
   const paddingProps = activeProps.filter((p) => p.cssProperty.startsWith("padding-"));
@@ -809,7 +809,7 @@ function SpacingSection({
           onCommitStyle={onCommitStyle}
           spacingScale={spacingScale}
           spacingVarPrefix={spacingVarPrefix}
-          tailwindTheme={tailwindTheme}
+          theme={theme}
         />
       )}
 
@@ -825,7 +825,7 @@ function SpacingSection({
           onCommitStyle={onCommitStyle}
           spacingScale={spacingScale}
           spacingVarPrefix={spacingVarPrefix}
-          tailwindTheme={tailwindTheme}
+          theme={theme}
         />
       )}
 
@@ -877,7 +877,7 @@ function TypographySection({
   onCommitClass,
   onCommitStyle,
   twScales,
-  tailwindTheme,
+  theme,
 }: {
   properties: UnifiedProperty[];
   tokenGroups: Record<string, any[]>;
@@ -886,7 +886,7 @@ function TypographySection({
   onCommitClass: (c: string, oldClass?: string) => void;
   onCommitStyle?: (cssProp: string, cssValue: string) => void;
   twScales?: TwScales;
-  tailwindTheme?: ResolvedTailwindTheme | null;
+  theme?: ResolvedTailwindTheme | null;
 }) {
   const isCssMode = !!onCommitStyle;
   const findProp = (cssProp: string) => properties.find((p) => p.cssProperty === cssProp);
@@ -917,7 +917,7 @@ function TypographySection({
     if (onCommitStyle) {
       onCommitStyle(cssProp, cssValue);
     } else {
-      const match = computedToTailwindClass(cssProp, cssValue, tailwindTheme);
+      const match = computedToTailwindClass(cssProp, cssValue, theme);
       if (match) {
         const prop = findProp(cssProp);
         const oldClass = prop?.fullClass || undefined;
@@ -1112,7 +1112,7 @@ function BorderSection({
   onCommitClass,
   onCommitStyle,
   twScales,
-  tailwindTheme,
+  theme,
 }: {
   properties: UnifiedProperty[];
   computedStyles: Record<string, string>;
@@ -1122,7 +1122,7 @@ function BorderSection({
   onCommitClass: (c: string, oldClass?: string) => void;
   onCommitStyle?: (cssProp: string, cssValue: string) => void;
   twScales?: TwScales;
-  tailwindTheme?: ResolvedTailwindTheme | null;
+  theme?: ResolvedTailwindTheme | null;
 }) {
   const active = properties.filter((p) => p.hasValue);
   const allRadiusProps = properties.filter((p) => p.cssProperty.includes("radius"));

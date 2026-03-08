@@ -30,6 +30,16 @@ export default function designtools(options?: DesigntoolsOptions): Plugin {
       isDev = config.command === "serve";
     },
 
+    configureServer(server) {
+      if (!isDev) return;
+      // Allow iframe embedding from any origin (Surface editor may run on a different host)
+      server.middlewares.use((_req, res, next) => {
+        res.setHeader("X-Frame-Options", "ALLOWALL");
+        res.removeHeader("Content-Security-Policy");
+        next();
+      });
+    },
+
     buildStart() {
       if (!isDev) return;
       try {

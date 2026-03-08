@@ -81,6 +81,9 @@ export function App() {
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
   const [leftPanelWidth, setLeftPanelWidth] = useState(250);
   const [isolationComponent, setIsolationComponent] = useState<ComponentEntry | null>(null);
+  const [elementMode, setElementMode] = useState<"component" | "instance">("instance");
+  const [isDataDriven, setIsDataDriven] = useState(false);
+  const isDataDrivenRef = useRef(false);
   const scanReady = useScanReady();
   const componentData = useComponents();
 
@@ -151,6 +154,28 @@ export function App() {
       .catch(console.error);
   }, []);
 
+  const sendOverlayState = useCallback((
+    el: SelectedElementData | null,
+    mode: "component" | "instance",
+    dataDriven = false,
+  ) => {
+    if (!iframeRef.current?.contentWindow || !el) return;
+    const hasEditableSource = el.source && !el.source.file.includes("node_modules");
+    const tier: "full" | "instance-only" | "inspect-only" =
+      hasEditableSource ? "full" :
+      el.instanceSource ? "instance-only" :
+      "inspect-only";
+    const showToggle = tier === "full" && !!el.instanceSource;
+    iframeRef.current.contentWindow.postMessage({
+      type: "tool:setOverlayState",
+      tier,
+      showToggle,
+      activeMode: showToggle ? mode : null,
+      isDataDriven: dataDriven,
+      packageName: el.packageName ?? undefined,
+    }, "*");
+  }, []);
+
   const handleMessage = useCallback(
     (msg: import("../shared/protocol.js").IframeToEditor) => {
       switch (msg.type) {
@@ -182,7 +207,44 @@ export function App() {
         case "tool:elementSelected":
           setSelectedElement(msg.data);
           selectedDomPathRef.current = msg.data.domPath;
+          // Reset mode to instance on new selection, send initial overlay state
+          setElementMode("instance");
+          setIsDataDriven(false);
+          isDataDrivenRef.current = false;
+          sendOverlayState(msg.data, "instance", false);
+          // Fire classify-element async to detect data-driven instances
+          {
+            const src = msg.data.source;
+            if (src && !src.file.includes("node_modules")) {
+              const params = new URLSearchParams({
+                file: src.file,
+                line: String(src.line),
+                col: String(src.col),
+              });
+              fetch(`/api/classify-element?${params}`)
+                .then(r => r.json())
+                .then((classification: { instance: { isAuthored: boolean } }) => {
+                  const dataDriven = !classification.instance.isAuthored;
+                  isDataDrivenRef.current = dataDriven;
+                  setIsDataDriven(dataDriven);
+                  setSelectedElement(prev => {
+                    if (prev) sendOverlayState(prev, "instance", dataDriven);
+                    return prev;
+                  });
+                })
+                .catch(() => {}); // classify failing silently is fine
+            }
+          }
           break;
+        case "tool:editModeToggled": {
+          const newMode = (msg as any).mode as "component" | "instance";
+          setElementMode(newMode);
+          setSelectedElement(prev => {
+            if (prev) sendOverlayState(prev, newMode, isDataDrivenRef.current);
+            return prev;
+          });
+          break;
+        }
         case "tool:pathChanged":
           setIframePath(msg.path);
           // Request updated component tree after navigation
@@ -203,7 +265,7 @@ export function App() {
         }
       }
     },
-    []
+    [sendOverlayState]
   );
 
   const { send } = usePostMessage(iframeRef, handleMessage);
@@ -568,6 +630,11 @@ export function App() {
       onWriteModeChange={setWriteMode}
       onAiModelChange={setAiModel}
       terminalKey={terminalKey}
+      elementMode={elementMode}
+      onElementModeChange={(mode) => {
+        setElementMode(mode);
+        sendOverlayState(selectedElement, mode, isDataDrivenRef.current);
+      }}
     />
   );
 

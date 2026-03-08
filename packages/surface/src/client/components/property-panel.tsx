@@ -44,7 +44,7 @@ import {
   type PropertyCategory,
 } from "../../shared/tailwind-parser.js";
 import type { ResolvedTailwindTheme } from "../../shared/tailwind-theme.js";
-import { getTwScales, type TwScales } from "./controls/tailwind-maps.js";
+import { getThemeScales, type TwScales } from "./controls/tailwind-maps.js";
 
 // ---------------------------------------------------------------------------
 // Tailwind property → CSS longhand expansion (mirrors TW_PROP_TO_CSS)
@@ -208,7 +208,7 @@ interface PropertyPanelProps {
   classes: string;
   onClassChange: (oldClass: string, newClass: string) => void;
   tokenGroups: Record<string, any[]>;
-  tailwindTheme?: ResolvedTailwindTheme | null;
+  theme?: ResolvedTailwindTheme | null;
   flat?: boolean;
 }
 
@@ -216,10 +216,10 @@ export function PropertyPanel({
   classes,
   onClassChange,
   tokenGroups,
-  tailwindTheme,
+  theme,
   flat = false,
 }: PropertyPanelProps) {
-  const twScales = getTwScales(tailwindTheme);
+  const twScales = getThemeScales(theme);
   const parsed = parseClasses(classes);
 
   const categories: { key: PropertyCategory; label: string; icon: React.ReactNode }[] = [

@@ -71,6 +71,14 @@ export function Surface() {
     highlightOverlay: null as HTMLDivElement | null,
     tooltip: null as HTMLDivElement | null,
     selectedOverlay: null as HTMLDivElement | null,
+    toggleBadge: null as HTMLDivElement | null,
+    overlayState: null as {
+      tier: "full" | "instance-only" | "inspect-only";
+      showToggle: boolean;
+      activeMode: "component" | "instance" | null;
+      isDataDriven: boolean;
+      packageName?: string;
+    } | null,
   });
 
   // Preview overlay state
@@ -145,11 +153,101 @@ export function Surface() {
     });
     document.body.appendChild(s.selectedOverlay);
 
+    s.toggleBadge = document.createElement("div");
+    s.toggleBadge.id = "tool-toggle-badge";
+    Object.assign(s.toggleBadge.style, {
+      position: "fixed",
+      pointerEvents: "auto",
+      zIndex: "100001",
+      display: "none",
+      alignItems: "center",
+      gap: "2px",
+      borderRadius: "6px",
+      padding: "0",
+      fontSize: "11px",
+      fontFamily: "ui-sans-serif, system-ui, sans-serif",
+      background: "#1e1e2e",
+      border: "1px solid rgba(255,255,255,0.15)",
+      color: "#cdd6f4",
+      boxShadow: "0 2px 8px rgba(0,0,0,0.35)",
+      userSelect: "none",
+      cursor: "default",
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+    });
+    document.body.appendChild(s.toggleBadge);
+
     // --- Helpers ---
     function getElementName(el: Element): string {
       const slot = el.getAttribute("data-slot");
       if (slot) return slot.charAt(0).toUpperCase() + slot.slice(1);
+      // "~" prefix signals inspect-only (no data-source = not a project-authored element)
+      if (!el.getAttribute("data-source")) return `~ <${el.tagName.toLowerCase()}>`;
       return `<${el.tagName.toLowerCase()}>`;
+    }
+
+    /** Update selectedOverlay colour + toggleBadge content based on overlay state. */
+    function updateOverlayState(state: typeof s.overlayState) {
+      if (!state) return;
+      s.overlayState = state;
+      const { tier, activeMode, isDataDriven, showToggle, packageName } = state;
+
+      // Update border/background colour
+      if (s.selectedOverlay) {
+        if (tier === "inspect-only") {
+          s.selectedOverlay.style.border = "2px solid #6b7280";
+          s.selectedOverlay.style.backgroundColor = "rgba(107,114,128,0.06)";
+          s.selectedOverlay.style.borderStyle = "solid";
+        } else if (isDataDriven) {
+          s.selectedOverlay.style.border = "2px dashed #f97316";
+          s.selectedOverlay.style.backgroundColor = "rgba(249,115,22,0.06)";
+        } else if (activeMode === "component") {
+          s.selectedOverlay.style.border = "2px solid #8b5cf6";
+          s.selectedOverlay.style.backgroundColor = "rgba(139,92,246,0.06)";
+          s.selectedOverlay.style.borderStyle = "solid";
+        } else {
+          // instance mode or plain element — amber
+          s.selectedOverlay.style.border = "2px solid #f59e0b";
+          s.selectedOverlay.style.backgroundColor = "rgba(245,158,11,0.06)";
+          s.selectedOverlay.style.borderStyle = "solid";
+        }
+      }
+
+      // Update toggle badge
+      if (!s.toggleBadge) return;
+      if (tier === "inspect-only") {
+        s.toggleBadge.innerHTML = `<span style="padding:5px 10px;display:flex;align-items:center;gap:6px;font-size:12px;color:#9ca3af">🔒 <span>${packageName || "Read only"}</span></span>`;
+        s.toggleBadge.style.display = "flex";
+        s.toggleBadge.style.cursor = "default";
+        s.toggleBadge.onclick = null;
+      } else if (isDataDriven) {
+        s.toggleBadge.innerHTML = `<span style="padding:5px 10px;display:flex;align-items:center;gap:6px;font-size:12px;color:#f97316">⟡ <span>From data</span></span>`;
+        s.toggleBadge.style.display = "flex";
+        s.toggleBadge.style.cursor = "default";
+        s.toggleBadge.onclick = null;
+      } else if (showToggle) {
+        const compActive = activeMode === "component";
+        const btnBase = "display:flex;align-items:center;gap:5px;padding:5px 10px;font-size:12px;font-weight:500;border:none;background:none;cursor:pointer;transition:background 0.1s;";
+        s.toggleBadge.innerHTML = [
+          `<button data-mode="instance" style="${btnBase}color:${!compActive ? "#f59e0b" : "#6b7280"};background:${!compActive ? "rgba(245,158,11,0.12)" : "none"}">`,
+          `<svg width="13" height="13" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7.5 1L14 13H1L7.5 1Z" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>`,
+          `Instance</button>`,
+          `<button data-mode="component" style="${btnBase}color:${compActive ? "#8b5cf6" : "#6b7280"};background:${compActive ? "rgba(139,92,246,0.12)" : "none"}">`,
+          `<svg width="13" height="13" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.5" fill="none"/><rect x="8" y="1" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.5" fill="none"/><rect x="1" y="8" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.5" fill="none"/><rect x="8" y="8" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>`,
+          `Component</button>`,
+        ].join("");
+        s.toggleBadge.style.display = "flex";
+        s.toggleBadge.style.cursor = "default";
+        s.toggleBadge.onclick = (e) => {
+          const btn = (e.target as Element).closest("[data-mode]") as HTMLElement | null;
+          if (!btn) return;
+          const next = btn.dataset.mode as "component" | "instance";
+          if (next === activeMode) return;
+          window.parent.postMessage({ type: "tool:editModeToggled", mode: next }, "*");
+        };
+      } else {
+        s.toggleBadge.style.display = "none";
+      }
     }
 
     function getDomPath(el: Element): string {
@@ -193,7 +291,7 @@ export function Surface() {
     // --- Component tree extraction (React Fiber) ---
 
     // IDs of overlay elements to skip during tree building
-    const overlayIds = new Set(["tool-highlight", "tool-tooltip", "tool-selected", "surface-token-preview"]);
+    const overlayIds = new Set(["tool-highlight", "tool-tooltip", "tool-selected", "tool-toggle-badge", "surface-token-preview"]);
 
     // Tags to skip even if authored — document-level elements and void
     // elements that aren't meaningful to designers
@@ -964,6 +1062,15 @@ export function Surface() {
             if (key !== lastRect) {
               lastRect = key;
               positionOverlay(s.selectedOverlay!, rect);
+              // Position toggle badge above the top-right corner
+              if (s.toggleBadge && s.toggleBadge.style.display !== "none") {
+                const bw = s.toggleBadge.offsetWidth || 60;
+                const bh = s.toggleBadge.offsetHeight || 22;
+                const left = Math.max(0, rect.right - bw);
+                const top = Math.max(0, rect.top - bh - 4);
+                s.toggleBadge.style.left = `${left}px`;
+                s.toggleBadge.style.top = `${top}px`;
+              }
             }
           }
         }
@@ -977,6 +1084,7 @@ export function Surface() {
       if (s.highlightOverlay) s.highlightOverlay.style.display = "none";
       if (s.tooltip) s.tooltip.style.display = "none";
       if (s.selectedOverlay) s.selectedOverlay.style.display = "none";
+      if (s.toggleBadge) s.toggleBadge.style.display = "none";
       s.hoveredElement = null;
     }
 
@@ -996,7 +1104,9 @@ export function Surface() {
     function clearSelection() {
       s.selectedElement = null;
       s.selectedDomPath = null;
+      s.overlayState = null;
       if (s.selectedOverlay) s.selectedOverlay.style.display = "none";
+      if (s.toggleBadge) s.toggleBadge.style.display = "none";
       if (s.overlayRafId) {
         cancelAnimationFrame(s.overlayRafId);
         s.overlayRafId = null;
@@ -1007,7 +1117,7 @@ export function Surface() {
     function onMouseMove(e: MouseEvent) {
       if (!s.selectionMode || !s.highlightOverlay || !s.tooltip) return;
       const el = document.elementFromPoint(e.clientX, e.clientY);
-      if (!el || el === s.highlightOverlay || el === s.tooltip || el === s.selectedOverlay) return;
+      if (!el || el === s.highlightOverlay || el === s.tooltip || el === s.selectedOverlay || s.toggleBadge?.contains(el as Node)) return;
       const selectable = findSelectableElement(el);
       if (selectable === s.hoveredElement) return;
       s.hoveredElement = selectable;
@@ -1032,7 +1142,7 @@ export function Surface() {
       e.preventDefault();
       e.stopPropagation();
       const el = document.elementFromPoint(e.clientX, e.clientY);
-      if (!el || el === s.highlightOverlay || el === s.tooltip || el === s.selectedOverlay) return;
+      if (!el || el === s.highlightOverlay || el === s.tooltip || el === s.selectedOverlay || s.toggleBadge?.contains(el as Node)) return;
       const selectable = findSelectableElement(el);
       selectElement(selectable);
     }
@@ -1147,6 +1257,15 @@ export function Surface() {
           }
           break;
         }
+        case "tool:setOverlayState":
+          updateOverlayState({
+            tier: msg.tier,
+            showToggle: msg.showToggle,
+            activeMode: msg.activeMode,
+            isDataDriven: msg.isDataDriven,
+            packageName: msg.packageName,
+          });
+          break;
         case "tool:selectParentInstance": {
           if (!s.selectedElement) break;
           let el: Element | null = s.selectedElement.parentElement;
@@ -1259,6 +1378,7 @@ export function Surface() {
       s.highlightOverlay?.remove();
       s.tooltip?.remove();
       s.selectedOverlay?.remove();
+      s.toggleBadge?.remove();
     };
   }, []);
 

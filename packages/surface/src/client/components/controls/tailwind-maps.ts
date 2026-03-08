@@ -51,7 +51,7 @@ export interface TwScales {
   propToScale: Record<string, { scale: readonly string[]; prefix: string; varPrefix?: string }>;
 }
 
-export function getTwScales(theme: ResolvedTailwindTheme | null | undefined): TwScales {
+export function getThemeScales(theme: ResolvedTailwindTheme | null | undefined): TwScales {
   const spacing = theme?.spacing?.length ? theme.spacing.map((e) => e.key) : [];
   const fontSize = theme?.fontSize?.length ? theme.fontSize.map((e) => e.key) : [];
   const fontWeight = theme?.fontWeight?.length ? theme.fontWeight.map((e) => e.key) : [];

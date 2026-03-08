@@ -1,12 +1,61 @@
 import fs from "fs";
 import path from "path";
+import { execSync } from "child_process";
 import process from "process";
 import readline from "readline";
+import { createServer as createHttpsServer } from "https";
 import open from "open";
 import { detectFramework, type FrameworkInfo } from "./server/lib/detect-framework.js";
 import { detectStylingSystem, type StylingSystem } from "./server/lib/detect-styling.js";
 import { createServer } from "./server/index.js";
 import { setupTerminalServer } from "./server/lib/terminal-server.js";
+
+/**
+ * Generate a trusted local certificate using mkcert, or fall back to a
+ * self-signed cert via openssl. Returns PEM key + cert strings.
+ */
+function generateLocalCert(): { key: string; cert: string } {
+  const tmpDir = path.join(process.env.TMPDIR || "/tmp", "designtools-certs");
+  fs.mkdirSync(tmpDir, { recursive: true });
+  const keyPath = path.join(tmpDir, "localhost-key.pem");
+  const certPath = path.join(tmpDir, "localhost.pem");
+
+  // If certs already exist and are less than 30 days old, reuse them
+  if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
+    const age = Date.now() - fs.statSync(certPath).mtimeMs;
+    if (age < 30 * 24 * 60 * 60 * 1000) {
+      return {
+        key: fs.readFileSync(keyPath, "utf-8"),
+        cert: fs.readFileSync(certPath, "utf-8"),
+      };
+    }
+  }
+
+  // Try mkcert first (produces browser-trusted certs)
+  try {
+    execSync(`mkcert -key-file "${keyPath}" -cert-file "${certPath}" localhost 127.0.0.1 ::1`, {
+      stdio: "pipe",
+    });
+    return {
+      key: fs.readFileSync(keyPath, "utf-8"),
+      cert: fs.readFileSync(certPath, "utf-8"),
+    };
+  } catch {
+    // mkcert not installed — fall back to openssl
+  }
+
+  // Fallback: self-signed via openssl (browser will show warning)
+  execSync(
+    `openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes ` +
+    `-keyout "${keyPath}" -out "${certPath}" -days 30 -subj "/CN=localhost" ` +
+    `-addext "subjectAltName=DNS:localhost,IP:127.0.0.1" 2>/dev/null`,
+    { stdio: "pipe" },
+  );
+  return {
+    key: fs.readFileSync(keyPath, "utf-8"),
+    cert: fs.readFileSync(certPath, "utf-8"),
+  };
+}
 
 // ANSI colors
 const green = (s: string) => `\x1b[32m${s}\x1b[0m`;
@@ -231,9 +280,11 @@ async function main() {
   const args = process.argv.slice(2);
   let targetPort = 3000;
   let toolPort = 4400;
+  let targetUrl: string | undefined;
   let componentsOverride: string | undefined;
   let cssOverride: string | undefined;
   let noOpen = false;
+  let useHttps = false;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--port" && args[i + 1]) {
@@ -242,6 +293,10 @@ async function main() {
     }
     if (args[i] === "--tool-port" && args[i + 1]) {
       toolPort = parseInt(args[i + 1], 10);
+      i++;
+    }
+    if (args[i] === "--url" && args[i + 1]) {
+      targetUrl = args[i + 1].replace(/\/+$/, ""); // strip trailing slash
       i++;
     }
     if (args[i] === "--components" && args[i + 1]) {
@@ -254,6 +309,9 @@ async function main() {
     }
     if (args[i] === "--no-open") {
       noOpen = true;
+    }
+    if (args[i] === "--https") {
+      useHttps = true;
     }
   }
 
@@ -359,71 +417,105 @@ async function main() {
   console.log("");
 
   // 4. Wait for target dev server (retry for up to 15 seconds)
-  // Also scan nearby ports in case the dev server auto-picked a different one
-  // (e.g. Next.js prints "Port 3000 is in use, using 3001 instead").
-  const scanPorts = [targetPort, targetPort + 1, targetPort + 2];
-  let targetReachable = false;
-  let waited = false;
+  if (targetUrl) {
+    // Remote URL mode — check reachability of the provided URL
+    let targetReachable = false;
+    let waited = false;
 
-  /** Check which ports in the scan range have a reachable server. */
-  async function findReachablePorts(): Promise<number[]> {
-    const reachable: number[] = [];
-    for (const port of scanPorts) {
+    for (let attempt = 0; attempt < 15; attempt++) {
       try {
-        await fetch(`http://localhost:${port}`, { signal: AbortSignal.timeout(1000) });
-        reachable.push(port);
+        await fetch(targetUrl, { signal: AbortSignal.timeout(3000) });
+        targetReachable = true;
+        break;
       } catch {
-        // not reachable
+        // not reachable yet
       }
+      if (attempt === 0) {
+        process.stdout.write(`  ${dim("Waiting for dev server at " + targetUrl + "...")}`);
+        waited = true;
+      }
+      await new Promise((r) => setTimeout(r, 1000));
     }
-    return reachable;
-  }
+    if (waited) process.stdout.write("\r\x1b[K");
 
-  let reachablePorts: number[] = [];
-  for (let attempt = 0; attempt < 15; attempt++) {
-    reachablePorts = await findReachablePorts();
-    if (reachablePorts.length > 0) {
-      targetReachable = true;
-      break;
+    if (!targetReachable) {
+      console.log("");
+      console.log(`  ${red("✗")} No dev server at ${targetUrl}`);
+      console.log(`    ${dim("Start your dev server first, then run this command.")}`);
+      console.log("");
+      process.exit(1);
     }
-    if (attempt === 0) {
-      process.stdout.write(`  ${dim("Waiting for dev server on port " + scanPorts.join("/") + "...")}`);
-      waited = true;
-    }
-    await new Promise((r) => setTimeout(r, 1000));
-  }
-  if (waited) process.stdout.write("\r\x1b[K");
 
-  if (!targetReachable) {
-    console.log("");
-    console.log(`  ${red("✗")} No dev server on port ${scanPorts.join(", ")}`);
-    console.log(`    ${dim("Start your dev server first, then run this command.")}`);
-    console.log(`    ${dim(`Use --port to specify a different port.`)}`);
-    console.log("");
-    process.exit(1);
-  }
-
-  if (reachablePorts.length === 1 && reachablePorts[0] === targetPort) {
-    // Exact match on the requested port — no ambiguity
-    console.log(`  ${green("✓")} Target         http://localhost:${targetPort}`);
-  } else if (reachablePorts.length === 1) {
-    // Only one port responded, but it's not the one they asked for
-    const found = reachablePorts[0];
-    console.log(`  ${yellow("⚠")} Target         http://localhost:${found} ${dim(`(port ${targetPort} not reachable, found server on ${found})`)}`);
-    targetPort = found;
+    console.log(`  ${green("✓")} Target         ${targetUrl}`);
   } else {
-    // Multiple ports are responding — ask the user which one is their app
-    targetPort = await promptPort(
-      `Multiple servers found. Which is your dev app?`,
-      reachablePorts,
-    );
-    console.log(`  ${green("✓")} Target         http://localhost:${targetPort}`);
+    // Local port scanning mode
+    // Also scan nearby ports in case the dev server auto-picked a different one
+    // (e.g. Next.js prints "Port 3000 is in use, using 3001 instead").
+    const scanPorts = [targetPort, targetPort + 1, targetPort + 2];
+    let targetReachable = false;
+    let waited = false;
+
+    /** Check which ports in the scan range have a reachable server. */
+    async function findReachablePorts(): Promise<number[]> {
+      const reachable: number[] = [];
+      for (const port of scanPorts) {
+        try {
+          await fetch(`http://localhost:${port}`, { signal: AbortSignal.timeout(1000) });
+          reachable.push(port);
+        } catch {
+          // not reachable
+        }
+      }
+      return reachable;
+    }
+
+    let reachablePorts: number[] = [];
+    for (let attempt = 0; attempt < 15; attempt++) {
+      reachablePorts = await findReachablePorts();
+      if (reachablePorts.length > 0) {
+        targetReachable = true;
+        break;
+      }
+      if (attempt === 0) {
+        process.stdout.write(`  ${dim("Waiting for dev server on port " + scanPorts.join("/") + "...")}`);
+        waited = true;
+      }
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+    if (waited) process.stdout.write("\r\x1b[K");
+
+    if (!targetReachable) {
+      console.log("");
+      console.log(`  ${red("✗")} No dev server on port ${scanPorts.join(", ")}`);
+      console.log(`    ${dim("Start your dev server first, then run this command.")}`);
+      console.log(`    ${dim(`Use --port to specify a different port, or --url for a remote server.`)}`);
+      console.log("");
+      process.exit(1);
+    }
+
+    if (reachablePorts.length === 1 && reachablePorts[0] === targetPort) {
+      // Exact match on the requested port — no ambiguity
+      console.log(`  ${green("✓")} Target         http://localhost:${targetPort}`);
+    } else if (reachablePorts.length === 1) {
+      // Only one port responded, but it's not the one they asked for
+      const found = reachablePorts[0];
+      console.log(`  ${yellow("⚠")} Target         http://localhost:${found} ${dim(`(port ${targetPort} not reachable, found server on ${found})`)}`);
+      targetPort = found;
+    } else {
+      // Multiple ports are responding — ask the user which one is their app
+      targetPort = await promptPort(
+        `Multiple servers found. Which is your dev app?`,
+        reachablePorts,
+      );
+      console.log(`  ${green("✓")} Target         http://localhost:${targetPort}`);
+    }
   }
 
   // 5. Start server
   const { app, viteDevServer } = await createServer({
     targetPort,
     toolPort,
+    targetUrl,
     projectRoot,
     stylingType: styling.type,
     framework,
@@ -431,17 +523,27 @@ async function main() {
   });
 
   // Try to listen on the tool port, auto-increment if busy
+  const protocol = useHttps ? "https" : "http";
+
+  // For HTTPS, generate a self-signed cert and create an https server factory
+  let httpsOptions: { key: string; cert: string } | null = null;
+  if (useHttps) {
+    httpsOptions = generateLocalCert();
+  }
+
   const httpServer = await new Promise<ReturnType<typeof app.listen>>((resolve, reject) => {
     let attempts = 0;
     const maxAttempts = 5;
 
     function tryListen(port: number) {
-      const server = app.listen(port);
+      const server = httpsOptions
+        ? createHttpsServer(httpsOptions, app).listen(port)
+        : app.listen(port);
       server.on("listening", () => {
         if (port !== toolPort) {
-          console.log(`  ${yellow("⚠")} Tool           http://localhost:${port} ${dim(`(port ${toolPort} was busy)`)}`);
+          console.log(`  ${yellow("⚠")} Tool           ${protocol}://localhost:${port} ${dim(`(port ${toolPort} was busy)`)}`);
         } else {
-          console.log(`  ${green("✓")} Tool           http://localhost:${port}`);
+          console.log(`  ${green("✓")} Tool           ${protocol}://localhost:${port}`);
         }
         toolPort = port;
         resolve(server);
@@ -466,7 +568,7 @@ async function main() {
   console.log("");
 
   if (!noOpen && !process.env.PLAYWRIGHT_TEST) {
-    open(`http://localhost:${toolPort}`);
+    open(`${protocol}://localhost:${toolPort}`);
   }
 
   // Graceful shutdown — close Vite's HMR WebSocket and the HTTP server

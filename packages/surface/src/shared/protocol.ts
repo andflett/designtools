@@ -90,7 +90,11 @@ export type IframeToEditor =
   | { type: "tool:pathChanged"; path: string }
   | { type: "tool:componentTree"; tree: ComponentTreeNode[] }
   | { type: "tool:previewReady"; cellCount: number }
-  | { type: "tool:cssCustomProperties"; properties: { name: string; value: string }[] };
+  | { type: "tool:cssCustomProperties"; properties: { name: string; value: string }[] }
+  /** User clicked the component/instance toggle badge on the canvas overlay */
+  | { type: "tool:editModeToggled"; mode: "component" | "instance" };
+
+export type OverlayTier = "full" | "instance-only" | "inspect-only";
 
 // Messages from editor -> target app iframe
 export type EditorToIframe =
@@ -110,4 +114,12 @@ export type EditorToIframe =
   | { type: "tool:selectParentInstance" }
   | { type: "tool:renderPreview"; dataSlot: string; componentPath: string; exportName: string;
       combinations: PreviewCombination[]; defaultChildren: string }
-  | { type: "tool:exitPreview" };
+  | { type: "tool:exitPreview" }
+  /** Update the canvas overlay colour, badge and toggle state */
+  | { type: "tool:setOverlayState";
+      tier: OverlayTier;
+      showToggle: boolean;
+      activeMode: "component" | "instance" | null;
+      isDataDriven: boolean;
+      packageName?: string;
+    };

@@ -59,8 +59,8 @@ import { useTokens, useComponents } from "../lib/scan-hooks.js";
 import type { IndexedTokenMap } from "../lib/scan-store.js";
 import { getEditability } from "../lib/editability.js";
 
-type EditMode = "token" | "component" | "instance";
-type PanelTab = "editor" | "chat";
+type PanelTab = "selected" | "tokens" | "chat";
+type ElementMode = "component" | "instance";
 
 interface EditorPanelProps {
   element: SelectedElementData | null;
@@ -86,6 +86,8 @@ interface EditorPanelProps {
   onAiModelChange?: (model: AiModel) => void;
   /** Increment to force terminal reconnect */
   terminalKey?: number;
+  elementMode: ElementMode;
+  onElementModeChange: (mode: ElementMode) => void;
 }
 
 /** Open a file in the user's editor via the local server. */
@@ -118,6 +120,8 @@ export function EditorPanel({
   onWriteModeChange,
   onAiModelChange,
   terminalKey = 0,
+  elementMode,
+  onElementModeChange,
 }: EditorPanelProps) {
   const tokenData = useTokens();
   const componentData = useComponents();
@@ -128,12 +132,7 @@ export function EditorPanel({
     ? componentData?.byDataSlot.get(dataSlot) ?? null
     : null;
 
-  const availableModes: EditMode[] = isComponent
-    ? ["token", "component", "instance"]
-    : ["token", "instance"];
-
-  const [activeMode, setActiveMode] = useState<EditMode>("token");
-  const [panelTab, setPanelTab] = useState<PanelTab>("editor");
+  const [panelTab, setPanelTab] = useState<PanelTab>("selected");
 
   // Pending changes accumulated in AI mode
   const [pendingChanges, setPendingChanges] = useState<ChangeIntent[]>([]);
@@ -154,10 +153,10 @@ export function EditorPanel({
     setPendingChanges([]);
   }, [element?.source?.file, element?.source?.line]);
 
-  // Auto-select tab when a new element is selected
+  // Auto-switch to Selected tab when a new element is selected
   useEffect(() => {
     if (!element) return;
-    setActiveMode("instance");
+    setPanelTab("selected");
     if (isComponent) {
       const hasVariants = componentEntry?.variants && componentEntry.variants.length > 0;
       setInstanceSubTab(hasVariants ? "props" : "styles");
@@ -210,32 +209,38 @@ export function EditorPanel({
   /** In AI mode, accumulate a ChangeIntent instead of immediately writing. */
   const handleAiCommitClass = useCallback(
     (tailwindClass: string, oldClass: string | undefined) => {
-      if (!element?.source) return;
+      const targetSource = elementMode === "component"
+        ? element?.source
+        : element?.instanceSource ?? element?.source;
+      if (!targetSource) return;
       addPendingChange({
         type: "class",
         property: inferCssPropertyFromClass(tailwindClass),
         fromValue: oldClass ?? "",
         toValue: tailwindClass,
-        elementSource: element.source,
-        currentClassName: element.className,
+        elementSource: targetSource,
+        currentClassName: element?.className ?? "",
       });
     },
-    [element, addPendingChange],
+    [element, elementMode, addPendingChange],
   );
 
   const handleAiCommitStyle = useCallback(
     (prop: string, val: string) => {
-      if (!element?.source) return;
+      const targetSource = elementMode === "component"
+        ? element?.source
+        : element?.instanceSource ?? element?.source;
+      if (!targetSource) return;
       addPendingChange({
         type: "style",
         property: prop,
-        fromValue: element.computed?.[prop] ?? "",
+        fromValue: element?.computed?.[prop] ?? "",
         toValue: val,
-        elementSource: element.source,
-        currentClassName: element.className,
+        elementSource: targetSource,
+        currentClassName: element?.className ?? "",
       });
     },
-    [element, addPendingChange],
+    [element, elementMode, addPendingChange],
   );
 
   const withSave = async (fn: () => Promise<void>) => {
@@ -260,12 +265,6 @@ export function EditorPanel({
     return queued;
   };
 
-  const modeConfig: Record<EditMode, { icon: any; label: string }> = {
-    token: { icon: TokensIcon, label: "Tokens" },
-    component: { icon: Component1Icon, label: "Component" },
-    instance: { icon: isComponent ? ComponentInstanceIcon : BoxIcon, label: isComponent ? "Instance" : "Element" },
-  };
-
   return (
     <div
       className="flex flex-col border-l"
@@ -276,167 +275,429 @@ export function EditorPanel({
         borderColor: "var(--studio-border)",
       }}
     >
-      {/* Header */}
-      {element && (
-        <div
-          className="border-b shrink-0"
-          style={{ borderColor: "var(--studio-border)" }}
-        >
-          {/* Name row + actions */}
-          <div className="flex items-center gap-2 px-4 pt-3 pb-1">
-            <div
-              className="w-5 h-5 rounded flex items-center justify-center shrink-0"
-              style={{ background: "var(--studio-accent-muted)" }}
+      {/* ── Top-level tab bar ── always visible */}
+      <div
+        className="flex shrink-0 border-b"
+        style={{ borderColor: "var(--studio-border)" }}
+      >
+        {(["selected", "tokens", "chat"] as PanelTab[]).map((tab) => {
+          const label =
+            tab === "selected" ? "Selected" :
+            tab === "tokens" ? "Tokens" :
+            `Chat${pendingChanges.length > 0 ? ` (${pendingChanges.length})` : ""}`;
+          return (
+            <button
+              key={tab}
+              onClick={() => setPanelTab(tab)}
+              style={{
+                flex: 1,
+                padding: "8px 4px",
+                fontSize: 11,
+                fontWeight: panelTab === tab ? 600 : 400,
+                color: panelTab === tab ? "var(--studio-text)" : "var(--studio-text-dimmed)",
+                background: "none",
+                border: "none",
+                borderBottom: panelTab === tab ? "2px solid var(--studio-accent)" : "2px solid transparent",
+                cursor: "pointer",
+                transition: "color 0.1s",
+              }}
+              data-testid={`panel-tab-${tab}`}
             >
-              {isComponent ? (
-                <Component1Icon
-                  style={{
-                    width: 12,
-                    height: 12,
-                    color: "var(--studio-accent)",
-                  }}
-                />
-              ) : (
-                <BoxIcon
-                  style={{
-                    width: 12,
-                    height: 12,
-                    color: "var(--studio-accent)",
-                  }}
-                />
-              )}
-            </div>
-            <span
-              className="text-[12px] font-semibold truncate flex-1 min-w-0"
-              style={{ color: "var(--studio-text)" }}
-              data-testid="editor-element-name"
-            >
-              {elementName}
-            </span>
-            {saving && (
-              <span
-                className="flex items-center gap-0.5 text-[10px] shrink-0"
-                style={{ color: "var(--studio-success)" }}
-                data-testid="save-indicator"
-              >
-                <CheckIcon style={{ width: 10, height: 10 }} />
-                Saved
-              </span>
-            )}
-            <div className="flex items-center shrink-0" style={{ gap: 2 }}>
-              {isComponent && onToggleUsagePanel && (
-                <Tooltip content="View usage across pages">
-                  <button
-                    onClick={onToggleUsagePanel}
-                    className="studio-icon-btn"
-                    style={{ width: 24, height: 24 }}
-                  >
-                    <LayersIcon />
-                  </button>
-                </Tooltip>
-              )}
-              {isComponent && onIsolate && componentEntry && (
-                <Tooltip content="Isolate component">
-                  <button
-                    onClick={() => onIsolate(componentEntry)}
-                    className="studio-icon-btn"
-                    style={{ width: 24, height: 24 }}
-                  >
-                    <TransformIcon />
-                  </button>
-                </Tooltip>
-              )}
-              <button
-                onClick={onClose}
-                className="studio-icon-btn"
-                style={{ width: 24, height: 24 }}
-              >
-                <Cross2Icon />
-              </button>
-            </div>
-          </div>
+              {label}
+            </button>
+          );
+        })}
+      </div>
 
-          {/* File path — prefer element.source, fall back to scanned component filePath, then npm package */}
-          {(element.source || componentEntry?.filePath || element.packageName || element.instanceSource) && (
-            <div className="px-4 pb-2.5 pt-0.5">
-              {(element.source || componentEntry?.filePath) ? (
-                <button
-                  onClick={() => {
-                    if (element.source) {
-                      openInEditor(element.source.file, element.source.line, element.source.col);
-                    } else if (componentEntry?.filePath) {
-                      openInEditor(componentEntry.filePath, 1, 0);
-                    }
-                  }}
-                  className="text-[10px] font-mono truncate block text-left w-full"
-                  style={{
-                    color: "var(--studio-text-dimmed)",
-                    background: "none",
-                    border: "none",
-                    padding: 0,
-                    cursor: "pointer",
-                  }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.textDecoration = "underline")
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.textDecoration = "none")
-                  }
-                  title="Open in editor"
-                >
-                  {element.source
-                    ? `${element.source.file}:${element.source.line}:${element.source.col}`
-                    : componentEntry?.filePath}
-                </button>
+      {/* ── SELECTED TAB ── */}
+      {panelTab === "selected" && (
+        <div className="flex flex-col flex-1 min-h-0">
+          {!element ? (
+            <>
+              {typeof window !== "undefined" && new URLSearchParams(window.location.search).has("gallery") ? (
+                <div className="flex-1 overflow-y-auto studio-scrollbar">
+                  <ControlsGallery />
+                </div>
               ) : (
-                <>
-                  {element.packageName && (
+                <div className="flex-1 flex items-center justify-center p-8">
+                  <p style={{ fontSize: 11, color: "var(--studio-text-dimmed)", textAlign: "center" }}>
+                    Click an element in the preview to select it
+                  </p>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              {/* Element header */}
+              <div className="px-4 pt-3 pb-2 shrink-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <div
+                    className="w-5 h-5 rounded flex items-center justify-center shrink-0"
+                    style={{ background: "var(--studio-accent-muted)" }}
+                  >
+                    {isComponent ? (
+                      <Component1Icon style={{ width: 12, height: 12, color: "var(--studio-accent)" }} />
+                    ) : (
+                      <BoxIcon style={{ width: 12, height: 12, color: "var(--studio-accent)" }} />
+                    )}
+                  </div>
+                  <span
+                    className="text-[12px] font-semibold truncate flex-1 min-w-0"
+                    style={{ color: "var(--studio-text)" }}
+                    data-testid="editor-element-name"
+                  >
+                    {elementName}
+                  </span>
+                  {saving && (
                     <span
-                      className="text-[10px] font-mono truncate block"
-                      style={{ color: "var(--studio-text-dimmed)", opacity: 0.6 }}
+                      className="flex items-center gap-0.5 text-[10px] shrink-0"
+                      style={{ color: "var(--studio-success)" }}
+                      data-testid="save-indicator"
                     >
-                      {element.packageName}
+                      <CheckIcon style={{ width: 10, height: 10 }} /> Saved
                     </span>
                   )}
-                  {element.instanceSource && (
-                    <button
-                      onClick={() => {
-                        openInEditor(
-                          element.instanceSource!.file,
-                          element.instanceSource!.line,
-                          element.instanceSource!.col,
-                        );
-                      }}
-                      className="text-[10px] font-mono truncate block text-left w-full"
-                      style={{
-                        color: "var(--studio-text-dimmed)",
-                        background: "none",
-                        border: "none",
-                        padding: 0,
-                        cursor: "pointer",
-                        marginTop: element.packageName ? 2 : 0,
-                      }}
-                      onMouseEnter={(e) =>
-                        (e.currentTarget.style.textDecoration = "underline")
-                      }
-                      onMouseLeave={(e) =>
-                        (e.currentTarget.style.textDecoration = "none")
-                      }
-                      title="Open instance in editor"
-                    >
-                      {`${element.instanceSource.file}:${element.instanceSource.line}`}
+                  <div className="flex items-center shrink-0" style={{ gap: 2 }}>
+                    {isComponent && onToggleUsagePanel && (
+                      <Tooltip content="View usage across pages">
+                        <button onClick={onToggleUsagePanel} className="studio-icon-btn" style={{ width: 24, height: 24 }}>
+                          <LayersIcon />
+                        </button>
+                      </Tooltip>
+                    )}
+                    {isComponent && onIsolate && componentEntry && (
+                      <Tooltip content="Isolate component">
+                        <button onClick={() => onIsolate(componentEntry)} className="studio-icon-btn" style={{ width: 24, height: 24 }}>
+                          <TransformIcon />
+                        </button>
+                      </Tooltip>
+                    )}
+                    <button onClick={onClose} className="studio-icon-btn" style={{ width: 24, height: 24 }}>
+                      <Cross2Icon />
                     </button>
-                  )}
-                </>
+                  </div>
+                </div>
+                {/* File path — changes based on elementMode */}
+                {(element.source || componentEntry?.filePath || element.packageName) && (
+                  <div>
+                    {(element.source || componentEntry?.filePath) ? (
+                      <button
+                        onClick={() => {
+                          const src = elementMode === "instance" && element.instanceSource
+                            ? element.instanceSource
+                            : element.source;
+                          if (src) openInEditor(src.file, src.line, src.col);
+                          else if (componentEntry?.filePath) openInEditor(componentEntry.filePath, 1, 0);
+                        }}
+                        className="text-[10px] font-mono truncate block text-left w-full"
+                        style={{ color: "var(--studio-text-dimmed)", background: "none", border: "none", padding: 0, cursor: "pointer" }}
+                        onMouseEnter={e => (e.currentTarget.style.textDecoration = "underline")}
+                        onMouseLeave={e => (e.currentTarget.style.textDecoration = "none")}
+                        title="Open in editor"
+                      >
+                        {(() => {
+                          const src = elementMode === "instance" && element.instanceSource
+                            ? element.instanceSource
+                            : element.source;
+                          return src ? `${src.file}:${src.line}` : componentEntry?.filePath;
+                        })()}
+                      </button>
+                    ) : element.packageName ? (
+                      <span className="text-[10px] font-mono truncate block" style={{ color: "var(--studio-text-dimmed)", opacity: 0.6 }}>
+                        {element.packageName}
+                      </span>
+                    ) : null}
+                  </div>
+                )}
+              </div>
+
+              {/* Component/Instance segmented toggle — only when editable and has instanceSource */}
+              {editability === "full" && element.instanceSource && (
+                <div className="px-4 pb-2 shrink-0">
+                  <div className="studio-segmented" style={{ width: "100%" }} data-testid="editor-tabs">
+                    <button
+                      onClick={() => onElementModeChange("instance")}
+                      className={elementMode === "instance" ? "active" : ""}
+                      style={{ flex: 1 }}
+                      data-testid="mode-instance"
+                    >
+                      <ComponentInstanceIcon style={{ width: 12, height: 12 }} />
+                      Instance
+                    </button>
+                    <button
+                      onClick={() => onElementModeChange("component")}
+                      className={elementMode === "component" ? "active" : ""}
+                      style={{ flex: 1 }}
+                      data-testid="mode-component"
+                    >
+                      <Component1Icon style={{ width: 12, height: 12 }} />
+                      Component
+                    </button>
+                  </div>
+                </div>
               )}
-            </div>
+
+              {/* Scrollable property content */}
+              <div className="flex-1 overflow-y-auto studio-scrollbar">
+                {/* npm component notice */}
+                {isNpmComponent && element.instanceSource && (
+                  <div className="px-3 py-2" style={{ borderBottom: "1px solid var(--studio-border-subtle)" }}>
+                    <div className="text-[10px] px-2 py-1.5 rounded" style={{ color: "var(--studio-text-dimmed)", background: "var(--studio-surface-hover)" }}>
+                      Editing instance in{" "}
+                      <span className="font-mono">{element.instanceSource.file.split("/").pop()}:{element.instanceSource.line}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* COMPONENT mode content */}
+                {elementMode === "component" && isComponent && (
+                  <>
+                    {/* Sub-tabs: Props vs Styles */}
+                    <div className="px-4 py-2 border-t" style={{ borderColor: "var(--studio-border)" }}>
+                      <div className="studio-segmented" style={{ width: "100%" }}>
+                        <button
+                          onClick={() => setComponentSubTab("props")}
+                          className={componentSubTab === "props" ? "active" : ""}
+                          style={{ flex: 1 }}
+                          data-testid="component-subtab-props"
+                        >
+                          Props
+                        </button>
+                        <button
+                          onClick={() => setComponentSubTab("styles")}
+                          className={componentSubTab === "styles" ? "active" : ""}
+                          style={{ flex: 1 }}
+                          data-testid="component-subtab-styles"
+                        >
+                          Styles
+                        </button>
+                      </div>
+                    </div>
+
+                    {componentSubTab === "styles" && (
+                      <div className="">
+                        <ComputedPropertyPanel
+                          tag={element.tag}
+                          className={element.className}
+                          computedStyles={element.computed}
+                          parentComputedStyles={element.parentComputed || {}}
+                          authoredStyles={element.authored}
+                          isReadOnly={editability === "inspect-only"}
+                          readOnlyPackageName={element.packageName ?? undefined}
+                          onSelectParentInstance={onSelectParentInstance}
+                          onPreviewInlineStyle={onPreviewInlineStyle}
+                          onRevertInlineStyles={onRevertInlineStyles}
+                          onCommitClass={isCssMode && !isAiMode ? () => {} : (tailwindClass, oldClass) => {
+                            if (oldClass && tailwindClass === oldClass) return;
+                            if (isAiMode) { handleAiCommitClass(tailwindClass, oldClass); return; }
+                            const isCva = componentEntry && componentEntry.variants.length > 0;
+                            if (isCva) {
+                              if (oldClass) {
+                                withSave(async () => {
+                                  await handleComponentClassChange(componentEntry.filePath, oldClass, tailwindClass);
+                                });
+                              } else if (element.source) {
+                                const source = element.source;
+                                withSave(async () => {
+                                  await handleWriteElement(source, "addClass", tailwindClass, undefined, element.activeBreakpoint);
+                                });
+                              }
+                            } else if (element.source) {
+                              const source = element.source;
+                              if (oldClass) {
+                                withSave(async () => {
+                                  await handleWriteElement(source, "replaceClass", tailwindClass, oldClass, element.activeBreakpoint);
+                                });
+                              } else {
+                                withSave(async () => {
+                                  await handleWriteElement(source, "addClass", tailwindClass, undefined, element.activeBreakpoint);
+                                });
+                              }
+                            }
+                          }}
+                          onCommitStyle={isCssMode && element.source ? (prop, val) => {
+                            if (isAiMode) { handleAiCommitStyle(prop, val); return; }
+                            const source = element.source!;
+                            withSave(() => handleWriteStyle(source, prop, val, element.activeBreakpoint));
+                          } : undefined}
+                          theme={tailwindTheme}
+                        />
+                      </div>
+                    )}
+
+                    {componentSubTab === "props" && componentEntry && componentEntry.variants.length > 0 && (
+                      <div className="">
+                        {componentEntry.variants
+                          .filter((dim: any) => !isBooleanDim(dim))
+                          .map((dim: any) => (
+                            <ComponentVariantSection
+                              key={dim.name}
+                              dim={dim}
+                              componentEntry={componentEntry}
+                              theme={tailwindTheme}
+                              onClassChange={(oldClass, newClass, variantContext) => {
+                                withSave(async () => {
+                                  await handleComponentClassChange(componentEntry.filePath, oldClass, newClass, variantContext);
+                                });
+                              }}
+                            />
+                          ))}
+                      </div>
+                    )}
+
+                    {componentSubTab === "props" && (!componentEntry || componentEntry.variants.length === 0) && (
+                      <div className="px-4 py-3">
+                        <ExplainerNote>
+                          This component has no predefined style props. Edit its styles directly in the "Styles" tab.
+                        </ExplainerNote>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* INSTANCE mode content */}
+                {(elementMode === "instance" || !isComponent) && (
+                  <>
+                    {isComponent && componentEntry && componentEntry.variants.length > 0 ? (
+                      <>
+                        {/* Sub-tabs: Props vs Styles */}
+                        <div className="px-4 py-2 border-t" style={{ borderColor: "var(--studio-border)" }}>
+                          <div className="studio-segmented" style={{ width: "100%" }}>
+                            <button
+                              onClick={() => setInstanceSubTab("props")}
+                              className={instanceSubTab === "props" ? "active" : ""}
+                              style={{ flex: 1 }}
+                              data-testid="instance-subtab-props"
+                            >
+                              Props
+                            </button>
+                            <button
+                              onClick={() => setInstanceSubTab("styles")}
+                              className={instanceSubTab === "styles" ? "active" : ""}
+                              style={{ flex: 1 }}
+                              data-testid="instance-subtab-styles"
+                            >
+                              Styles
+                            </button>
+                          </div>
+                        </div>
+
+                        {instanceSubTab === "props" && (
+                          <div className="">
+                            {componentEntry.variants.map((dim: any) => (
+                              <InstanceVariantSection
+                                key={dim.name}
+                                dim={dim}
+                                currentValue={
+                                  (element?.fiberProps?.[dim.name] != null ? String(element.fiberProps[dim.name]) : null)
+                                    ?? instanceProps?.[dim.name]
+                                    ?? dim.default
+                                    ?? null
+                                }
+                                onSelect={(value) => {
+                                  if (!element.instanceSource || !element.componentName) return;
+                                  withSave(async () => {
+                                    await handleInstancePropChange(element.instanceSource!, element.componentName!, dim.name, value);
+                                    setInstancePropsVersion((v) => v + 1);
+                                  });
+                                }}
+                              />
+                            ))}
+                          </div>
+                        )}
+
+                        {instanceSubTab === "styles" && (
+                          <div className="">
+                            <ComputedPropertyPanel
+                              tag={element.tag}
+                              className={element.className}
+                              computedStyles={element.computed}
+                              parentComputedStyles={element.parentComputed || {}}
+                              authoredStyles={element.authored}
+                              isReadOnly={editability === "inspect-only"}
+                              readOnlyPackageName={element.packageName ?? undefined}
+                              onSelectParentInstance={onSelectParentInstance}
+                              onPreviewInlineStyle={onPreviewInlineStyle}
+                              onRevertInlineStyles={onRevertInlineStyles}
+                              onCommitClass={isCssMode && !isAiMode ? () => {} : (tailwindClass, oldClass) => {
+                                if (oldClass && tailwindClass === oldClass) return;
+                                if (isAiMode) { handleAiCommitClass(tailwindClass, oldClass); return; }
+                                if (element.instanceSource && element.componentName) {
+                                  withSave(async () => {
+                                    await handleInstanceOverride(element.instanceSource!, element.componentName!, tailwindClass, oldClass || undefined);
+                                  });
+                                }
+                              }}
+                              onCommitStyle={isCssMode && element.source ? (prop, val) => {
+                                if (isAiMode) { handleAiCommitStyle(prop, val); return; }
+                                const source = element.source!;
+                                withSave(() => handleWriteStyle(source, prop, val));
+                              } : undefined}
+                              theme={tailwindTheme}
+                            />
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="">
+                        <ComputedPropertyPanel
+                          tag={element.tag}
+                          className={element.className}
+                          computedStyles={element.computed}
+                          parentComputedStyles={element.parentComputed || {}}
+                          authoredStyles={element.authored}
+                          isReadOnly={editability === "inspect-only"}
+                          readOnlyPackageName={element.packageName ?? undefined}
+                          onSelectParentInstance={onSelectParentInstance}
+                          onPreviewInlineStyle={onPreviewInlineStyle}
+                          onRevertInlineStyles={onRevertInlineStyles}
+                          onCommitClass={isCssMode && !isAiMode ? () => {} : (tailwindClass, oldClass) => {
+                            if (oldClass && tailwindClass === oldClass) return;
+                            if (isAiMode) { handleAiCommitClass(tailwindClass, oldClass); return; }
+                            if (element.instanceSource && element.componentName) {
+                              withSave(async () => {
+                                await handleInstanceOverride(element.instanceSource!, element.componentName!, tailwindClass, oldClass || undefined);
+                              });
+                            } else if (element.source) {
+                              const source = element.source;
+                              if (oldClass) {
+                                withSave(async () => {
+                                  await handleWriteElement(source, "replaceClass", tailwindClass, oldClass, element.activeBreakpoint);
+                                });
+                              } else {
+                                withSave(async () => {
+                                  await handleWriteElement(source, "addClass", tailwindClass, undefined, element.activeBreakpoint);
+                                });
+                              }
+                            }
+                          }}
+                          onCommitStyle={isCssMode && element.source ? (prop, val) => {
+                            if (isAiMode) { handleAiCommitStyle(prop, val); return; }
+                            const source = element.source!;
+                            withSave(() => handleWriteStyle(source, prop, val, element.activeBreakpoint));
+                          } : undefined}
+                          theme={tailwindTheme}
+                        />
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>{/* end scrollable content */}
+            </>
           )}
         </div>
-      )}
+      )}{/* end selected tab */}
 
-      {!element && typeof window !== "undefined" && new URLSearchParams(window.location.search).has("gallery") && (
+      {/* ── TOKENS TAB ── */}
+      {panelTab === "tokens" && (
         <div className="flex-1 overflow-y-auto studio-scrollbar">
-          <ControlsGallery />
+          <TokenEditor
+            tokenRefs={tokenRefs}
+            theme={theme}
+            onPreviewToken={onPreviewToken}
+            onClearTokenPreview={onClearTokenPreview}
+            onPreviewShadow={onPreviewShadow}
+          />
         </div>
       )}
 
@@ -455,462 +716,23 @@ export function EditorPanel({
         />
       </div>
 
-      {/* ── EDITOR TAB ── */}
-      {panelTab === "editor" && (
-        <>
-          {/* Inner tabs row */}
-          {element && (
-            <div className="px-4 py-2.5 shrink-0" style={{ borderColor: "var(--studio-border)" }}>
-              <div className="studio-segmented" style={{ width: "100%" }} data-testid="editor-tabs">
-                {availableModes.map((mode) => {
-                  const cfg = modeConfig[mode];
-                  return (
-                    <button
-                      key={mode}
-                      onClick={() => setActiveMode(mode)}
-                      className={activeMode === mode ? "active" : ""}
-                      style={{ flex: 1 }}
-                      data-testid={`editor-tab-${mode}`}
-                    >
-                      <cfg.icon style={{ width: 12, height: 12 }} />
-                      {cfg.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Scrollable editor content */}
-          <div className="flex-1 overflow-y-auto studio-scrollbar">
-        {!element && (
-          <div>
-            <div
-              className="px-4 pt-3 pb-3"
-            >
-              <div
-                className="text-[10px] font-semibold uppercase tracking-wide mb-1"
-                style={{ color: "var(--studio-text-muted)" }}
-              >
-                Design Tokens
-              </div>
-              <p className="text-[11px]" style={{ color: "var(--studio-text-dimmed)" }}>
-                Global design tokens defined in your project. Edit values here to update every usage at once.
-              </p>
-            </div>
-            <TokenEditor
-              tokenRefs={tokenRefs}
-              theme={theme}
-              onPreviewToken={onPreviewToken}
-              onClearTokenPreview={onClearTokenPreview}
-              onPreviewShadow={onPreviewShadow}
-            />
-          </div>
-        )}
-
-        {activeMode === "token" && element && (
-          <TokenEditor
-            tokenRefs={tokenRefs}
-            theme={theme}
-            onPreviewToken={onPreviewToken}
-            onClearTokenPreview={onClearTokenPreview}
-            onPreviewShadow={onPreviewShadow}
-          />
-        )}
-
-        {activeMode === "component" && element && isComponent && (
-          <>
-            {/* Sub-tabs: Props vs Styles */}
-            <div
-              className="px-4 py-2 border-t"
-              style={{ borderColor: "var(--studio-border)" }}
-            >
-              <div className="studio-segmented" style={{ width: "100%" }}>
-                <button
-                  onClick={() => setComponentSubTab("props")}
-                  className={componentSubTab === "props" ? "active" : ""}
-                  style={{ flex: 1 }}
-                  data-testid="component-subtab-props"
-                >
-                  Props
-                </button>
-                <button
-                  onClick={() => setComponentSubTab("styles")}
-                  className={componentSubTab === "styles" ? "active" : ""}
-                  style={{ flex: 1 }}
-                  data-testid="component-subtab-styles"
-                >
-                  Styles
-                </button>
-              </div>
-            </div>
-
-            {componentSubTab === "styles" && (
-              <div className="">
-                <ComputedPropertyPanel
-                  tag={element.tag}
-                  className={element.className}
-                  computedStyles={element.computed}
-                  parentComputedStyles={element.parentComputed || {}}
-                  authoredStyles={element.authored}
-                  isReadOnly={editability === "inspect-only"}
-                  readOnlyPackageName={element.packageName ?? undefined}
-                  onSelectParentInstance={onSelectParentInstance}
-                  onPreviewInlineStyle={onPreviewInlineStyle}
-                  onRevertInlineStyles={onRevertInlineStyles}
-                  onCommitClass={isCssMode && !isAiMode ? () => {} : (tailwindClass, oldClass) => {
-                    if (oldClass && tailwindClass === oldClass) return;
-                    if (isAiMode) { handleAiCommitClass(tailwindClass, oldClass); return; }
-                    const isCva =
-                      componentEntry && componentEntry.variants.length > 0;
-                    if (isCva) {
-                      if (oldClass) {
-                        withSave(async () => {
-                          await handleComponentClassChange(
-                            componentEntry.filePath,
-                            oldClass,
-                            tailwindClass,
-                          );
-                        });
-                      } else if (element.source) {
-                        const source = element.source;
-                        withSave(async () => {
-                          await handleWriteElement(
-                            source,
-                            "addClass",
-                            tailwindClass,
-                            undefined,
-                            element.activeBreakpoint,
-                          );
-                        });
-                      }
-                    } else if (element.source) {
-                      const source = element.source;
-                      if (oldClass) {
-                        withSave(async () => {
-                          await handleWriteElement(
-                            source,
-                            "replaceClass",
-                            tailwindClass,
-                            oldClass,
-                            element.activeBreakpoint,
-                          );
-                        });
-                      } else {
-                        withSave(async () => {
-                          await handleWriteElement(
-                            source,
-                            "addClass",
-                            tailwindClass,
-                            undefined,
-                            element.activeBreakpoint,
-                          );
-                        });
-                      }
-                    }
-                  }}
-                  onCommitStyle={(isCssMode || isAiMode) && element.source ? (prop, val) => {
-                    if (isAiMode) { handleAiCommitStyle(prop, val); return; }
-                    const source = element.source!;
-                    withSave(() => handleWriteStyle(source, prop, val, element.activeBreakpoint));
-                  } : undefined}
-                  tailwindTheme={tailwindTheme}
-                />
-              </div>
-            )}
-
-            {componentSubTab === "props" &&
-              componentEntry &&
-              componentEntry.variants.length > 0 && (
-                <div className="">
-                  {componentEntry.variants
-                    .filter((dim: any) => !isBooleanDim(dim))
-                    .map((dim: any) => (
-                    <ComponentVariantSection
-                      key={dim.name}
-                      dim={dim}
-                      componentEntry={componentEntry}
-                      tailwindTheme={tailwindTheme}
-                      onClassChange={(oldClass, newClass, variantContext) => {
-                        withSave(async () => {
-                          await handleComponentClassChange(
-                            componentEntry.filePath,
-                            oldClass,
-                            newClass,
-                            variantContext,
-                          );
-                        });
-                      }}
-                    />
-                  ))}
-
-                </div>
-              )}
-
-            {componentSubTab === "props" &&
-              (!componentEntry || componentEntry.variants.length === 0) && (
-                <div className="px-4 py-3">
-                  <ExplainerNote>
-                    This component has no predefined style props. Edit its styles directly in the "Styles" tab.
-                  </ExplainerNote>
-                </div>
-              )}
-          </>
-        )}
-
-      
-
-        {activeMode === "instance" && element && (
-          <>
-            {isNpmComponent && element.instanceSource && (
-              <div
-                className="px-3 py-2"
-                style={{ borderBottom: "1px solid var(--studio-border-subtle)" }}
-              >
-                <div
-                  className="text-[10px] px-2 py-1.5 rounded"
-                  style={{
-                    color: "var(--studio-text-dimmed)",
-                    background: "var(--studio-surface-hover)",
-                  }}
-                >
-                  Editing instance in{" "}
-                  <span className="font-mono">
-                    {element.instanceSource.file.split("/").pop()}:{element.instanceSource.line}
-                  </span>
-                </div>
-              </div>
-            )}
-            {isComponent &&
-            componentEntry &&
-            componentEntry.variants.length > 0 ? (
-              <>
-                {/* Sub-tabs: Props vs Styles */}
-                <div
-                  className="px-4 py-2 border-t"
-                  style={{ borderColor: "var(--studio-border)" }}
-                >
-                  <div className="studio-segmented" style={{ width: "100%" }}>
-                    <button
-                      onClick={() => setInstanceSubTab("props")}
-                      className={instanceSubTab === "props" ? "active" : ""}
-                      style={{ flex: 1 }}
-                      data-testid="instance-subtab-props"
-                    >
-                      Props
-                    </button>
-                    <button
-                      onClick={() => setInstanceSubTab("styles")}
-                      className={instanceSubTab === "styles" ? "active" : ""}
-                      style={{ flex: 1 }}
-                      data-testid="instance-subtab-styles"
-                    >
-                      Styles
-                    </button>
-                  </div>
-                </div>
-
-                {instanceSubTab === "props" && (
-                  <div className="">
-                    {componentEntry.variants.map((dim: any) => (
-                      <InstanceVariantSection
-                        key={dim.name}
-                        dim={dim}
-                        currentValue={
-                          (element?.fiberProps?.[dim.name] != null ? String(element.fiberProps[dim.name]) : null)
-                            ?? instanceProps?.[dim.name]
-                            ?? dim.default
-                            ?? null
-                        }
-                        onSelect={(value) => {
-                          if (!element.instanceSource || !element.componentName)
-                            return;
-                          withSave(async () => {
-                            await handleInstancePropChange(
-                              element.instanceSource!,
-                              element.componentName!,
-                              dim.name,
-                              value,
-                            );
-                            setInstancePropsVersion((v) => v + 1);
-                          });
-                        }}
-                      />
-                    ))}
-                  </div>
-                )}
-
-                {instanceSubTab === "styles" && (
-                  <div className="">
-                    <ComputedPropertyPanel
-                      tag={element.tag}
-                      className={element.className}
-                      computedStyles={element.computed}
-                      parentComputedStyles={element.parentComputed || {}}
-                  authoredStyles={element.authored}
-                      isReadOnly={editability === "inspect-only"}
-                      readOnlyPackageName={element.packageName ?? undefined}
-                      onSelectParentInstance={onSelectParentInstance}
-                      onPreviewInlineStyle={onPreviewInlineStyle}
-                      onRevertInlineStyles={onRevertInlineStyles}
-                      onCommitClass={isCssMode && !isAiMode ? () => {} : (tailwindClass, oldClass) => {
-                        if (oldClass && tailwindClass === oldClass) return;
-                        if (isAiMode) { handleAiCommitClass(tailwindClass, oldClass); return; }
-                        if (element.instanceSource && element.componentName) {
-                          withSave(async () => {
-                            await handleInstanceOverride(
-                              element.instanceSource!,
-                              element.componentName!,
-                              tailwindClass,
-                              oldClass || undefined,
-                            );
-                          });
-                        }
-                      }}
-                      onCommitStyle={(isCssMode || isAiMode) && element.source ? (prop, val) => {
-                        if (isAiMode) { handleAiCommitStyle(prop, val); return; }
-                        const source = element.source!;
-                        withSave(() => handleWriteStyle(source, prop, val));
-                      } : undefined}
-                      tailwindTheme={tailwindTheme}
-                    />
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="">
-                <ComputedPropertyPanel
-                  tag={element.tag}
-                  className={element.className}
-                  computedStyles={element.computed}
-                  parentComputedStyles={element.parentComputed || {}}
-                  authoredStyles={element.authored}
-                  isReadOnly={editability === "inspect-only"}
-                  readOnlyPackageName={element.packageName ?? undefined}
-                  onSelectParentInstance={onSelectParentInstance}
-                  onPreviewInlineStyle={onPreviewInlineStyle}
-                  onRevertInlineStyles={onRevertInlineStyles}
-                  onCommitClass={isCssMode && !isAiMode ? () => {} : (tailwindClass, oldClass) => {
-                    if (oldClass && tailwindClass === oldClass) return;
-                    if (isAiMode) { handleAiCommitClass(tailwindClass, oldClass); return; }
-                    // Component instances: write to the usage site (instanceSource)
-                    if (element.instanceSource && element.componentName) {
-                      withSave(async () => {
-                        await handleInstanceOverride(
-                          element.instanceSource!,
-                          element.componentName!,
-                          tailwindClass,
-                          oldClass || undefined,
-                        );
-                      });
-                    } else if (element.source) {
-                      const source = element.source;
-                      if (oldClass) {
-                        withSave(async () => {
-                          await handleWriteElement(
-                            source,
-                            "replaceClass",
-                            tailwindClass,
-                            oldClass,
-                            element.activeBreakpoint,
-                          );
-                        });
-                      } else {
-                        withSave(async () => {
-                          await handleWriteElement(
-                            source,
-                            "addClass",
-                            tailwindClass,
-                            undefined,
-                            element.activeBreakpoint,
-                          );
-                        });
-                      }
-                    }
-                  }}
-                  onCommitStyle={(isCssMode || isAiMode) && element.source ? (prop, val) => {
-                    if (isAiMode) { handleAiCommitStyle(prop, val); return; }
-                    const source = element.source!;
-                    withSave(() => handleWriteStyle(source, prop, val, element.activeBreakpoint));
-                  } : undefined}
-                  tailwindTheme={tailwindTheme}
-                />
-              </div>
-            )}
-          </>
-        )}
-          </div>{/* end scrollable content */}
-
-          {/* AI mode switch footer */}
-          <div
-            style={{
-              borderTop: "1px solid var(--studio-border)",
-              padding: "8px 16px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              flexShrink: 0,
-              background: "var(--studio-surface)",
-            }}
-          >
-            <span style={{ fontSize: 11, color: "var(--studio-text-dimmed)" }}>AI Mode</span>
-            <ModeToggle
-              writeMode={writeMode}
-              onWriteModeChange={onWriteModeChange ?? (() => {})}
-            />
-          </div>
-        </>
-      )}{/* end editor tab */}
-
-      {/* ── Bottom tab switcher ── */}
+      {/* ── Persistent footer: AI mode toggle ── */}
       <div
+        className="shrink-0 border-t"
         style={{
-          borderTop: "1px solid var(--studio-border)",
+          borderColor: "var(--studio-border)",
+          padding: "8px 16px",
           display: "flex",
-          flexShrink: 0,
+          alignItems: "center",
+          justifyContent: "space-between",
+          background: "var(--studio-surface)",
         }}
       >
-        {(["editor", "chat"] as PanelTab[]).map((tab) => {
-          const active = panelTab === tab;
-          const showBadge = tab === "chat" && pendingChanges.length > 0;
-          return (
-            <button
-              key={tab}
-              onClick={() => setPanelTab(tab)}
-              style={{
-                flex: 1,
-                height: 34,
-                fontSize: 11,
-                fontWeight: active ? 600 : 400,
-                color: active ? "var(--studio-text)" : "var(--studio-text-dimmed)",
-                background: active ? "var(--studio-surface-hover)" : "transparent",
-                border: "none",
-                borderRight: tab === "editor" ? "1px solid var(--studio-border)" : "none",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 5,
-                transition: "background 0.1s, color 0.1s",
-                textTransform: "capitalize",
-              }}
-            >
-              {tab}
-              {showBadge && (
-                <span
-                  style={{
-                    width: 5,
-                    height: 5,
-                    borderRadius: "50%",
-                    background: "var(--studio-accent)",
-                    display: "inline-block",
-                    flexShrink: 0,
-                  }}
-                />
-              )}
-            </button>
-          );
-        })}
+        <span style={{ fontSize: 11, color: "var(--studio-text-dimmed)" }}>AI Mode</span>
+        <ModeToggle
+          writeMode={writeMode}
+          onWriteModeChange={onWriteModeChange ?? (() => {})}
+        />
       </div>
     </div>
   );
@@ -922,12 +744,12 @@ function ComponentVariantSection({
   dim,
   componentEntry,
   onClassChange,
-  tailwindTheme,
+  theme,
 }: {
   dim: any;
   componentEntry: any;
   onClassChange: (oldClass: string, newClass: string, variantContext: string) => void;
-  tailwindTheme?: ResolvedTailwindTheme | null;
+  theme?: ResolvedTailwindTheme | null;
 }) {
   const tokenData = useTokens();
   const [collapsed, setCollapsed] = useState(true);
@@ -987,7 +809,7 @@ function ComponentVariantSection({
                       onClassChange(oldClass, newClass, opt);
                     }}
                     tokenGroups={tokenData?.groups || {}}
-                    tailwindTheme={tailwindTheme}
+                    theme={theme}
                     flat
                   />
                 </div>

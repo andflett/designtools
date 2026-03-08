@@ -201,7 +201,7 @@ export function TerminalPanel({
       fitRef.current = fit;
 
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const ws = new WebSocket(`${protocol}//localhost:${toolPort}/ws/terminal?model=${m}`);
+      const ws = new WebSocket(`${protocol}//${window.location.hostname}:${toolPort}/ws/terminal?model=${m}`);
       wsRef.current = ws;
 
       ws.onopen = () => {

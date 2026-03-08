@@ -23,6 +23,21 @@ export function withDesigntools<T extends Record<string, any>>(nextConfig: T = {
 
   const result: any = {
     ...nextConfig,
+    // Allow iframe embedding from any origin (Surface editor may run on a different host)
+    async headers() {
+      const userHeaders = typeof nextConfig.headers === "function"
+        ? await nextConfig.headers()
+        : [];
+      return [
+        ...userHeaders,
+        {
+          source: "/(.*)",
+          headers: [
+            { key: "X-Frame-Options", value: "ALLOWALL" },
+          ],
+        },
+      ];
+    },
     webpack(config: any, context: any) {
       // Only add the loader in development
       if (context.dev) {
