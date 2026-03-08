@@ -4,7 +4,25 @@ Supplementary to the [direct manipulation plan](./direct-manipulation-plan.md). 
 
 ---
 
-## The Problem
+## Why This Is Hard
+
+Most visual editors sidestep the interesting problems. They generate code into a blank project, or they work on a proprietary file format where every element is a known quantity. When every element is authored, everything is editable, and there's nothing to figure out.
+
+Surface edits your actual codebase. Your production React app, your Svelte marketing site, your Astro blog — whatever you've already built, with all its real-world complexity. That means the tool has to deal with things greenfield generators never encounter:
+
+- **Components are used more than once.** A `<Button>` is defined in one file and used in thirty others. When you click one in the preview, are you editing the component or this specific usage? Both are valid — they're different files, different intentions, different consequences. The tool needs to know which one you mean and show you different data for each.
+
+- **Not everything is authored.** That product card you're looking at might be one of forty, rendered from `products.map(p => <Card>{p.title}</Card>)`. The card's *structure and styling* are authored (in the component file), but this specific *instance's content* comes from data. You can't "edit the text" — there is no text to edit, there's a data binding. The tool needs to understand this distinction and communicate it clearly, not just fail silently or worse, let you break the data binding.
+
+- **Styling is everywhere.** One component might use Tailwind classes, another uses CSS modules, another has scoped styles in a `<style>` block. Some classes are static, some are conditional on variant props, some are merged at runtime via `cn()` or `clsx()`. The tool needs to read all of these from source and present a coherent picture of "what styles does this component actually author?"
+
+- **The editing target depends on the context.** Changing a button's padding in the component file affects every instance. Adding `mt-4` on a specific instance only affects that usage. The user needs to see this difference, understand the blast radius, and choose deliberately.
+
+This plan is about making the selection layer smart enough to answer all of these questions the moment you click on an element — before any editing action is even offered.
+
+---
+
+## The Current Problem
 
 When you select an element that is both a component and an instance, the editor currently shows three tabs: Token | Component | Instance. Two problems:
 
