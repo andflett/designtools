@@ -210,6 +210,16 @@ const [selectionMode, setSelectionMode] = useState<"component" | "instance">("in
 
 Auto-set on element selection: default to "instance" (most common intent is editing this specific usage).
 
+**Loading & transition behaviour:**
+
+Switching to component mode triggers a server fetch (`GET /api/component-styles`). Even though the response is fast (AST parse + cache), it's async and the panel needs to handle the gap:
+
+- **Skeleton loading state.** When `selectionMode` switches to `"component"` and data hasn't arrived yet, the property panel shows skeleton placeholders in place of property rows. Not a spinner — skeletons in the shape of the property rows (label + value pill), so the layout doesn't jump. Same skeleton treatment if the fetch errors and retries.
+- **Keep previous data while loading instance attribution.** In instance mode, the runtime data from the iframe is already available (no fetch needed for the primary view). The component-authored data fetch for attribution markers is additive — render the instance properties immediately, then layer in the "from component" / "overridden" markers when the attribution data arrives. Properties render without attribution initially, then fade in the markers. No skeleton needed for this — the panel is already populated.
+- **Prefetch on selection.** When an element is selected and it's a component instance, kick off the `component-styles` fetch immediately in the background — don't wait for the user to toggle. By the time they switch to component mode, the data is likely already cached. This also means instance-mode attribution markers appear faster.
+- **Error state.** If the endpoint fails (file deleted, parse error), show an inline error in the panel body: "Could not read component styles" with a retry action. Don't fall back to instance data in component mode — that would be misleading.
+- **Transition feel.** The toggle itself should feel instant (active state changes on click, not on data arrival). The panel content transitions with a brief crossfade (~100ms) between modes. If component data is already cached, the crossfade is the only delay the user perceives.
+
 **Component mode active:**
 - Fetch from `GET /api/component-styles` using `element.source`
 - Pass component-authored data to the property panel instead of runtime data
