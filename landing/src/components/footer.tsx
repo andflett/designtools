@@ -11,6 +11,11 @@ export function Footer() {
         </span>
         <ul className="flex flex-wrap justify-center gap-5 list-none">
           <li>
+            <a href="#docs" className="text-[12px] text-ink3 hover:text-ink2 transition-colors font-mono">
+              docs
+            </a>
+          </li>
+          <li>
             <a href="https://github.com/andflett/designtools" target="_blank" rel="noopener" className="text-[12px] text-ink3 hover:text-ink2 transition-colors font-mono">
               github
             </a>

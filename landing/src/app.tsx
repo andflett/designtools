@@ -9,6 +9,7 @@ import { Stack } from "./components/stack.js";
 import { Waitlist } from "./components/waitlist.js";
 import { Footer } from "./components/footer.js";
 import { Privacy } from "./components/privacy.js";
+import { Docs } from "./components/docs.js";
 import { Analytics } from '@vercel/analytics/react';
 
 function useHash() {
@@ -29,6 +30,16 @@ export function App() {
       <>
         <Nav />
         <Privacy />
+        <Footer />
+      </>
+    );
+  }
+
+  if (hash === "#docs") {
+    return (
+      <>
+        <Nav />
+        <Docs />
         <Footer />
       </>
     );
