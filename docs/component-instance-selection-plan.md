@@ -1,0 +1,293 @@
+# Component vs Instance Selection: Plan
+
+Supplementary to the [direct manipulation plan](./direct-manipulation-plan.md). This work is independent — it doesn't depend on drag/drop, resize, or text editing, and can be built in parallel or before those features.
+
+---
+
+## The Problem
+
+When you select an element that is both a component and an instance, the editor currently shows three tabs: Token | Component | Instance. Two problems:
+
+1. **Both tabs show identical data.** The `ComputedPropertyPanel` receives the same `className`, `computedStyles`, and `authoredStyles` in both modes — all sourced from the rendered DOM element. The only difference is the write callback (`handleWriteElement` vs `handleInstanceOverride`). The user can't tell what they're editing because the panel looks the same either way.
+
+2. **The file path never changes.** It always shows the component definition file (`element.source`), even in instance mode. The user has no visual confirmation that switching tabs changed their editing context.
+
+The tab approach is also indirect — it's a panel-level concept that doesn't connect to what's happening on canvas. There's no feedback in the overlay itself about which mode you're in.
+
+---
+
+## The Solution
+
+Replace the component/instance tabs with a **toggle on the selection overlay itself**, mirrored in the panel header. The toggle switches between two distinct data views:
+
+### Component Mode
+Shows the **authored styles from the component definition file**. This is a source-level read — what the developer wrote in the component, regardless of how any particular instance renders. The data comes from the server reading the component file's AST and associated stylesheets (CSS modules, scoped styles, Tailwind classes — whatever styling method the component uses).
+
+- File path: component definition file
+- Writes target: component definition file
+- Available actions: variant editing, component class changes
+
+### Instance Mode
+Shows the **winning rendered styles on this specific instance**. This is what the panel does today — the runtime result from the DOM, including authored stylesheet values, computed fallbacks, and Tailwind class parsing. Additionally, values that are inherited from the component (not overridden by the instance) are visually marked as "from component" — present but de-emphasized, non-editable in instance mode.
+
+- File path: instance usage site (the page file where `<Button className="...">` is written)
+- Writes target: instance usage site
+- Available actions: instance prop changes, instance style overrides, reset overrides
+
+---
+
+## Overlay UX
+
+### Toggle on the Selection Overlay
+
+When a selected element is both a component and an instance, the selection overlay shows a small toggle in the top-right corner:
+
+- **Component icon** (filled diamond / component symbol) — switches to component mode
+- **Instance icon** (outlined diamond / instance symbol) — switches to instance mode
+- Active state is visually distinct (filled vs outlined, or highlighted background)
+- Mirrors the existing Figma convention for component/instance badges
+
+The toggle is **absent** when:
+- The element is a plain HTML element (only `data-source`, no `data-slot`) — no toggle, just direct element editing
+- The component comes from `node_modules` (has `packageName`, no editable `source`) — only instance mode available, no toggle. Show package name badge instead.
+
+### Panel Header
+
+The panel header mirrors the overlay toggle:
+- Shows the same component/instance toggle icons
+- Displays the correct file path for the active mode
+- Element name adapts: component mode shows the component name (`Button`), instance mode shows `<Button>` with the instance context
+
+### Editability Indicators
+
+For **non-editable elements** (npm packages, elements without source):
+- Overlay shows a lock icon or package badge instead of the toggle
+- Panel shows "Inspect only" with the package name
+- Properties are visible but read-only (current behaviour, unchanged)
+
+---
+
+## Data Architecture
+
+### Current State
+
+Both modes receive identical data from the iframe:
+
+```
+SelectedElementData {
+  className: "flex p-4 text-red-500 mt-8"  // merged from component + instance
+  computed: { display: "flex", ... }         // getComputedStyle() — final cascade
+  authored: { padding: "1rem", ... }         // from matching stylesheet rules — merged
+  source: { file: "button.tsx", line: 5 }   // component definition
+  instanceSource: { file: "page.tsx", line: 12 }  // usage site
+}
+```
+
+### New: Component-Authored Styles Endpoint
+
+**`GET /api/component-styles?file=...&line=...&col=...`**
+
+New server endpoint that reads the component definition file and extracts authored styles from source. Returns the styles the component defines on its root element, independent of any particular instance.
+
+#### What It Extracts (by styling method)
+
+**Tailwind classes (className attribute):**
+- Parse the JSX element at the source location
+- Extract `className` attribute value via `findAttr()`
+- For string literals: parse directly
+- For expressions (`cn()`, `clsx()`, ternaries): extract the static base classes (the always-applied ones). Variant-conditional classes are returned separately with their conditions.
+- Run through `parseClasses()` to get structured CSS property → value mapping
+
+**CSS modules:**
+- `findCssModuleImports()` already identifies module imports in the file
+- Resolve which module class is applied to this element (`resolveModuleClassNames()`)
+- Read the `.module.css` file and extract all CSS properties from the matching rule
+- Return as authored key-value pairs: `{ "padding": "1rem", "color": "var(--primary)" }`
+
+**Scoped styles (Svelte/Astro):**
+- `sfc-parse.ts` already extracts `<style>` blocks and element class lists
+- Find scoped CSS rules that match the element's classes
+- Extract authored properties from matching rules
+- Return as authored key-value pairs
+
+**Inline style prop:**
+- Extract `style` attribute from JSX/template AST
+- Parse object expression to key-value pairs
+
+**Response shape:**
+
+```typescript
+type ComponentAuthoredStyles = {
+  // CSS properties authored on this element, with their source values
+  properties: Record<string, {
+    value: string;              // as written: "1rem", "var(--space-4)", "p-4", etc.
+    source: "class" | "css-module" | "scoped-style" | "inline-style";
+    tailwindClass?: string;     // if from a Tailwind class, the full class string
+  }>;
+
+  // Variant-conditional styles (from CVA/tv/etc)
+  variantStyles?: Array<{
+    variantName: string;
+    variantValue: string;
+    properties: Record<string, string>;
+  }>;
+};
+```
+
+#### Caching
+
+- Cache by file path + line:col + file mtime
+- Invalidate on HMR (file change notification)
+- Component files change infrequently — this cache will have high hit rates
+
+### Instance Attribution
+
+In instance mode, the panel needs to show which values are inherited from the component vs overridden by the instance. This uses both data sources:
+
+1. Fetch `ComponentAuthoredStyles` for the component (same endpoint, cached)
+2. Use the existing runtime data (`authored`, `computed`, `className`) from the iframe
+3. For each CSS property in the panel:
+   - If the instance's value differs from the component's authored value → **overridden** (highlight, editable)
+   - If the instance's value matches the component's authored value → **inherited from component** (de-emphasised, shows "from Component" label, not directly editable in instance mode)
+   - If the property exists in the instance but not in the component → **instance-added** (editable, shown normally)
+   - If the property exists in the component but the instance has removed/reset it → edge case, probably rare
+
+This diffing happens client-side in the editor — it already has both datasets.
+
+---
+
+## Implementation
+
+### Phase 1: Component Styles Endpoint
+
+**File: `packages/surface/src/server/api/component-styles.ts` (new)**
+
+- `GET /api/component-styles?file=<path>&line=<n>&col=<n>`
+- Parse the file with appropriate parser (Babel for JSX/TSX, `svelte/compiler` for .svelte, `@astrojs/compiler` for .astro)
+- Find element at source location
+- Extract styles from all sources:
+  - `findAttr(element, "className")` → parse Tailwind classes or resolve CSS module references
+  - `findAttr(element, "style")` → parse inline style object
+  - For SFC: `sfc-parse` to find matching scoped style rules
+  - `findCssModuleImports()` + `resolveModuleClassNames()` for CSS modules
+  - Read referenced CSS files and extract matching rule properties
+- Return `ComponentAuthoredStyles`
+
+**File: `packages/surface/src/server/lib/ast-helpers.ts` (extend)**
+
+Add: `extractElementStyles(ast, line, col, source: string)`:
+- Finds element, extracts className value (handling string literals, expressions, function calls)
+- Returns raw className string for Tailwind parsing, or resolved module class references
+- Handles the expression complexity (cn/clsx calls, ternaries) by extracting static base arguments
+
+**Framework dispatch:** check file extension, route to JSX/Svelte/Astro parser (same pattern as existing transforms).
+
+### Phase 2: Selection Overlay Toggle
+
+**File: `packages/surface/src/client/components/selection-overlay.tsx` (new or extend existing)**
+
+- When selected element has both `source` and `instanceSource` (is a component + instance):
+  - Render toggle icons in top-right corner of the selection overlay border
+  - Component icon / Instance icon, mutually exclusive
+  - Click toggles `selectionMode: "component" | "instance"` state
+- When element is plain HTML (no `data-slot`): no toggle
+- When element is npm package (has `packageName`, no `source`): no toggle, show package badge
+
+**File: `packages/surface/src/shared/protocol.ts` (extend)**
+
+No new iframe messages needed. The toggle is purely editor-side state. The iframe selection doesn't change — same DOM element stays selected.
+
+### Phase 3: Panel Data Switching
+
+**File: `packages/surface/src/client/components/editor-panel.tsx` (modify)**
+
+Replace the tab system with mode-aware rendering:
+
+**State:**
+```typescript
+const [selectionMode, setSelectionMode] = useState<"component" | "instance">("instance");
+```
+
+Auto-set on element selection: default to "instance" (most common intent is editing this specific usage).
+
+**Component mode active:**
+- Fetch from `GET /api/component-styles` using `element.source`
+- Pass component-authored data to the property panel instead of runtime data
+- File path shows component definition file
+- `onCommitClass` routes to `handleWriteElement(element.source, ...)`
+- `onCommitStyle` routes to `handleWriteStyle(element.source, ...)`
+- Show variant editing (existing `ComponentVariantSection`) below styles
+
+**Instance mode active:**
+- Use existing runtime data from iframe (`className`, `authored`, `computed`)
+- Also fetch component-authored data (for attribution — "inherited from component" markers)
+- File path shows instance usage site (`element.instanceSource`)
+- `onCommitClass` routes to `handleInstanceOverride(element.instanceSource, ...)`
+- Properties inherited from component are marked and de-emphasised
+
+**Remove:** The three-tab system (`token | component | instance`). Token editing moves to a separate access point (it's not element-selection-dependent).
+
+### Phase 4: Instance Attribution UI
+
+**File: `packages/surface/src/client/lib/style-attribution.ts` (new)**
+
+Client-side diffing logic:
+
+```typescript
+function attributeStyles(
+  instanceProperties: UnifiedProperty[],       // from runtime (current panel data)
+  componentAuthored: ComponentAuthoredStyles,   // from server endpoint
+): AttributedProperty[] {
+  return instanceProperties.map(prop => {
+    const componentValue = componentAuthored.properties[prop.cssProperty];
+    if (!componentValue) {
+      return { ...prop, attribution: "instance-added" };
+    }
+    if (valuesMatch(prop, componentValue)) {
+      return { ...prop, attribution: "inherited", componentSource: componentValue };
+    }
+    return { ...prop, attribution: "overridden", componentSource: componentValue };
+  });
+}
+```
+
+**File: `packages/surface/src/client/components/computed-property-panel.tsx` (extend)**
+
+- Accept optional `attribution` data
+- For `"inherited"` properties: render with reduced opacity, "from Component" label, click-to-edit disabled (or click shows "edit in component mode" prompt)
+- For `"overridden"` properties: render normally with a small indicator showing the component's original value (tooltip or inline chip)
+- For `"instance-added"` properties: render normally, no special indicator
+
+### Phase 5: Token Tab Relocation
+
+The token tab is currently part of the three-tab system being removed. Tokens aren't element-specific — they're global design system values.
+
+Options (to be decided):
+- Move to a separate panel/section accessible from the sidebar
+- Show as a collapsible section at the bottom of the property panel
+- Keep as a mode but separate from the component/instance toggle
+
+This is a minor UI reorganisation, not a data architecture change.
+
+---
+
+## What Changes Where
+
+| Location | Change |
+|----------|--------|
+| **Selection overlay (canvas)** | Add component/instance toggle icons, top-right corner |
+| **Panel header** | Mirror toggle, show correct file path per mode |
+| **Panel body** | Switch data source: server-provided component styles vs runtime instance styles |
+| **Server** | New `GET /api/component-styles` endpoint |
+| **AST helpers** | New `extractElementStyles()` function |
+| **Protocol** | No changes — toggle is editor-side only |
+| **Iframe (surface.tsx)** | No changes — same element stays selected |
+| **Tab system** | Removed, replaced by overlay/header toggle |
+
+---
+
+## Dependency on Other Work
+
+**Independent of drag-and-drop plan.** This can be built before, after, or in parallel with the three features in the direct manipulation plan. The component styles endpoint would also be useful for text editing (Feature 3) — knowing whether text content is authored in the component vs passed as a prop.
+
+**Shared infrastructure:** The `extractElementStyles` function builds on the same AST helpers used by the write pipeline and would be used by the resize handles (Feature 2) to understand what sizing values the component authors vs what the instance overrides.
