@@ -27,6 +27,7 @@ import { ShadowPicker } from "./shadow-picker.js";
 import { GradientPicker } from "./gradient-picker.js";
 import { BoxSpacingControl } from "./box-spacing.js";
 import { GridInputDemo } from "./grid-input.js";
+import { IconExplorations } from "./icon-explorations.js";
 import type { UnifiedProperty } from "../../lib/computed-styles.js";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -446,6 +447,11 @@ export function ControlsGallery() {
       {/* GridInput (with Display segmented) */}
       <Section title="GridInput">
         <GridInputDemo />
+      </Section>
+
+      {/* Icon Explorations — Padding & Margin */}
+      <Section title="Spacing Icon Explorations">
+        <IconExplorations />
       </Section>
 
       {/* BoxSpacingControl */}
