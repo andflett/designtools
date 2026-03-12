@@ -18,7 +18,7 @@ interface StatCardProps {
 export function StatCard({ label, value, change, progress }: StatCardProps) {
   const isPositive = change.startsWith("+");
   return (
-    <Card>
+    <Card className="text-destructive">
       <CardHeader className="pb-2">
         <CardDescription>{label}</CardDescription>
         <CardTitle className="text-3xl">{value}</CardTitle>

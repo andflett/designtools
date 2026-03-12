@@ -38,13 +38,16 @@ const recentActivity = [
 export function DashboardPage() {
   return (
     <div className="space-y-6">
-      <Alert variant="destructive" border="left">
+      <Alert
+        variant="destructive"
+        border="left"
+        className="bg-[image:var(--gradient-2)] shadow-2xl opacity-[0.48] border-l-[18px] border-l-[82px] border-ring">
         <AlertTitle variant="destructive">Vite Plugin Active</AlertTitle>
-        <AlertDescription>
+        <AlertDescription className="opacity-[1]">
           Source annotations and Surface component are being injected by @designtools/vite-plugin.
         </AlertDescription>
       </Alert>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 flex-nowrap gap-[38px]">
         {stats.map((s) => (
           <StatCard key={s.label} {...s} />
         ))}
