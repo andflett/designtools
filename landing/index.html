@@ -34,6 +34,13 @@
     <meta name="robots" content="index, follow" />
     <meta name="theme-color" content="#09090b" />
 
+    <!-- Theme (prevent flash) -->
+    <script>
+      (function(){var t=localStorage.getItem('theme');
+      if(t==='dark'||((!t)&&matchMedia('(prefers-color-scheme:dark)').matches))
+      document.documentElement.classList.add('dark')})()
+    </script>
+
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

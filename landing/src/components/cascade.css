@@ -1,0 +1,10 @@
+/* Panel design tokens — portable across repos */
+:root {
+  --panel-icon-muted: oklch(55% 0 0);
+  --panel-icon-active: oklch(15% 0 0);
+}
+
+.dark {
+  --panel-icon-muted: oklch(55% 0 0);
+  --panel-icon-active: oklch(95% 0 0);
+}

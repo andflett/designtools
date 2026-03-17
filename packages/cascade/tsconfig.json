@@ -11,10 +11,7 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": true,
-    "paths": {
-      "#cascade": ["./src/cascade-icons.dev.tsx"]
-    }
+    "noEmit": true
   },
   "include": ["src"]
 }

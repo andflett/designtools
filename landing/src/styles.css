@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "SF Mono", "Fira Code", monospace;
@@ -15,6 +17,23 @@
   --color-ink3: #a1a1aa;
   --color-btn: #18181b;
   --color-sel: #3b82f6;
+}
+
+/* ─────────────────────────────────────────────────
+   DARK MODE
+   ───────────────────────────────────────────────── */
+
+.dark {
+  --color-page: #09090b;
+  --color-raised: #18181b;
+  --color-muted: #27272a;
+  --color-surface: #111113;
+  --color-edge: #27272a;
+  --color-edge-subtle: #1f1f23;
+  --color-ink: #fafafa;
+  --color-ink2: #a1a1aa;
+  --color-ink3: #71717a;
+  --color-btn: #fafafa;
 }
 
 html {
@@ -266,4 +285,52 @@ body {
   color: var(--color-ink3);
   font-family: var(--font-mono);
   font-size: 11px;
+}
+
+/* ─────────────────────────────────────────────────
+   DARK MODE — grid & dither overrides
+   ───────────────────────────────────────────────── */
+
+.dark .graph-grid::before {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.12) 1px, transparent 1px);
+}
+
+.dark .graph-grid-fade::before {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+}
+
+.dark .dot-grid::before {
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.12) 1px, transparent 1px);
+}
+
+.dark .scanlines::before {
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 3px,
+    rgba(255, 255, 255, 0.02) 3px,
+    rgba(255, 255, 255, 0.02) 4px
+  );
+}
+
+.dark .npx-command::before {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.dark .checker-dither {
+  background-image: url("data:image/svg+xml,%3Csvg width='8' height='8' viewBox='0 0 8 8' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='4' height='4' fill='%23fafafa' fill-opacity='0.015'/%3E%3Crect x='4' y='4' width='4' height='4' fill='%23fafafa' fill-opacity='0.015'/%3E%3C/svg%3E");
+}
+
+.dark .screenshot-slot {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
 }

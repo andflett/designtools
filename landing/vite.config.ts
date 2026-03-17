@@ -2,17 +2,28 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { imagetools } from "vite-imagetools";
+import path from "node:path";
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react(), tailwindcss(), imagetools()],
   server: { port: 5555 },
+  resolve: {
+    alias: {
+      "#cascade": path.resolve(
+        import.meta.dirname!,
+        mode === "production"
+          ? "src/cascade-icons.prod.tsx"
+          : "src/cascade-icons.dev.tsx",
+      ),
+    },
+  },
   build: {
     rollupOptions: {
       input: {
         main: "index.html",
         "ai-writes": "ai-writes.html",
-        "icon-reference": "icon-reference.html",
+        cascade: "cascade.html",
       },
     },
   },
-});
+}));

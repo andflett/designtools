@@ -5,6 +5,10 @@ export function Footer() {
         <span className="text-[12px] text-ink3 font-mono">
           <span className="text-ink3/50">@designtools/</span>surface{" "}
           <span className="text-ink3/30 mx-1">/</span>{" "}
+          <a href="/cascade" className="text-ink3/50 hover:text-ink2 transition-colors">
+            cascade
+          </a>
+          <span className="text-ink3/30 mx-1">/</span>{" "}
           <a href="https://flett.cc" target="_blank" rel="noopener" className="text-ink3/50 hover:text-ink2 transition-colors">
             flett.cc
           </a>

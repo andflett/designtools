@@ -9,7 +9,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@designtools/cascade": "^0.1.2",
     "@radix-ui/react-icons": "^1.3.2",
+    "@radix-ui/react-tooltip": "^1.1.8",
     "@upstash/redis": "^1.36.3",
     "@vercel/analytics": "^1.6.1",
     "@vercel/node": "^5.6.9",
