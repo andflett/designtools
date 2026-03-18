@@ -1,7 +1,8 @@
 import "./cascade.css";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, createContext, useContext } from "react";
 import clsx from "clsx";
 import { Sun, Moon, Copy, Check } from "lucide-react";
+import * as Popover from "@radix-ui/react-popover";
 import { useTheme, toggleTheme } from "../theme.js";
 import { DitherGlow } from "./dither-glow.js";
 import {
@@ -14,8 +15,10 @@ import {
 import {
   metadata,
   lookupIcon,
+  solidifyIcon,
   IconSvg,
   iconToSvgString,
+  iconToReactString,
   PV_BG as _PV_BG,
   PV_LABEL_COLOR as _PV_LABEL_COLOR,
   type CascadeIcon,
@@ -24,7 +27,7 @@ import {
 
 // Override package defaults — stronger control backgrounds, visible labels
 const PV_BG = "bg-[color:var(--color-muted)]";
-const PV_LABEL_COLOR = "text-[color:var(--color-ink2)]";
+const PV_LABEL_COLOR = "text-[color:var(--color-ink2)]/80";
 
 /* ═══════════════════════════════════════════════════════
    NAV
@@ -47,7 +50,7 @@ function ThemeToggle() {
   return (
     <button
       onClick={toggleTheme}
-      className="inline-flex items-center text-white/50 hover:text-white transition-colors"
+      className="cursor-pointer inline-flex items-center text-white/50 hover:text-white transition-colors"
       aria-label="Toggle theme"
     >
       {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
@@ -60,10 +63,10 @@ function CascadeNav() {
     <nav className="fixed top-0 left-0 right-0 z-50 py-3 bg-[#09090b]/90 backdrop-blur-xl border-b border-white/8">
       <div className="max-w-[1100px] mx-auto px-6 flex items-center justify-between">
         <span className="text-[13px] font-mono flex items-center gap-0">
-          <span className="text-white/30">@designtools/</span>
+          <span className="text-white/40">@designtools/</span>
           <span className="text-white">cascade</span>
           <span className="text-white/20 mx-1.5">/</span>
-          <a href="/" className="text-white/30 hover:text-white/60 transition-colors">surface</a>
+          <a href="/" className="text-white/40 hover:text-white/60 transition-colors">surface</a>
         </span>
         <div className="flex items-center gap-6">
           <ThemeToggle />
@@ -91,94 +94,142 @@ function CascadeNav() {
   );
 }
 
+/* ── Icon style context ── */
+
+type IconStyle = "duo" | "solid";
+const IconStyleContext = createContext<IconStyle>("duo");
+
 /* ═══════════════════════════════════════════════════════
    ICON GRID (left column)
    ═══════════════════════════════════════════════════════ */
 
 /** Category grouping — controls icon ordering in the grid. */
 const CATEGORIES: { label: string; properties: string[] }[] = [
-  { label: "Layout", properties: ["position", "display", "flex-direction", "flex-wrap", "flex-grow", "flex-shrink", "overflow"] },
-  { label: "Alignment", properties: ["justify-content", "align-items", "align-self", "align-content"] },
-  { label: "Spacing", properties: ["gap", "size", "padding", "margin", "axis"] },
+  { label: "Layout", properties: ["position", "display", "flex-direction", "flex-wrap", "flex-grow", "flex-shrink"] },
+  { label: "Spacing", properties: ["gap", "overflow", "padding", "margin", "axis", "size"] },
   { label: "Borders", properties: ["border-radius", "border-style", "border-width"] },
   { label: "Typography", properties: ["font-family", "font-size", "font-weight", "line-height", "letter-spacing", "text-align", "text-decoration", "text-transform"] },
   { label: "Effects", properties: ["opacity", "box-shadow"] },
+  { label: "Alignment", properties: ["justify-content", "align-items", "align-self", "align-content"] },
 ];
+
+/** Values to hide from the landing page grid (still in the library). */
+const HIDDEN_VALUES = new Set(["none", "auto", "static", "nowrap", "start", "end"]);
+/** Property::value combos exempt from hiding (visually unique). */
+const HIDDEN_EXCEPTIONS = new Set(["display::none"]);
 
 /** Build flat ordered list of metadata entries for the grid. */
 function orderedEntries(): IconEntry[] {
   const ordered: IconEntry[] = [];
   for (const cat of CATEGORIES) {
     for (const prop of cat.properties) {
-      const matches = metadata.filter((e) => e.property === prop);
+      const matches = metadata.filter((e) => {
+        if (e.property !== prop) return false;
+        const v = e.value ?? "";
+        if (HIDDEN_VALUES.has(v) && !HIDDEN_EXCEPTIONS.has(`${e.property}::${v}`)) return false;
+        return true;
+      });
       ordered.push(...matches);
     }
   }
+  // Add text-decoration "none" at the end
+  const tdNone = metadata.find((e) => e.property === "text-decoration" && e.value === "none");
+  if (tdNone) ordered.push(tdNone);
   return ordered;
 }
 
-/* ── Copy button ── */
+/* ── Copy action bar (docked to popover bottom) ── */
 
-function CopyButton({ text, className }: { text: string; className?: string }) {
-  const [copied, setCopied] = useState(false);
+type CopyKey = "svg" | "react";
+
+function CopyActions({ texts }: { texts: Record<CopyKey, string> }) {
+  const [copied, setCopied] = useState<CopyKey | false>(false);
   const timeout = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
+  const handleCopy = useCallback((key: CopyKey) => {
+    navigator.clipboard.writeText(texts[key]);
+    setCopied(key);
     clearTimeout(timeout.current);
     timeout.current = setTimeout(() => setCopied(false), 1500);
-  }, [text]);
+  }, [texts]);
 
   useEffect(() => () => clearTimeout(timeout.current), []);
 
+  const btn = "flex-1 inline-flex items-center justify-center gap-2 py-3 text-[10px] font-mono transition-all cursor-pointer";
+  const idle = "text-ink2 hover:text-ink hover:bg-ink/5 dark:hover:bg-white/8";
+
   return (
-    <button
-      type="button"
-      onClick={handleCopy}
-      className={clsx(
-        "inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-medium rounded-md transition-all cursor-pointer",
-        copied
-          ? "bg-green-500/10 text-green-600 dark:text-green-400"
-          : "bg-ink/5 dark:bg-white/8 text-ink2 hover:text-ink hover:bg-ink/10 dark:hover:bg-white/15",
-        className,
-      )}
-    >
-      {copied ? <Check size={11} /> : <Copy size={11} />}
-      {copied ? "Copied" : "Copy SVG"}
-    </button>
+    <div className="flex border-t border-edge">
+      <button type="button" onClick={() => handleCopy("svg")} className={clsx(btn, idle)}>
+        {copied === "svg" ? (
+          <>
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="animate-ping absolute inset-0 rounded-full bg-green-500 opacity-75" />
+              <span className="relative rounded-full h-1.5 w-1.5 bg-green-500" />
+            </span>
+            Copied
+          </>
+        ) : (
+          <>
+            <Copy size={11} />
+            Copy SVG
+          </>
+        )}
+      </button>
+      <button type="button" onClick={() => handleCopy("react")} className={clsx(btn, "border-l border-edge", idle)}>
+        {copied === "react" ? (
+          <>
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="animate-ping absolute inset-0 rounded-full bg-green-500 opacity-75" />
+              <span className="relative rounded-full h-1.5 w-1.5 bg-green-500" />
+            </span>
+            Copied
+          </>
+        ) : (
+          <>
+            <Copy size={11} />
+            React
+          </>
+        )}
+      </button>
+    </div>
   );
 }
 
 /* ── Icon popover (rendered inside a bordered grid cell) ── */
 
-const CELL = 64; // px — grid cell size
+const CELL = 72; // px — grid cell size
 const ICON_COLS = 12; // fixed icon columns per row
 
 function IconCellContent({ entry }: { entry: IconEntry }) {
   const [open, setOpen] = useState(false);
+  const iconStyle = useContext(IconStyleContext);
+  const globalSolid = iconStyle === "solid";
+  const [localSolid, setLocalSolid] = useState(false);
+  const solid = open ? localSolid : globalSolid;
   const icon = lookupIcon(entry.property, entry.value);
   if (!icon) return null;
 
   const hasValue = entry.value !== null;
-  const importStatement = `import { ${entry.icon} } from "@designtools/cascade"`;
+  const componentName = entry.icon;
 
   return (
-    <div className="relative w-full h-full">
+    <Popover.Root open={open} onOpenChange={(v) => { setOpen(v); if (v) setLocalSolid(globalSolid); }}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <button
-            type="button"
-            onClick={() => setOpen(!open)}
-            className={clsx(
-              "flex items-center justify-center w-full h-full transition-colors cursor-pointer",
-              open
-                ? "bg-ink text-page"
-                : "text-ink hover:bg-ink/[0.04] dark:hover:bg-white/[0.06]",
-            )}
-          >
-            <IconSvg icon={icon} className="w-[15px] h-[15px]" />
-          </button>
+          <Popover.Trigger asChild>
+            <button
+              type="button"
+              className={clsx(
+                "flex items-center justify-center w-full h-full transition-colors cursor-pointer",
+                open
+                  ? "bg-ink text-page"
+                  : "text-ink hover:bg-ink/[0.04] dark:hover:bg-white/[0.06]",
+              )}
+            >
+              <IconSvg icon={icon} className="w-[15px] h-[15px]" solid={globalSolid} />
+            </button>
+          </Popover.Trigger>
         </TooltipTrigger>
         {!open && (
           <TooltipContent side="bottom" className="font-mono">
@@ -188,27 +239,68 @@ function IconCellContent({ entry }: { entry: IconEntry }) {
         )}
       </Tooltip>
 
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute z-50 top-full left-1/2 -translate-x-1/2 mt-2 bg-page border border-edge rounded-xl shadow-xl overflow-hidden w-[220px] animate-in fade-in-0 zoom-in-95">
-            <div className="flex items-center justify-center bg-muted/50 p-6">
-              <IconSvg icon={icon} className="w-16 h-16" />
-            </div>
-            <div className="p-3 space-y-2">
-              <div>
-                <p className="text-[10px] text-ink3 font-mono">{entry.property}</p>
-                <p className="text-[13px] font-semibold font-mono">{hasValue ? entry.value : entry.icon}</p>
+      <Popover.Portal>
+        <Popover.Content
+          side="bottom"
+          align="center"
+          sideOffset={8}
+          collisionPadding={{ top: 12, bottom: 80, left: 12, right: 12 }}
+          className="bg-page border border-edge rounded-xl shadow-xl overflow-hidden w-[240px] animate-in fade-in-0 zoom-in-95"
+        >
+          {/* Preview with subtle 5px grid */}
+          <div
+            className={clsx("relative flex items-center justify-center", entry.duotone ? "px-8 pt-7 pb-15" : "p-8")}
+            style={{
+              backgroundImage: `
+                linear-gradient(to right, color-mix(in srgb, var(--color-ink) 4%, transparent) 0.5px, transparent 0.5px),
+                linear-gradient(to bottom, color-mix(in srgb, var(--color-ink) 4%, transparent) 0.5px, transparent 0.5px)
+              `,
+              backgroundSize: "5px 5px",
+              backgroundPosition: "center center",
+            }}
+          >
+            <IconSvg icon={icon} className="w-16 h-16" solid={localSolid} />
+            {/* Duo/Solid toggle for duotone icons */}
+            {entry.duotone && (
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex bg-ink/8 dark:bg-white/10 rounded-full p-0.5 text-[10px] font-medium">
+                <button
+                  type="button"
+                  onClick={() => setLocalSolid(false)}
+                  className={clsx(
+                    "px-3 py-1 rounded-full transition-colors cursor-pointer",
+                    !localSolid ? "bg-page text-ink shadow-sm" : "text-ink3 hover:text-ink",
+                  )}
+                >
+                  Duotone
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLocalSolid(true)}
+                  className={clsx(
+                    "px-3 py-1 rounded-full transition-colors cursor-pointer",
+                    localSolid ? "bg-page text-ink shadow-sm" : "text-ink3 hover:text-ink",
+                  )}
+                >
+                  Solid
+                </button>
               </div>
-              <code className="block text-[10px] font-mono text-ink3 bg-muted rounded-md px-2 py-1.5 truncate" title={importStatement}>
-                {importStatement}
-              </code>
-              <CopyButton text={iconToSvgString(icon)} />
-            </div>
+            )}
           </div>
-        </>
-      )}
-    </div>
+          {/* Info */}
+          <div className="px-4 py-4 border-t border-edge">
+            <p className="text-[13px] font-semibold font-mono truncate" title={componentName}>{componentName}</p>
+            <p className="text-[10px] text-ink3 font-mono mt-0.5">
+              {hasValue ? `${entry.property}: ${entry.value}` : entry.property}
+            </p>
+          </div>
+          {/* Copy actions */}
+          <CopyActions texts={{
+            svg: iconToSvgString(icon, localSolid),
+            react: iconToReactString(componentName, localSolid),
+          }} />
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 
@@ -219,9 +311,9 @@ function IconCellContent({ entry }: { entry: IconEntry }) {
    ─────────────────────────────────────────────────────────────────── */
 
 // 3-tier line colors via color-mix — auto dark mode, kept subtle
-const LINE_FINE = "color-mix(in srgb, var(--color-ink) 4%, transparent)";
-const LINE_MED  = "color-mix(in srgb, var(--color-ink) 5%, transparent)";
-const LINE_BOLD = "color-mix(in srgb, var(--color-ink) 6%, transparent)";
+const LINE_FINE = "color-mix(in srgb, var(--color-ink) 3%, transparent)";
+const LINE_MED  = "color-mix(in srgb, var(--color-ink) 3%, transparent)";
+const LINE_BOLD = "color-mix(in srgb, var(--color-ink) 3%, transparent)";
 
 /** Line color based on distance from icon grid origin — bold every 4, medium every 2 */
 function lineColor(relIndex: number): string {
@@ -247,7 +339,7 @@ function CanvasGrid({ entries, padTop = 1, panelWidth = 0 }: {
       const rect = el.getBoundingClientRect();
       const startCol = Math.max(0, Math.round(rect.left / CELL));
       const iconRows = Math.ceil(entries.length / ICON_COLS);
-      const rows = padTop + iconRows + 4;
+      const rows = padTop + iconRows + 1;
       setLayout({ cols: totalCols, iconStartCol: startCol, totalRows: rows });
     };
     measure();
@@ -271,8 +363,8 @@ function CanvasGrid({ entries, padTop = 1, panelWidth = 0 }: {
           overflow: "hidden",
           display: "grid",
           gridTemplateColumns: `repeat(${cols}, ${CELL}px)`,
-          borderTop: `1px solid ${LINE_FINE}`,
-          borderLeft: `1px solid ${LINE_FINE}`,
+          borderTop: "none",
+          borderLeft: "none",
         }}
       >
         {Array.from({ length: totalCells }, (_, i) => {
@@ -310,26 +402,6 @@ function CanvasGrid({ entries, padTop = 1, panelWidth = 0 }: {
           );
         })}
       </div>
-      {/* Fade in top of grid — full viewport width */}
-      <div
-        className="absolute top-0 pointer-events-none"
-        style={{
-          height: CELL * 2,
-          width: "100vw",
-          marginLeft: "calc(-50vw + 50%)",
-          background: "linear-gradient(to top, transparent, var(--color-page) 160%)",
-        }}
-      />
-      {/* Fade out bottom of grid — full viewport width */}
-      <div
-        className="absolute bottom-0 pointer-events-none"
-        style={{
-          height: CELL * 3.5,
-          width: "100vw",
-          marginLeft: "calc(-50vw + 50%)",
-          background: "linear-gradient(to bottom, transparent, var(--color-page) 85%)",
-        }}
-      />
     </div>
   );
 }
@@ -480,8 +552,9 @@ function LayoutPreview({ property, value, width: w = 108, ctx = DEFAULT_CTX }: {
   );
 }
 
-/** Animated property explainer — cycles through values showing the effect. */
-function PropertyExplainer({ property, ctx, onClose }: { property: string; ctx: LayoutContext; onClose: () => void }) {
+
+/** Content for the property explainer popover — cycles through values showing the effect. */
+function PropertyExplainerContent({ property, ctx, onClose }: { property: string; ctx: LayoutContext; onClose: () => void }) {
   const explainer = getExplainer(property, ctx);
   if (!explainer) return null;
 
@@ -499,59 +572,54 @@ function PropertyExplainer({ property, ctx, onClose }: { property: string; ctx: 
   }, [playing, values.length]);
 
   return (
-    <>
-      <div className="fixed inset-0 z-50" onClick={onClose} />
-      <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-[color:var(--color-page)] border border-[color:var(--color-edge)] rounded-xl shadow-lg overflow-hidden animate-in fade-in-0 zoom-in-95">
-        <div className="p-3 space-y-2.5">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <h4 className="text-[12px] font-semibold font-mono">{explainer.title}</h4>
-              <p className="text-[10px] text-[color:var(--color-ink3)] leading-relaxed mt-0.5">{explainer.description}</p>
-            </div>
-            <button type="button" onClick={onClose} className="text-[color:var(--color-ink3)] hover:text-[color:var(--color-ink)] shrink-0 mt-0.5 cursor-pointer">
-              <svg viewBox="0 0 15 15" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 4l7 7M11 4l-7 7" /></svg>
-            </button>
-          </div>
-          <div className="flex justify-center">
-            <LayoutPreview property={property} value={value} width={200} ctx={ctx} />
-          </div>
-          <div className="flex flex-wrap gap-1">
-            {values.map((v, i) => (
-              <button
-                key={v}
-                type="button"
-                onClick={() => { setActiveIndex(i); setPlaying(false); }}
-                className={clsx(
-                  "px-2 py-0.5 text-[10px] rounded-md transition-all cursor-pointer",
-                  i === activeIndex
-                    ? "bg-[color:var(--color-ink)] text-[color:var(--color-page)] font-medium"
-                    : "bg-[color:var(--color-muted)] text-[color:var(--color-ink3)] hover:text-[color:var(--color-ink)]",
-                )}
-              >
-                {v}
-              </button>
-            ))}
-          </div>
-          <div className="text-[10px] text-[color:var(--color-ink3)] leading-relaxed min-h-[28px]">
-            {VALUE_HINTS[property]?.[value] ?? ""}
-          </div>
-          <div className="flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => setPlaying(!playing)}
-              className="text-[10px] text-[color:var(--color-ink3)] hover:text-[color:var(--color-ink)] cursor-pointer flex items-center gap-1"
-            >
-              {playing ? (
-                <><svg viewBox="0 0 12 12" className="w-3 h-3" fill="currentColor"><rect x="2" y="2" width="3" height="8" rx="0.5" /><rect x="7" y="2" width="3" height="8" rx="0.5" /></svg> Pause</>
-              ) : (
-                <><svg viewBox="0 0 12 12" className="w-3 h-3" fill="currentColor"><path d="M3 1.5l7 4.5-7 4.5z" /></svg> Play</>
-              )}
-            </button>
-            <span className="text-[10px] text-[color:var(--color-ink3)]/50">{activeIndex + 1} / {values.length}</span>
-          </div>
+    <div className="p-3 space-y-2.5">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h4 className="text-[12px] font-semibold font-mono">{explainer.title}</h4>
+          <p className="text-[10px] text-[color:var(--color-ink3)] leading-relaxed mt-0.5">{explainer.description}</p>
         </div>
+        <Popover.Close className="text-[color:var(--color-ink3)] hover:text-[color:var(--color-ink)] shrink-0 mt-0.5 cursor-pointer">
+          <svg viewBox="0 0 15 15" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 4l7 7M11 4l-7 7" /></svg>
+        </Popover.Close>
       </div>
-    </>
+      <div className="flex justify-center">
+        <LayoutPreview property={property} value={value} width={200} ctx={ctx} />
+      </div>
+      <div className="flex flex-wrap gap-1">
+        {values.map((v, i) => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => { setActiveIndex(i); setPlaying(false); }}
+            className={clsx(
+              "px-2 py-0.5 text-[10px] rounded-md transition-all cursor-pointer",
+              i === activeIndex
+                ? "bg-[color:var(--color-ink)] text-[color:var(--color-page)] font-medium"
+                : "bg-[color:var(--color-muted)] text-[color:var(--color-ink3)] hover:text-[color:var(--color-ink)]",
+            )}
+          >
+            {v}
+          </button>
+        ))}
+      </div>
+      <div className="text-[10px] text-[color:var(--color-ink3)] leading-relaxed min-h-[28px]">
+        {VALUE_HINTS[property]?.[value] ?? ""}
+      </div>
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => setPlaying(!playing)}
+          className="text-[10px] text-[color:var(--color-ink3)] hover:text-[color:var(--color-ink)] cursor-pointer flex items-center gap-1"
+        >
+          {playing ? (
+            <><svg viewBox="0 0 12 12" className="w-3 h-3" fill="currentColor"><rect x="2" y="2" width="3" height="8" rx="0.5" /><rect x="7" y="2" width="3" height="8" rx="0.5" /></svg> Pause</>
+          ) : (
+            <><svg viewBox="0 0 12 12" className="w-3 h-3" fill="currentColor"><path d="M3 1.5l7 4.5-7 4.5z" /></svg> Play</>
+          )}
+        </button>
+        <span className="text-[10px] text-[color:var(--color-ink3)]/50">{activeIndex + 1} / {values.length}</span>
+      </div>
+    </div>
   );
 }
 
@@ -601,119 +669,169 @@ function getExplainer(property: string, ctx: LayoutContext): { title: string; de
 
 /* ── Shared editor panel sub-components ── */
 
-/** Segmented toggle with overflow dropdown. */
 /** Look up icon by property+value, with fallback to treat value as a property name. */
 function resolve(property: string, value: string): CascadeIcon | undefined {
   return lookupIcon(property, value) ?? lookupIcon(value, null);
 }
 
-function SegmentedIcons({ property, values, rotate = 0, maxVisible = 4, layoutProperty, layoutCtx }: {
+/* ── Segmented control styles ── */
+const SEG_ITEM = "flex-1 flex items-center justify-center py-[8px] transition-all focus-visible:outline-none";
+const SEG_IDLE = "text-[color:var(--color-ink)]/50 hover:text-[color:var(--color-ink)]/60 hover:bg-black/[0.03] dark:hover:bg-white/[0.04]";
+const SEG_ACTIVE = "!text-[color:var(--color-ink)] bg-black/[0.06] dark:bg-white/[0.08] dark:shadow-sm";
+const SEG_OVERFLOW_BTN = "flex items-center justify-center py-1 pl-1.5 pr-2 transition-all focus-visible:outline-none";
+
+/** Edge rounding — only first/last items get rounded corners. */
+function segRounding(index: number, total: number): string {
+  if (total === 1) return "rounded-md";
+  if (index === 0) return "rounded-l-md";
+  if (index === total - 1) return "rounded-r-md";
+  return "";
+}
+const SEG_DROPDOWN = "absolute right-0 top-full mt-1 z-50 bg-[color:var(--color-page)] border border-[color:var(--color-edge)] rounded-lg shadow-lg p-1 min-w-[160px] animate-in fade-in-0 zoom-in-95";
+const SEG_DROP_ITEM = "w-full flex items-center gap-2.5 px-2.5 py-1.5 text-[11px] rounded-md transition-colors cursor-pointer text-[color:var(--color-ink)]/70 hover:bg-black/[0.06] dark:hover:bg-white/[0.08]";
+
+/** Dots icon for overflow trigger. */
+const OverflowDots = () => (
+  <svg viewBox="0 0 15 15" className="w-[15px] h-[15px]" fill="currentColor">
+    <circle cx="3" cy="7.5" r="1" />
+    <circle cx="7.5" cy="7.5" r="1" />
+    <circle cx="12" cy="7.5" r="1" />
+  </svg>
+);
+
+/** Overflow dropdown menu shared between segmented variants. */
+function SegmentedOverflowMenu({ items, selected, property, onSelect, onClose, resolveIcon }: {
+  items: readonly string[];
+  selected: string;
+  property: string;
+  onSelect: (v: string) => void;
+  onClose: () => void;
+  resolveIcon?: (property: string, value: string) => CascadeIcon | undefined;
+}) {
+  const getIcon = resolveIcon ?? resolve;
+  return (
+    <>
+      <div className="fixed inset-0 z-40" onClick={onClose} />
+      <div className={SEG_DROPDOWN}>
+        {items.map((v) => {
+          const icon = getIcon(property, v);
+          return (
+            <button
+              key={v}
+              type="button"
+              onClick={() => { onSelect(v); onClose(); }}
+              className={clsx(SEG_DROP_ITEM, selected === v && "bg-black/[0.06] dark:bg-white/[0.08]")}
+            >
+              {icon && <IconSvg icon={icon} className="w-[15px] h-[15px] shrink-0" />}
+              <span className="flex-1 text-left">{v}</span>
+            </button>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+/** Overflow trigger button. */
+function SegmentedOverflowTrigger({ active, disabled, onClick, className }: { active: boolean; disabled?: boolean; onClick: () => void; className?: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={onClick}
+          disabled={disabled}
+          className={clsx(SEG_OVERFLOW_BTN, disabled ? "cursor-default" : "cursor-pointer", SEG_IDLE, active && SEG_ACTIVE, className)}
+        >
+          <OverflowDots />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" className="text-xs px-2 py-1 rounded-md">
+        More options
+        <TooltipArrow />
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+/** Segmented icon control with optional overflow, layout previews, and controlled/uncontrolled modes. */
+function SegmentedControl({ property, values, value: controlledValue, onChange, rotate = 0, maxVisible = 4, disabled, layoutProperty, layoutCtx }: {
   property: string;
   values: readonly string[];
+  value?: string;
+  onChange?: (v: string) => void;
   rotate?: number;
   maxVisible?: number;
+  disabled?: boolean;
   layoutProperty?: string;
   layoutCtx?: LayoutContext;
 }) {
-  const [selected, setSelected] = useState(values[0]);
+  const [internal, setInternal] = useState(values[0]);
   const [overflowOpen, setOverflowOpen] = useState(false);
+
+  const selected = controlledValue ?? internal;
+  const onSelect = (v: string) => { onChange ? onChange(v) : setInternal(v); };
 
   const hasOverflow = values.length > maxVisible;
   const visible = hasOverflow ? values.slice(0, maxVisible) : values;
   const overflow = hasOverflow ? values.slice(maxVisible) : [];
+  const hasLayoutTooltip = !!layoutProperty;
 
   return (
     <div className="relative">
-      <div className={clsx("flex w-full rounded-lg p-1 gap-1", PV_BG)}>
-        {visible.map((v) => {
+      <div className={clsx("flex w-full rounded-md p-0", PV_BG, disabled && "opacity-60")}>
+        {visible.map((v, i) => {
           const icon = resolve(property, v);
           if (!icon) return null;
           const active = selected === v;
+          const totalSlots = visible.length + (hasOverflow ? 1 : 0);
           return (
             <Tooltip key={v}>
               <TooltipTrigger asChild>
                 <button
                   type="button"
-                  onClick={() => setSelected(v)}
-                  className={clsx(
-                    "flex-1 flex items-center justify-center py-1.5 rounded-md transition-all cursor-pointer",
-                    "text-[color:var(--color-ink)]/30 hover:text-[color:var(--color-ink)]/40 hover:bg-black/[0.03] dark:hover:bg-white/[0.04]",
-                    active && "!text-[color:var(--color-ink)] bg-black/[0.06] dark:bg-white/[0.08] dark:shadow-sm",
-                    "focus-visible:outline-none",
-                  )}
+                  onClick={() => onSelect(v)}
+                  disabled={disabled}
+                  className={clsx(SEG_ITEM, segRounding(i, totalSlots), disabled ? "cursor-default" : "cursor-pointer", SEG_IDLE, active && SEG_ACTIVE)}
                 >
                   <IconSvg icon={icon} rotate={rotate} className="w-[15px] h-[15px]" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="bottom" className={layoutProperty ? "!bg-[color:var(--color-page)] !text-[color:var(--color-ink)] border border-[color:var(--color-edge)] p-0 rounded-xl overflow-hidden w-[140px] shadow-lg" : "text-xs px-2 py-1 rounded-md"}>
-                {layoutProperty ? (
+              <TooltipContent side="bottom" className={hasLayoutTooltip ? "!bg-[color:var(--color-page)] !text-[color:var(--color-ink)] border border-[color:var(--color-edge)] p-0 rounded-xl overflow-hidden w-[140px] shadow-lg" : "text-xs px-2 py-1 rounded-md"}>
+                {hasLayoutTooltip ? (
                   <div>
                     <div className="p-2 pb-1.5">
-                      <LayoutPreview property={layoutProperty} value={v} ctx={layoutCtx} />
+                      <LayoutPreview property={layoutProperty!} value={v} ctx={layoutCtx} />
                     </div>
                     <div className="px-2.5 pb-2 space-y-0.5">
                       <div className="text-[11px] font-medium">{v}</div>
-                      {VALUE_HINTS[layoutProperty]?.[v] && (
-                        <div className="text-[10px] text-[color:var(--color-ink3)] leading-tight">{VALUE_HINTS[layoutProperty][v]}</div>
+                      {VALUE_HINTS[layoutProperty!]?.[v] && (
+                        <div className="text-[10px] text-[color:var(--color-ink3)] leading-tight">{VALUE_HINTS[layoutProperty!][v]}</div>
                       )}
                     </div>
                   </div>
                 ) : v}
-                <TooltipArrow className={layoutProperty ? "!fill-[color:var(--color-page)]" : ""} />
+                <TooltipArrow className={hasLayoutTooltip ? "!fill-[color:var(--color-page)]" : ""} />
               </TooltipContent>
             </Tooltip>
           );
         })}
         {hasOverflow && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={() => setOverflowOpen(!overflowOpen)}
-                className={clsx(
-                  "flex items-center justify-center rounded-md py-1.5 pl-1.5 pr-2 transition-all cursor-pointer",
-                  "text-[color:var(--color-ink)]/30 hover:text-[color:var(--color-ink)]/40 hover:bg-black/[0.03] dark:hover:bg-white/[0.04]",
-                  overflow.includes(selected) && "!text-[color:var(--color-ink)] bg-black/[0.06] dark:bg-white/[0.08] dark:shadow-sm",
-                  "focus-visible:outline-none",
-                )}
-              >
-                <svg viewBox="0 0 15 15" className="w-[15px] h-[15px]" fill="currentColor">
-                  <circle cx="3" cy="7.5" r="1" />
-                  <circle cx="7.5" cy="7.5" r="1" />
-                  <circle cx="12" cy="7.5" r="1" />
-                </svg>
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="text-xs px-2 py-1 rounded-md">
-              More options
-              <TooltipArrow />
-            </TooltipContent>
-          </Tooltip>
+          <SegmentedOverflowTrigger
+            active={overflow.includes(selected)}
+            disabled={disabled}
+            onClick={() => !disabled && setOverflowOpen(!overflowOpen)}
+            className="rounded-r-md"
+          />
         )}
         {overflowOpen && (
-          <>
-            <div className="fixed inset-0 z-40" onClick={() => setOverflowOpen(false)} />
-            <div className="absolute right-0 top-full mt-1 z-50 bg-[color:var(--color-raised)] border border-[color:var(--color-edge)] rounded-lg shadow-lg p-1 min-w-[160px] animate-in fade-in-0 zoom-in-95">
-              {overflow.map((v) => {
-                const icon = resolve(property, v);
-                return (
-                  <button
-                    key={v}
-                    type="button"
-                    onClick={() => { setSelected(v); setOverflowOpen(false); }}
-                    className={clsx(
-                      "w-full flex items-center gap-2.5 px-2 py-1.5 text-[11px] rounded-md transition-colors cursor-pointer",
-                      "text-[color:var(--color-ink3)] hover:bg-[color:var(--color-muted)]",
-                      selected === v && "bg-[color:var(--color-muted)]",
-                    )}
-                  >
-                    {icon && <IconSvg icon={icon} className="w-[15px] h-[15px] shrink-0" />}
-                    <span className="flex-1 text-left">{v}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </>
+          <SegmentedOverflowMenu
+            items={overflow}
+            selected={selected}
+            property={property}
+            onSelect={onSelect}
+            onClose={() => setOverflowOpen(false)}
+          />
         )}
       </div>
     </div>
@@ -724,7 +842,7 @@ function SegmentedIcons({ property, values, rotate = 0, maxVisible = 4, layoutPr
 function ControlLabel({ children, actions }: { children: React.ReactNode; actions?: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between px-0.5">
-      <div className={clsx("text-[10px] font-medium capitalize", PV_LABEL_COLOR)}>{children}</div>
+      <div className={clsx("text-[9px] font-medium tracking-[0.25px] capitalize", PV_LABEL_COLOR)}>{children}</div>
       {actions}
     </div>
   );
@@ -732,7 +850,7 @@ function ControlLabel({ children, actions }: { children: React.ReactNode; action
 
 function LabelledControl({ label, actions, children }: { label: string; actions?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1.25">
       <ControlLabel actions={actions}>{label}</ControlLabel>
       {children}
     </div>
@@ -846,29 +964,43 @@ function PropertySection({ label, property, values, rotate = 0, layoutProperty, 
   layoutProperty?: string;
   layoutCtx?: LayoutContext;
 }) {
-  const [explainerProp, setExplainerProp] = useState<string | null>(null);
+  const [explainerOpen, setExplainerOpen] = useState(false);
 
   return (
-    <div className="relative">
+    <div>
       <LabelledControl
         label={label}
         actions={layoutProperty ? (
-          <button
-            type="button"
-            onClick={() => setExplainerProp(explainerProp ? null : layoutProperty)}
-            className="w-4 h-4 flex items-center justify-center rounded text-[color:var(--color-ink3)]/40 hover:text-[color:var(--color-ink3)] transition-colors cursor-pointer"
-          >
-            <svg viewBox="0 0 12 12" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="1.2"><circle cx="6" cy="6" r="5" /><path d="M6 5.5V8.5M6 3.5V4" /></svg>
-          </button>
+          <Popover.Root open={explainerOpen} onOpenChange={setExplainerOpen}>
+            <Popover.Trigger asChild>
+              <button
+                type="button"
+                className="w-4 h-4 flex items-center justify-center rounded text-[color:var(--color-ink3)]/40 hover:text-[color:var(--color-ink3)] transition-colors cursor-pointer"
+              >
+                <svg viewBox="0 0 12 12" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="1.2"><circle cx="6" cy="6" r="5" /><path d="M6 5.5V8.5M6 3.5V4" /></svg>
+              </button>
+            </Popover.Trigger>
+            <Popover.Portal>
+              <Popover.Content
+                side="bottom"
+                align="start"
+                sideOffset={8}
+                collisionPadding={{ top: 12, bottom: 80, left: 12, right: 12 }}
+                className="bg-[color:var(--color-page)] border border-[color:var(--color-edge)] rounded-xl shadow-xl overflow-hidden w-[240px] animate-in fade-in-0 zoom-in-95 z-50"
+              >
+                <PropertyExplainerContent property={layoutProperty} ctx={layoutCtx ?? DEFAULT_CTX} onClose={() => setExplainerOpen(false)} />
+              </Popover.Content>
+            </Popover.Portal>
+          </Popover.Root>
         ) : undefined}
       >
-        <SegmentedIcons property={property} values={values} rotate={rotate} layoutProperty={layoutProperty} layoutCtx={layoutCtx} />
+        <SegmentedControl property={property} values={values} rotate={rotate} layoutProperty={layoutProperty} layoutCtx={layoutCtx} />
       </LabelledControl>
-      {explainerProp && <PropertyExplainer property={explainerProp} ctx={layoutCtx ?? DEFAULT_CTX} onClose={() => setExplainerProp(null)} />}
     </div>
   );
 }
 
+/** Labelled segmented icon toggle — controlled, for editor panel top-level controls. */
 function IconToggle<T extends string>({ label, property, options, value, onChange, disabled, maxVisible }: {
   label: string;
   property: string;
@@ -878,96 +1010,16 @@ function IconToggle<T extends string>({ label, property, options, value, onChang
   disabled?: boolean;
   maxVisible?: number;
 }) {
-  const [overflowOpen, setOverflowOpen] = useState(false);
-  const hasOverflow = maxVisible != null && options.length > maxVisible;
-  const visible = hasOverflow ? options.slice(0, maxVisible) : options;
-  const overflow = hasOverflow ? options.slice(maxVisible) : [];
-
   return (
     <LabelledControl label={label}>
-      <div className={clsx("flex rounded-lg p-1 gap-1 relative", PV_BG, disabled && "opacity-60")}>
-        {visible.map((opt) => {
-          const icon = lookupIcon(property, opt);
-          if (!icon) return null;
-          const active = value === opt;
-          return (
-            <Tooltip key={opt}>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  onClick={() => onChange?.(opt)}
-                  disabled={disabled}
-                  className={clsx(
-                    "flex-1 flex items-center justify-center py-1.5 rounded-md transition-all",
-                    disabled ? "cursor-default" : "cursor-pointer",
-                    "text-[color:var(--color-ink)]/30 hover:text-[color:var(--color-ink)]/40 hover:bg-black/[0.03] dark:hover:bg-white/[0.04]",
-                    active && "!text-[color:var(--color-ink)] bg-black/[0.06] dark:bg-white/[0.08] dark:shadow-sm",
-                  )}
-                >
-                  <IconSvg icon={icon} className="w-[15px] h-[15px]" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="text-xs px-2 py-1 rounded-md">
-                {opt}
-                <TooltipArrow />
-              </TooltipContent>
-            </Tooltip>
-          );
-        })}
-        {hasOverflow && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={() => !disabled && setOverflowOpen(!overflowOpen)}
-                disabled={disabled}
-                className={clsx(
-                  "flex items-center justify-center rounded-md py-1.5 pl-1.5 pr-2 transition-all",
-                  disabled ? "cursor-default" : "cursor-pointer",
-                  "text-[color:var(--color-ink)]/30 hover:text-[color:var(--color-ink)]/40 hover:bg-black/[0.03] dark:hover:bg-white/[0.04]",
-                  overflow.includes(value) && "!text-[color:var(--color-ink)] bg-black/[0.06] dark:bg-white/[0.08] dark:shadow-sm",
-                  "focus-visible:outline-none",
-                )}
-              >
-                <svg viewBox="0 0 15 15" className="w-[15px] h-[15px]" fill="currentColor">
-                  <circle cx="3" cy="7.5" r="1" />
-                  <circle cx="7.5" cy="7.5" r="1" />
-                  <circle cx="12" cy="7.5" r="1" />
-                </svg>
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="text-xs px-2 py-1 rounded-md">
-              More options
-              <TooltipArrow />
-            </TooltipContent>
-          </Tooltip>
-        )}
-        {overflowOpen && (
-          <>
-            <div className="fixed inset-0 z-40" onClick={() => setOverflowOpen(false)} />
-            <div className="absolute right-0 top-full mt-1 z-50 bg-[color:var(--color-raised)] border border-[color:var(--color-edge)] rounded-lg shadow-lg p-1 min-w-[160px] animate-in fade-in-0 zoom-in-95">
-              {overflow.map((v) => {
-                const icon = lookupIcon(property, v);
-                return (
-                  <button
-                    key={v}
-                    type="button"
-                    onClick={() => { onChange?.(v); setOverflowOpen(false); }}
-                    className={clsx(
-                      "w-full flex items-center gap-2.5 px-2 py-1.5 text-[11px] rounded-md transition-colors cursor-pointer",
-                      "text-[color:var(--color-ink3)] hover:bg-[color:var(--color-muted)]",
-                      value === v && "bg-[color:var(--color-muted)]",
-                    )}
-                  >
-                    {icon && <IconSvg icon={icon} className="w-[15px] h-[15px] shrink-0" />}
-                    <span className="flex-1 text-left">{v}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </>
-        )}
-      </div>
+      <SegmentedControl
+        property={property}
+        values={options}
+        value={value}
+        onChange={onChange ? (v) => onChange(v as T) : undefined}
+        disabled={disabled}
+        maxVisible={maxVisible}
+      />
     </LabelledControl>
   );
 }
@@ -980,17 +1032,17 @@ function CollapsibleSection({ title, defaultOpen = false, first, children }: { t
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center justify-between w-full py-3 px-3.5 cursor-pointer transition-colors hover:bg-black/[0.05] dark:hover:bg-white/[0.05]"
+        className="flex items-center justify-between w-full py-3 px-6 cursor-pointer transition-colors group"
       >
-        <span className="text-[11px] font-semibold text-[color:var(--color-ink)]/80">{title}</span>
+        <span className="text-[11px] font-semibold text-[color:var(--color-ink)]/80 group-hover:text-[color:var(--color-ink)]">{title}</span>
         <svg
           width="12" height="12" viewBox="0 0 12 12" fill="none"
-          className={clsx("text-[color:var(--color-ink3)]/50 transition-transform", open && "rotate-180")}
+          className={clsx("text-[color:var(--color-ink2)] transition-transform", open && "rotate-180")}
         >
           <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
-      {open && <div className="space-y-3 pb-3 px-3">{children}</div>}
+      {open && <div className="space-y-3.5 pb-5.5 px-5.5">{children}</div>}
     </div>
   );
 }
@@ -1017,8 +1069,8 @@ function EditorPanelBody({ position, display, direction, wrap: wrapMode, showSel
 
   return (
     <div>
-      <CollapsibleSection title="Position" first defaultOpen>
-        <IconToggle label="Position" property="position" options={["static", "relative", "absolute", "fixed", "sticky"]} value={position} onChange={onChangePosition} disabled={locked} />
+      <CollapsibleSection title="Placement" first defaultOpen>
+        <IconToggle label="Position" property="position" options={["relative", "absolute", "fixed", "sticky"]} value={position} onChange={onChangePosition} disabled={locked} />
         <InputPairSection pairs={[
           { property: "size", value: "horizontal", label: "Width" },
           { property: "size", value: "vertical", label: "Height" },
@@ -1032,7 +1084,10 @@ function EditorPanelBody({ position, display, direction, wrap: wrapMode, showSel
           <IconToggle label="Direction" property="flex-direction" options={["row", "row-reverse", "column", "column-reverse"]} value={direction} onChange={onChangeDirection} disabled={locked} />
         )}
         {isFlex && (
-          <IconToggle label="Wrap" property="flex-wrap" options={["nowrap", "wrap", "wrap-reverse"]} value={wrapMode} onChange={onChangeWrap} disabled={locked} />
+          <div className="grid grid-cols-2 gap-2">
+            <IconToggle label="Wrap" property="flex-wrap" options={["wrap", "wrap-reverse"]} value={wrapMode === "nowrap" ? "wrap" : wrapMode} onChange={onChangeWrap} disabled={locked} />
+            <PropertySection label="Grow / Shrink" property="flex-grow" values={["flex-grow", "flex-shrink"]} />
+          </div>
         )}
       </CollapsibleSection>
 
@@ -1049,7 +1104,6 @@ function EditorPanelBody({ position, display, direction, wrap: wrapMode, showSel
               <PropertySection label="Align content" property="align-content" values={AC_VALUES} rotate={acRotate} layoutProperty="align-content" layoutCtx={ctx} />
             )}
             <PropertySection label="Align items" property="align-items" values={AI_VALUES} rotate={aiRotate} layoutProperty="align-items" layoutCtx={ctx} />
-            <PropertySection label="Grow/Shrink" property="flex-grow" values={["flex-grow", "flex-shrink"]} />
             {showSelf && (
               <>
                 <p className="text-[9px] text-[color:var(--color-ink3)]/50 px-0.5">On selected child</p>
@@ -1133,9 +1187,9 @@ function ContextPanel() {
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="rounded-xl border border-edge bg-page dark:bg-raised shadow-lg shadow-black/[0.1] dark:shadow-black/20 overflow-clip w-full">
+      <div className="border-l border-edge-subtle dark:border-edge bg-page dark:bg-raised w-full h-full">
         <EditorPanelBody
-          position={position} display={display} direction={direction} wrap={wrap} showSelf
+          position={position} display={display} direction={direction} wrap={wrap} showSelf={false}
           onChangePosition={setPosition} onChangeDisplay={setDisplay} onChangeDirection={setDirection} onChangeWrap={setWrap}
         />
       </div>
@@ -1149,27 +1203,27 @@ function ContextPanel() {
 
 function CascadeFooter() {
   return (
-    <footer className="py-8 border-t border-edge-subtle">
+    <footer className="py-8 bg-[#09090b] border-t border-white/8">
       <div className="max-w-[1100px] mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <span className="text-[12px] text-ink3 font-mono">
-          <span className="text-ink3/50">@designtools/</span>cascade{" "}
-          <span className="text-ink3/30 mx-1">/</span>{" "}
-          <a href="/" className="text-ink3/50 hover:text-ink2 transition-colors">
+        <span className="text-[12px] text-white/50 font-mono">
+          <span className="text-white/40">@designtools/</span>cascade{" "}
+          <span className="text-white/20 mx-1">/</span>{" "}
+          <a href="/" className="text-white/40 hover:text-white/60 transition-colors">
             surface
           </a>
-          <span className="text-ink3/30 mx-1">/</span>{" "}
-          <a href="https://flett.cc" target="_blank" rel="noopener" className="text-ink3/50 hover:text-ink2 transition-colors">
+          <span className="text-white/20 mx-1">/</span>{" "}
+          <a href="https://flett.cc" target="_blank" rel="noopener" className="text-white/40 hover:text-white/60 transition-colors">
             flett.cc
           </a>
         </span>
         <ul className="flex flex-wrap justify-center gap-5 list-none">
           <li>
-            <a href="https://github.com/andflett/cascade" target="_blank" rel="noopener" className="text-[12px] text-ink3 hover:text-ink2 transition-colors font-mono">
+            <a href="https://github.com/andflett/cascade" target="_blank" rel="noopener" className="text-[12px] text-white/50 hover:text-white transition-colors font-mono">
               github
             </a>
           </li>
           <li>
-            <a href="https://www.npmjs.com/package/@designtools/cascade" target="_blank" rel="noopener" className="text-[12px] text-ink3 hover:text-ink2 transition-colors font-mono">
+            <a href="https://www.npmjs.com/package/@designtools/cascade" target="_blank" rel="noopener" className="text-[12px] text-white/50 hover:text-white transition-colors font-mono">
               npm
             </a>
           </li>
@@ -1212,77 +1266,109 @@ function InstallCommand() {
   );
 }
 
+/** Duo/Solid segmented toggle. */
+function IconStyleToggle({ value, onChange }: { value: IconStyle; onChange: (v: IconStyle) => void }) {
+  return (
+    <div className="inline-flex rounded-lg p-0.5 gap-0.5 border border-white/10 bg-white/5">
+      {(["duo", "solid"] as const).map((opt) => (
+        <button
+          key={opt}
+          type="button"
+          onClick={() => onChange(opt)}
+          className={clsx(
+            "px-3 py-1 text-[11px] font-mono rounded-md transition-all cursor-pointer",
+            value === opt
+              ? "bg-white/15 text-white/80"
+              : "text-white/30 hover:text-white/50",
+          )}
+        >
+          {opt === "duo" ? "Duotone" : "Solid"}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function CascadePage() {
   const entries = orderedEntries();
   const uniqueIcons = new Set(metadata.map((e) => e.icon)).size;
   const uniqueProperties = new Set(metadata.map((e) => e.property)).size;
+  const [iconStyle, setIconStyle] = useState<IconStyle>("duo");
 
   return (
-    <div className="min-h-screen bg-page text-ink flex flex-col">
-      <CascadeNav />
+    <IconStyleContext.Provider value={iconStyle}>
+      <div className="min-h-screen bg-page text-ink flex flex-col">
+        <CascadeNav />
 
-      {/* Hero */}
-      <section className="relative pt-28 pb-16 text-center bg-[#09090b] overflow-hidden">
-        <div className="max-w-[1200px] mx-auto px-6 relative">
-          <div className="relative inline-flex justify-center mb-6">
-            <DitherGlow
-              width={450}
-              height={100}
-              pixelSize={3}
-              color="rgba(255,255,255,0.15)"
-              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
-            />
-            <span className="inline-flex items-center gap-2.5 px-4 py-1.5 text-xs font-medium text-white/70 font-mono relative rounded-full">
-              <span className="animate-pulse w-1.5 h-1.5 bg-green-400 rounded-full" />
-              v0.1 — @designtools/cascade
-            </span>
+        {/* Hero */}
+        <section className="relative pt-20 pb-8 text-center bg-[#09090b] overflow-hidden dark:border-b dark:border-edge">
+          <div className="max-w-[1200px] mx-auto px-6 relative">
+            <div className="relative inline-flex justify-center mb-7">
+              <DitherGlow
+                width={450}
+                height={100}
+                pixelSize={3}
+                color="rgba(255,255,255,0.15)"
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+              />
+              <span className="inline-flex items-center gap-2.5 px-4 py-1.5 text-xs font-medium text-white/70 font-mono relative rounded-full">
+                <span className="animate-pulse w-1.5 h-1.5 bg-green-400 rounded-full" />
+                v0.1 — @designtools/cascade
+              </span>
+            </div>
+            <h1
+              className="text-[clamp(2.25rem,5.5vw,3.75rem)] font-normal leading-[1.0] tracking-[-0.025em] text-white mb-3"
+              style={{ fontFamily: "'Jersey 25', sans-serif" }}
+            >
+              <span className="glitch" data-text="Cascade">
+                Cascade
+              </span>{" "}
+              Icons
+            </h1>
+            <p className="text-sm md:text-base text-white/60 max-w-[480px] mx-auto leading-relaxed mb-6">
+              {uniqueIcons} hand-crafted icons across {uniqueProperties} CSS
+              property groups. Designed for visual editors that speak code.
+            </p>
+            <InstallCommand />
+            <div className="mt-7">
+{/* Duo/Solid toggle removed — available per-icon in popovers */}
+            </div>
           </div>
-          <h1
-            className="text-[clamp(2.25rem,5.5vw,3.75rem)] font-normal leading-[1.0] tracking-[-0.025em] text-white mb-5"
-            style={{ fontFamily: "'Jersey 25', sans-serif" }}
-          >
-            <span className="glitch" data-text="CSS">CSS</span> property icons
-          </h1>
-          <p className="text-sm md:text-base text-white/60 max-w-[480px] mx-auto leading-relaxed mb-8">
-            {uniqueIcons} hand-crafted icons across {uniqueProperties} CSS
-            property groups. Designed for visual editors that speak code.
-          </p>
-          <InstallCommand />
-        </div>
-      </section>
+        </section>
 
-      {/* Design canvas — full-bleed grid, panel overlays right */}
-      <section className="relative -mt-px overflow-hidden">
-        <div
-          className="max-w-[1200px] mx-auto px-6"
-          style={{ display: "grid", gridTemplateColumns: "1fr 320px" }}
-        >
-          {/* CanvasGrid spans both columns — its container is full content width,
-              so the 100vw breakout inside centers correctly */}
-          <div style={{ gridColumn: "1 / -1", gridRow: 1, alignSelf: "start" }}>
+        {/* Design canvas — full-bleed grid + panel pinned to right edge */}
+        <section className="relative overflow-hidden">
+          {/* Canvas grid — full viewport width, icons centred */}
+          <div className="max-w-[1200px] mx-auto px-6">
             <TooltipProvider delayDuration={200}>
-              <CanvasGrid entries={entries} padTop={1} panelWidth={320 + CELL} />
+              <CanvasGrid
+                entries={entries}
+                padTop={1}
+                panelWidth={310 + CELL}
+              />
             </TooltipProvider>
           </div>
 
-          {/* Panel overlays right column, on top of the grid */}
+          {/* Panel — absolute to right edge, full height of section */}
           <div
-            className="max-lg:hidden relative z-20"
-            style={{ gridColumn: 2, gridRow: 1, paddingTop: 76 }}
+            className="max-lg:hidden absolute top-0 right-0 bottom-0 z-30"
+            style={{ width: 330 }}
           >
-            <ContextPanel />
+            <div className="sticky top-0 h-screen overflow-y-auto">
+              <ContextPanel />
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Mobile-only editor panel */}
-      <section className="lg:hidden py-12 px-6">
-        <ContextPanel />
-      </section>
+        {/* Mobile-only editor panel */}
+        <section className="lg:hidden py-12 px-6">
+          <ContextPanel />
+        </section>
 
-      <div className="dither-band" />
+        <div className="dither-band" />
 
-      <CascadeFooter />
-    </div>
+        <CascadeFooter />
+      </div>
+    </IconStyleContext.Provider>
   );
 }

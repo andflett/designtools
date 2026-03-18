@@ -5,9 +5,23 @@
 import * as React from "react";
 import type { SvgPathData, SlotIconData } from "./types";
 
+/* ---------- solidify utility ---------- */
+
+/** Clone an icon with all path opacity values set to 1 (full opacity). */
+export function solidifyIcon(icon: SlotIconData): SlotIconData {
+  return {
+    viewBox: icon.viewBox,
+    paths: icon.paths.map((p) =>
+      p.opacity !== undefined && p.opacity !== 1
+        ? { ...p, opacity: 1 }
+        : p,
+    ),
+  };
+}
+
 /* ---------- render a single SVG element for the preview ---------- */
 
-export function renderPreviewElement(p: SvgPathData) {
+export function renderPreviewElement(p: SvgPathData, solid?: boolean) {
   const common = {
     key: p.id,
     fill: p.fill,
@@ -16,7 +30,7 @@ export function renderPreviewElement(p: SvgPathData) {
     strokeLinecap: p.strokeLinecap,
     strokeLinejoin: p.strokeLinejoin,
     strokeDasharray: p.strokeDasharray,
-    opacity: p.opacity ?? 1,
+    opacity: solid ? 1 : (p.opacity ?? 1),
     fillRule: p.fillRule,
     clipRule: p.clipRule,
     transform: p.transform,
@@ -43,7 +57,7 @@ export function renderPreviewElement(p: SvgPathData) {
 export const PV_BG = "bg-black/[0.04] dark:bg-white/[0.06]";
 export const PV_LABEL_COLOR = "text-[color:var(--color-ink3)]/50";
 
-export function IconSvg({ icon, className, rotate = 0 }: { icon: SlotIconData | undefined; className?: string; rotate?: number }) {
+export function IconSvg({ icon, className, rotate = 0, solid = false }: { icon: SlotIconData | undefined; className?: string; rotate?: number; solid?: boolean }) {
   if (!icon) {
     return React.createElement("div", {
       className: `rounded-sm border border-dashed border-[color:var(--color-ink3)]/30 ${className ?? ""}`,
@@ -54,5 +68,5 @@ export function IconSvg({ icon, className, rotate = 0 }: { icon: SlotIconData | 
     className,
     fill: "none",
     style: rotate ? { transform: `rotate(${rotate}deg)` } : undefined,
-  }, icon.paths.map(renderPreviewElement));
+  }, icon.paths.map((p) => renderPreviewElement(p, solid)));
 }

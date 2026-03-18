@@ -34,6 +34,8 @@ const publishTypes = `import type { SVGAttributes } from "react";
 export interface CascadeIconProps extends SVGAttributes<SVGSVGElement> {
   /** Icon colour. Defaults to \\\`currentColor\\\` (inherits from parent text colour). */
   color?: string;
+  /** Render at full opacity (strips duotone fading). No effect on non-duotone icons. */
+  solid?: boolean;
   /** Icons do not accept children. */
   children?: never;
 }

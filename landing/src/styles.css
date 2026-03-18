@@ -24,15 +24,15 @@
    ───────────────────────────────────────────────── */
 
 .dark {
-  --color-page: #09090b;
+  --color-page: #161618;
   --color-raised: #18181b;
   --color-muted: #27272a;
   --color-surface: #111113;
   --color-edge: #27272a;
   --color-edge-subtle: #1f1f23;
   --color-ink: #fafafa;
-  --color-ink2: #a1a1aa;
-  --color-ink3: #71717a;
+  --color-ink2: #b5b5be;
+  --color-ink3: #9494a0;
   --color-btn: #fafafa;
 }
 

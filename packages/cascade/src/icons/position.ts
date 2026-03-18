@@ -21,9 +21,9 @@ function RR(x: number, y: number, w: number, h: number, r: number): string {
   return `M${x + r} ${y}h${w - 2 * r}a${r} ${r} 0 0 1 ${r} ${r}v${h - 2 * r}a${r} ${r} 0 0 1 ${-r} ${r}h${-(w - 2 * r)}a${r} ${r} 0 0 1 ${-r} ${-r}v${-(h - 2 * r)}a${r} ${r} 0 0 1 ${r} ${-r}z`;
 }
 
-/** Outlined block with 1px rounded outer corners, sharp inner cutout. */
-function O(x: number, y: number, w: number, h: number, t = 1): string {
-  return RR(x, y, w, h, 1) + R(x + t, y + t, w - t * 2, h - t * 2);
+/** Outlined block with rounded outer corners, inner cutout radius = r-t. */
+function O(x: number, y: number, w: number, h: number, t = 1, r = 1): string {
+  return RR(x, y, w, h, r) + RR(x + t, y + t, w - t * 2, h - t * 2, Math.max(0, r - t));
 }
 
 function ef(...parts: string[]): SvgPathData {
@@ -65,32 +65,36 @@ const pos_static = icon(
 );
 
 const pos_relative = icon(
-  ef(O(5, 5, 10, 10)),
-  stroke("M0.5 0.5L4.5 4.5"),
-  stroke("M0.5 3.5L0.5 0.5L3.5 0.5"),
+  // corner ticks marking reserved 9×9 space at (0,0)
+  pl(
+    R(0, 0, 3, 1), R(0, 1, 1, 2),                     // TL tick
+    R(6, 0, 3, 1), R(8, 1, 1, 2),                     // TR tick
+    R(0, 6, 1, 2), R(0, 8, 3, 1),                     // BL tick
+  ),
+  ef(O(6, 6, 9, 9, 1, 1)),                            // shifted element
 );
 
 const pos_absolute = icon(
-  ef(O(5, 5, 5, 5)),
-  // Top-left L
-  pl(R(0, 0, 1, 4) + R(0, 0, 4, 1)),
+  ef(O(5, 5, 5, 5, 1, 2)),
+  // Top-left L (1px round at outer corner)
+  pl("M1 0h3v1h-3v3h-1v-3a1 1 0 0 1 1 -1z"),
   // Top-right L
-  pl(R(14, 0, 1, 4) + R(11, 0, 4, 1)),
+  pl("M11 0h3a1 1 0 0 1 1 1v3h-1v-3h-3z"),
   // Bottom-left L
-  pl(R(0, 11, 1, 4) + R(0, 14, 4, 1)),
+  pl("M0 11h1v3h3v1h-3a1 1 0 0 1 -1 -1z"),
   // Bottom-right L
-  pl(R(14, 11, 1, 4) + R(11, 14, 4, 1)),
+  pl("M14 11h1v3a1 1 0 0 1 -1 1h-3v-1h3z"),
 );
 
 const pos_fixed = icon(
-  ef(O(0, 0, 15, 15)),
+  ef(O(0, 0, 15, 15, 1, 2)),
   pl(R(9, 9, 1, 6) + R(9, 9, 6, 1)),
   stroke("M3 3L7.5 7.5"),
   stroke("M7.5 4.5L7.5 7.5L4.5 7.5"),
 );
 
 const pos_sticky = icon(
-  ef(O(0, 0, 15, 15)),
+  ef(O(0, 0, 15, 15, 1, 2)),
   pl(R(1, 4, 13, 1)),
   stroke("M7.5 12.5L7.5 7.5"),
   stroke("M5.5 9.5L7.5 7.5L9.5 9.5"),

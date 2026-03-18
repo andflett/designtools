@@ -66,3 +66,10 @@ export function iconToSvgString(icon: CascadeIcon): string {
   const { Component } = icon;
   return renderToStaticMarkup(React.createElement(Component));
 }
+
+/** Generate a React JSX usage string for copying. */
+export function iconToReactString(name: string, solid: boolean): string {
+  const props: string[] = [];
+  if (solid) props.push("solid");
+  return props.length > 0 ? `<${name} ${props.join(" ")} />` : `<${name} />`;
+}

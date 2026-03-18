@@ -21,9 +21,9 @@ function RR(x: number, y: number, w: number, h: number, r: number): string {
   return `M${x + r} ${y}h${w - 2 * r}a${r} ${r} 0 0 1 ${r} ${r}v${h - 2 * r}a${r} ${r} 0 0 1 ${-r} ${r}h${-(w - 2 * r)}a${r} ${r} 0 0 1 ${-r} ${-r}v${-(h - 2 * r)}a${r} ${r} 0 0 1 ${r} ${-r}z`;
 }
 
-/** Outlined block with 1px rounded outer corners, sharp inner cutout. */
-function O(x: number, y: number, w: number, h: number, t = 1): string {
-  return RR(x, y, w, h, 1) + R(x + t, y + t, w - t * 2, h - t * 2);
+/** Outlined block with rounded outer corners, inner cutout radius = r-t. */
+function O(x: number, y: number, w: number, h: number, t = 1, r = 1): string {
+  return RR(x, y, w, h, r) + RR(x + t, y + t, w - t * 2, h - t * 2, Math.max(0, r - t));
 }
 
 function ef(...parts: string[]): SvgPathData {
@@ -69,13 +69,14 @@ function hatch(segments: [number, number, number, number][], sw = 0.7): SvgPathD
 }
 
 const vi_opacity = icon(
-  ef(ring(6, 6, 6)),
-  ef(ring(9, 9, 6)),
-  hatch([
-    [6.5, 4, 11, 8.5],
-    [5, 5, 10, 10],
-    [4, 6.5, 8.5, 11],
-  ], 0.8),
+  ef(ring(6, 6, 6, 0.75)),
+  ef(ring(9, 9, 6, 0.75)),
+  // diamond grid of dots filling the overlap lens (2px spacing)
+  cd(7, 5), cd(9, 5),
+  cd(6, 6), cd(8, 6),
+  cd(5, 7), cd(7, 7), cd(9, 7),
+  cd(6, 8), cd(8, 8),
+  cd(5, 9), cd(7, 9),
 );
 
 /* ================================================================
@@ -95,7 +96,7 @@ const vi_shadow = icon(
   cd(11, 11), cd(13, 11),
   cd(11, 13), cd(13, 13),
   // box outline (on top)
-  ef(O(0, 0, 10, 10)),
+  ef(O(0, 0, 10, 10, 1, 2)),
 );
 
 /* ── exports ────────────────────────────────────────────── */

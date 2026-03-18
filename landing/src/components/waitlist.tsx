@@ -67,8 +67,8 @@ export function WaitlistForm({ dark }: { dark?: boolean }) {
               disabled={state === "loading"}
               className={
                 dark
-                  ? "px-5 h-[42px] text-sm font-medium bg-white text-ink rounded-lg hover:bg-white/90 transition-colors disabled:opacity-50 cursor-pointer"
-                  : "px-5 h-[42px] text-sm font-medium bg-btn text-white rounded-lg hover:bg-btn/90 transition-colors disabled:opacity-50 cursor-pointer"
+                  ? "px-5 h-[42px] text-sm font-medium bg-white text-black rounded-lg hover:bg-white/90 transition-colors disabled:opacity-50 cursor-pointer"
+                  : "px-5 h-[42px] text-sm font-medium bg-ink text-page rounded-lg hover:bg-ink/90 transition-colors disabled:opacity-50 cursor-pointer"
               }
             >
               {state === "loading" ? "..." : "Join waitlist"}
@@ -102,7 +102,7 @@ export function Waitlist() {
             It's open source, so no hard sell, but we'll let you know when it's safe to use.
           </p>
           <WaitlistForm />
-          <p className="text-[11px] text-ink3/60 mt-4 font-mono">
+          <p className="text-[11px] text-ink3/60 dark:text-ink3 mt-4 font-mono">
             No spam.{" "}
             <a href="#privacy" className="underline hover:text-ink3 transition-colors">
               Privacy policy

@@ -82,8 +82,8 @@ const SPECS = [
   { key: "Y",       char: "Y", box: [1, 3.5, 13, 8] },
 
   // ── Size labels (standard height) ──
-  { key: "w_lower", char: "w", box: [1, 3.5, 13, 8] },
-  { key: "h_lower", char: "h", box: [1, 3.5, 13, 8] },
+  { key: "w_lower", char: "w", box: [2, 4, 11, 7] },
+  { key: "h_lower", char: "h", box: [3, 3, 9, 9] },
 ];
 
 /**

@@ -18,7 +18,7 @@ function ThemeToggle() {
   return (
     <button
       onClick={toggleTheme}
-      className="inline-flex items-center text-white/50 hover:text-white transition-colors"
+      className="cursor-pointer inline-flex items-center text-white/50 hover:text-white transition-colors"
       aria-label="Toggle theme"
     >
       {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
@@ -31,10 +31,10 @@ export function Nav() {
     <nav className="fixed top-0 left-0 right-0 z-50 py-3 bg-[#09090b]/90 backdrop-blur-xl border-b border-white/8">
       <div className="max-w-[1100px] mx-auto px-6 flex items-center justify-between">
         <span className="text-[13px] font-mono flex items-center gap-0">
-          <span className="text-white/30">@designtools/</span>
+          <span className="text-white/40">@designtools/</span>
           <span className="text-white">surface</span>
           <span className="text-white/20 mx-1.5">/</span>
-          <a href="/cascade" className="text-white/30 hover:text-white/60 transition-colors">
+          <a href="/cascade" className="text-white/40 hover:text-white/60 transition-colors">
             cascade
           </a>
         </span>

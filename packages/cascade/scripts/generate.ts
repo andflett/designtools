@@ -78,6 +78,13 @@ function toValue(key: string): string | null {
   return val;
 }
 
+// ── Duotone detection ───────────────────────────────────────
+
+/** An icon is duotone if any path has opacity < 1. */
+function isDuotone(icon: { paths: SvgPathData[] }): boolean {
+  return icon.paths.some((p) => p.opacity !== undefined && p.opacity !== 1);
+}
+
 // ── SVG attribute helpers ───────────────────────────────────
 
 /** camelCase → kebab-case for SVG attributes. */
@@ -148,7 +155,7 @@ function svgAttrs(p: SvgPathData): string {
 }
 
 /** Build JSX attribute string for a React component element. */
-function jsxAttrs(p: SvgPathData): string {
+function jsxAttrs(p: SvgPathData, solidAware = false): string {
   const attrs: string[] = [];
 
   const add = (name: string, value: string | number | undefined) => {
@@ -205,7 +212,13 @@ function jsxAttrs(p: SvgPathData): string {
   if (p.strokeDasharray) add("strokeDasharray", p.strokeDasharray);
   if (p.fillRule) add("fillRule", p.fillRule);
   if (p.clipRule) add("clipRule", p.clipRule);
-  if (p.opacity !== undefined && p.opacity !== 1) add("opacity", p.opacity);
+  if (p.opacity !== undefined && p.opacity !== 1) {
+    if (solidAware) {
+      attrs.push(`opacity={solid ? 1 : ${p.opacity}}`);
+    } else {
+      add("opacity", p.opacity);
+    }
+  }
   if (p.transform) add("transform", p.transform);
 
   return attrs.join(" ");
@@ -221,20 +234,69 @@ function generateSvg(icon: { viewBox: string; paths: SvgPathData[] }): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${icon.viewBox}" width="${w}" height="${h}" fill="none">\n${elements}\n</svg>\n`;
 }
 
-function generateComponent(
+/** Generate a solid SVG — same as generateSvg but omits opacity attributes. */
+function generateSolidSvg(icon: { viewBox: string; paths: SvgPathData[] }): string {
+  const [, , w, h] = icon.viewBox.split(" ");
+  const solidPaths = icon.paths.map((p) =>
+    p.opacity !== undefined && p.opacity !== 1 ? { ...p, opacity: undefined } : p,
+  );
+  const elements = solidPaths
+    .map((p) => `  <${p.type} ${svgAttrs(p as SvgPathData)} />`)
+    .join("\n");
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${icon.viewBox}" width="${w}" height="${h}" fill="none">\n${elements}\n</svg>\n`;
+}
+
+/** Generate a solid component — always renders at full opacity. */
+function generateSolidComponent(
   name: string,
   icon: { viewBox: string; paths: SvgPathData[] },
 ): string {
   const [, , w, h] = icon.viewBox.split(" ");
-  const elements = icon.paths
-    .map((p) => `      <${p.type} ${jsxAttrs(p)} />`)
+  const solidPaths = icon.paths.map((p) =>
+    p.opacity !== undefined && p.opacity !== 1 ? { ...p, opacity: undefined } : p,
+  );
+  const elements = solidPaths
+    .map((p) => `      <${p.type} ${jsxAttrs(p as SvgPathData)} />`)
     .join("\n");
 
   return `import { forwardRef } from "react";
 import type { CascadeIconProps } from "../types";
 
 const ${name} = forwardRef<SVGSVGElement, CascadeIconProps>(
-  ({ color = "currentColor", ...props }, ref) => (
+  ({ color = "currentColor", solid, ...props }, ref) => (
+    <svg
+      ref={ref}
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="${icon.viewBox}"
+      width="${w}"
+      height="${h}"
+      fill="none"
+      {...props}
+    >
+${elements}
+    </svg>
+  )
+);
+${name}.displayName = "${name}";
+export { ${name} };
+`;
+}
+
+function generateComponent(
+  name: string,
+  icon: { viewBox: string; paths: SvgPathData[] },
+): string {
+  const [, , w, h] = icon.viewBox.split(" ");
+  const duo = isDuotone(icon);
+  const elements = icon.paths
+    .map((p) => `      <${p.type} ${jsxAttrs(p, duo)} />`)
+    .join("\n");
+
+  return `import { forwardRef } from "react";
+import type { CascadeIconProps } from "../types";
+
+const ${name} = forwardRef<SVGSVGElement, CascadeIconProps>(
+  ({ color = "currentColor", solid, ...props }, ref) => (
     <svg
       ref={ref}
       xmlns="http://www.w3.org/2000/svg"
@@ -258,6 +320,8 @@ const TYPES_CONTENT = `import type { SVGAttributes } from "react";
 export interface CascadeIconProps extends SVGAttributes<SVGSVGElement> {
   /** Icon colour. Defaults to \`currentColor\` (inherits from parent text colour). */
   color?: string;
+  /** Render at full opacity (strips duotone fading). No effect on non-duotone icons. */
+  solid?: boolean;
   /** Icons do not accept children. */
   children?: never;
 }
@@ -306,6 +370,8 @@ export interface IconEntry {
   value: string | null;
   /** PascalCase icon name matching the SVG file and React component. */
   icon: string;
+  /** True when the icon uses opacity (has duo/solid variants). */
+  duotone: boolean;
 }
 `;
 
@@ -316,17 +382,28 @@ rmSync(OUT, { recursive: true, force: true });
 mkdirSync(SVG_DIR, { recursive: true });
 mkdirSync(ICONS_DIR, { recursive: true });
 
-const entries: { name: string; key: string }[] = [];
+const entries: { name: string; key: string; duotone: boolean }[] = [];
+const solidEntries: { name: string; key: string }[] = [];
 
 for (const [key, icon] of Object.entries(DEFAULT_ICONS)) {
   const name = toIconName(key);
-  entries.push({ name, key });
+  const duo = isDuotone(icon);
+  entries.push({ name, key, duotone: duo });
 
   // Write static SVG (PascalCase filename)
   writeFileSync(join(SVG_DIR, `${name}.svg`), generateSvg(icon));
 
   // Write React component (PascalCase filename)
   writeFileSync(join(ICONS_DIR, `${name}.tsx`), generateComponent(name, icon));
+
+  // Generate solid variant for duotone icons
+  if (duo) {
+    const solidName = `${name}Solid`;
+    solidEntries.push({ name: solidName, key });
+
+    writeFileSync(join(SVG_DIR, `${solidName}.svg`), generateSolidSvg(icon));
+    writeFileSync(join(ICONS_DIR, `${solidName}.tsx`), generateSolidComponent(solidName, icon));
+  }
 }
 
 // Write types.ts
@@ -334,24 +411,30 @@ writeFileSync(join(OUT, "types.ts"), TYPES_CONTENT);
 
 // ── Generate metadata.json ──────────────────────────────────
 
-const metadata: { property: string; value: string | null; icon: string }[] = [];
-for (const { name, key } of entries) {
+const metadata: { property: string; value: string | null; icon: string; duotone: boolean }[] = [];
+for (const { name, key, duotone } of entries) {
   metadata.push({
     property: toProperty(key),
     value: toValue(key),
     icon: name,
+    duotone,
   });
 }
 writeFileSync(join(OUT, "metadata.json"), JSON.stringify(metadata, null, 2) + "\n");
 
 // Write barrel index.ts
+const allComponentEntries = [
+  ...entries.map((e) => e.name),
+  ...solidEntries.map((e) => e.name),
+];
+
 const barrelLines = [
   "// Auto-generated barrel — do not edit manually.",
   '// Run `npm run generate` to regenerate.',
   "",
   'export type { CascadeIconProps, SvgPathData, SlotIconData, IconEntry } from "./types";',
   "",
-  ...entries.map((e) => `export { ${e.name} } from "./icons/${e.name}";`),
+  ...allComponentEntries.map((name) => `export { ${name} } from "./icons/${name}";`),
   "",
   "// Metadata",
   'import type { IconEntry } from "./types";',
@@ -362,7 +445,7 @@ const barrelLines = [
   'export { DEFAULT_ICONS, POSITION_ICONS, DISPLAY_ICONS, FLEX_ICONS, ALIGNMENT_ICONS, DISTRIBUTION_ICONS, SPACING_ICONS, BORDER_ICONS, OVERFLOW_ICONS, TEXT_ICONS, VISUAL_ICONS, ICON_NAME_TO_KEY } from "./data";',
   "",
   "// Render utilities",
-  'export { renderPreviewElement, IconSvg, PV_BG, PV_LABEL_COLOR } from "./render";',
+  'export { renderPreviewElement, solidifyIcon, IconSvg, PV_BG, PV_LABEL_COLOR } from "./render";',
   "",
   "// Properties",
   'export { LAYOUT_PROPERTIES, slotKey, TOTAL_SLOTS } from "./properties";',
@@ -426,7 +509,8 @@ writeFileSync(join(OUT, "render.ts"), renderSrc);
 const propertiesSrc = readFileSync(join(SRC, "properties.ts"), "utf-8");
 writeFileSync(join(OUT, "properties.ts"), propertiesSrc);
 
-console.log(`Generated ${entries.length} icons → ${OUT}`);
-console.log(`  ${entries.length} SVGs in svg/`);
-console.log(`  ${entries.length} React components in icons/`);
+const duoCount = entries.filter((e) => e.duotone).length;
+console.log(`Generated ${entries.length} icons (${duoCount} duotone + ${solidEntries.length} solid variants) → ${OUT}`);
+console.log(`  ${entries.length + solidEntries.length} SVGs in svg/`);
+console.log(`  ${entries.length + solidEntries.length} React components in icons/`);
 console.log(`  types.ts + index.ts + data.ts + metadata.json + render.ts + properties.ts`);

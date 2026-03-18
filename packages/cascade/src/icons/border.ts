@@ -77,13 +77,13 @@ const br_bl = icon(ef(
 
 const br_all = icon(ef(
   // top-left
-  "M2 7v-2a3 3 0 0 1 3-3h2v1h-2a2 2 0 0 0-2 2v2z" +
+  "M2 6v-1a3 3 0 0 1 3-3h1v1h-1a2 2 0 0 0-2 2v1z" +
   // top-right
-  "M13 7v-2a3 3 0 0 0-3-3h-2v1h2a2 2 0 0 1 2 2v2z" +
+  "M13 6v-1a3 3 0 0 0-3-3h-1v1h1a2 2 0 0 1 2 2v1z" +
   // bottom-right
-  "M8 13h2a3 3 0 0 0 3-3v-2h-1v2a2 2 0 0 1-2 2h-2z" +
+  "M9 13h1a3 3 0 0 0 3-3v-1h-1v1a2 2 0 0 1-2 2h-1z" +
   // bottom-left
-  "M7 13h-2a3 3 0 0 1-3-3v-2h1v2a2 2 0 0 0 2 2h2z",
+  "M6 13h-1a3 3 0 0 1-3-3v-1h1v1a2 2 0 0 0 2 2h1z",
 ));
 
 /* ── exports ────────────────────────────────────────────── */

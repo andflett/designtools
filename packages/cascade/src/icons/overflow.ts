@@ -15,6 +15,12 @@ function R(x: number, y: number, w: number, h: number): string {
   return `M${x} ${y}h${w}v${h}h${-w}z`;
 }
 
+/** Rounded rect (CW). Falls back to sharp R() when r<=0. */
+function RR(x: number, y: number, w: number, h: number, r: number): string {
+  if (r <= 0) return R(x, y, w, h);
+  return `M${x + r} ${y}h${w - 2 * r}a${r} ${r} 0 0 1 ${r} ${r}v${h - 2 * r}a${r} ${r} 0 0 1 ${-r} ${r}h${-(w - 2 * r)}a${r} ${r} 0 0 1 ${-r} ${-r}v${-(h - 2 * r)}a${r} ${r} 0 0 1 ${r} ${-r}z`;
+}
+
 function C(x: number, y: number, w: number, h: number): string {
   return `M${x} ${y}v${h}h${w}v${-h}z`;
 }
@@ -54,40 +60,43 @@ function icon(...paths: SvgPathData[]): SlotIconData {
  * OVERFLOW
  * ================================================================ */
 
-function bracket(x: number, y: number, h: number, capW: number): string {
-  return R(x, y, 1, h) + R(x - capW + 1, y, capW, 1) + R(x - capW + 1, y + h - 1, capW, 1);
+/** Faded path at reduced opacity. */
+function faded(d: string, op = 0.3): SvgPathData {
+  return {
+    id: nid(), type: "path", d,
+    fill: "currentColor", stroke: "none", strokeWidth: 0,
+    opacity: op,
+  };
 }
 
-function bracketWithGaps(x: number, y: number, h: number, capW: number, lineYs: number[]): string {
-  const yEnd = y + h;
-  const segments: string[] = [];
-  let cur = y;
-  for (const ly of lineYs.sort((a, b) => a - b)) {
-    const gapStart = ly - 1;
-    const gapEnd = ly + 2;
-    if (cur < gapStart) segments.push(R(x, cur, 1, gapStart - cur));
-    cur = gapEnd;
-  }
-  if (cur < yEnd) segments.push(R(x, cur, 1, yEnd - cur));
-  segments.push(R(x - capW + 1, y, capW, 1));
-  segments.push(R(x - capW + 1, yEnd - 1, capW, 1));
-  return segments.join("");
-}
+// Broken ] bracket — vertical at x=9 with gaps where bars cut through
+const BROKEN_BRACKET =
+  R(6, 1, 4, 1) +    // top cap
+  R(9, 2, 1, 2) +    // vertical y=2-3
+                      // gap y=4-10 (bars at y=5,9 + white either side)
+  R(9, 11, 1, 2) +   // vertical y=11-12
+  R(6, 13, 4, 1);    // bottom cap
+
+// Solid ] bracket — no gaps (content is clipped)
+const SOLID_BRACKET = R(9, 1, 1, 13) + R(6, 1, 4, 1) + R(6, 13, 4, 1);
 
 const ov_visible = icon(
-  pl(bracketWithGaps(9, 0, 15, 3, [4, 7, 10])),
-  pl(R(1, 4, 12, 1) + R(1, 7, 10, 1) + R(1, 10, 12, 1)),
+  pl(BROKEN_BRACKET),                                  // ] with gaps where bars cut through
+  pl(R(0, 5, 15, 1)),                                 // bar 1 — full width, overflows well past ]
+  pl(R(0, 9, 15, 1)),                                 // bar 2 — full width, overflows well past ]
 );
 
 const ov_hidden = icon(
-  pl(bracket(9, 0, 15, 3)),
-  pl(R(1, 4, 7, 1) + R(1, 7, 5, 1) + R(1, 10, 7, 1)),
+  pl(SOLID_BRACKET),                                   // solid ] (clip edge)
+  pl(R(1, 5, 7, 1)),                                  // bar 1 — stops at bracket
+  pl(R(1, 9, 5, 1)),                                  // bar 2 — shorter, clipped
 );
 
 const ov_scroll = icon(
-  pl(bracket(9, 0, 15, 3)),
-  pl(R(1, 4, 7, 1) + R(1, 7, 5, 1) + R(1, 10, 7, 1)),
-  cd(11, 3), cd(11, 5), cd(11, 7), cd(11, 9), cd(11, 11),
+  pl(R(1, 5, 7, 1)),                                  // bar 1
+  pl(R(1, 9, 5, 1)),                                  // bar 2
+  faded(R(11, 1, 2, 13), 0.15),                       // scrollbar track (duotone)
+  pl(R(11, 1, 2, 4)),                                 // scrollbar handle (solid)
 );
 
 const ov_auto = icon(pl(R(4, 7, 7, 1)));

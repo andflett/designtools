@@ -55,7 +55,7 @@ export function Hero() {
         </div>
       </div>
 
-      {/* Bayer dither dissolve edge */}
+      {/* Bayer dither dissolve edge — dark hero into content */}
       <DitherGradient
         direction="down"
         height={160}

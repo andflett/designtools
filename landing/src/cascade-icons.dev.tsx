@@ -7,6 +7,7 @@ import {
   DEFAULT_ICONS,
   ICON_NAME_TO_KEY,
   renderPreviewElement,
+  solidifyIcon,
   IconSvg,
   PV_BG,
   PV_LABEL_COLOR,
@@ -17,7 +18,7 @@ import type { SlotIconData, SvgPathData, IconEntry } from "../../packages/cascad
 
 export type CascadeIcon = SlotIconData;
 
-export { IconSvg, PV_BG, PV_LABEL_COLOR, renderPreviewElement, metadata };
+export { IconSvg, PV_BG, PV_LABEL_COLOR, renderPreviewElement, solidifyIcon, metadata };
 export type { IconEntry };
 
 /* ── Lookup by property + value ── */
@@ -45,7 +46,7 @@ const CAMEL_TO_KEBAB: Record<string, string> = {
   clipRule: "clip-rule",
 };
 
-function svgElementString(p: SvgPathData): string {
+function svgElementString(p: SvgPathData, solid = false): string {
   const attrs: string[] = [];
   const addAttr = (name: string, val: string | number | undefined) => {
     if (val !== undefined && val !== "none" && val !== 0) attrs.push(`${CAMEL_TO_KEBAB[name] ?? name}="${val}"`);
@@ -67,13 +68,20 @@ function svgElementString(p: SvgPathData): string {
   if (p.strokeDasharray) addAttr("strokeDasharray", p.strokeDasharray);
   if (p.fillRule) addAttr("fillRule", p.fillRule);
   if (p.clipRule) addAttr("clipRule", p.clipRule);
-  if (p.opacity !== undefined && p.opacity !== 1) addAttr("opacity", p.opacity);
+  if (p.opacity !== undefined && p.opacity !== 1 && !solid) addAttr("opacity", p.opacity);
   if (p.transform) addAttr("transform", p.transform);
 
   return `  <${p.type} ${attrs.join(" ")} />`;
 }
 
-export function iconToSvgString(icon: SlotIconData): string {
-  const children = icon.paths.map(svgElementString).join("\n");
+export function iconToSvgString(icon: SlotIconData, solid = false): string {
+  const children = icon.paths.map((p) => svgElementString(p, solid)).join("\n");
   return `<svg viewBox="${icon.viewBox}" fill="none" xmlns="http://www.w3.org/2000/svg">\n${children}\n</svg>`;
+}
+
+/** Generate a React JSX usage string for copying. */
+export function iconToReactString(name: string, solid: boolean): string {
+  const props: string[] = [];
+  if (solid) props.push("solid");
+  return props.length > 0 ? `<${name} ${props.join(" ")} />` : `<${name} />`;
 }
