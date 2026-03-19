@@ -250,7 +250,7 @@ function BannerD() {
             const icon = lookupIcon(entry.property, entry.value);
             if (!icon) return <div key={i} />;
             return (
-              <div key={i} className="flex items-center justify-center text-white/15 border-r border-b border-white/[0.03]" style={{ width: CELL, height: CELL }}>
+              <div key={i} className="flex items-center justify-center text-white/20 border-r border-b border-white/[0.04]" style={{ width: CELL, height: CELL }}>
                 <IconSvg icon={icon} className="w-[15px] h-[15px]" />
               </div>
             );
@@ -260,10 +260,10 @@ function BannerD() {
         <div className="absolute inset-0" style={{ background: "radial-gradient(circle at center, transparent 20%, #09090b 70%)" }} />
         {/* Title centred */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <h2 className="text-[96px] font-normal leading-[1.0] tracking-[-0.03em] text-white" style={jersey}>Cascade</h2>
-          <p className="text-[22px] text-white/50 mt-6 max-w-[520px] text-center leading-relaxed">{TAGLINE}</p>
-          <div className="mt-8 inline-flex items-center gap-3 px-5 py-2.5 rounded-lg border border-white/10 bg-white/5">
-            <span className="text-[14px] font-mono text-white/70">npm i @designtools/cascade</span>
+          <h2 className="text-[120px] font-normal leading-[1.0] tracking-[-0.03em] text-white" style={jersey}>Cascade</h2>
+          <p className="text-[26px] text-white/50 mt-6 max-w-[580px] text-center leading-relaxed">{TAGLINE}</p>
+          <div className="mt-8 inline-flex items-center gap-3 px-6 py-3 rounded-lg border border-white/10 bg-white/5">
+            <span className="text-[16px] font-mono text-white/70">npm i @designtools/cascade</span>
           </div>
         </div>
       </div>
@@ -292,7 +292,7 @@ function BannerDOg() {
             const icon = lookupIcon(entry.property, entry.value);
             if (!icon) return <div key={i} />;
             return (
-              <div key={i} className="flex items-center justify-center text-white/15 border-r border-b border-white/[0.03]" style={{ width: CELL, height: CELL }}>
+              <div key={i} className="flex items-center justify-center text-white/20 border-r border-b border-white/[0.04]" style={{ width: CELL, height: CELL }}>
                 <IconSvg icon={icon} className="w-[15px] h-[15px]" />
               </div>
             );
@@ -302,10 +302,10 @@ function BannerDOg() {
         <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 80% 90% at center, transparent 20%, #09090b 70%)" }} />
         {/* Title centred */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <h2 className="text-[80px] font-normal leading-[1.0] tracking-[-0.03em] text-white" style={jersey}>Cascade</h2>
-          <p className="text-[20px] text-white/50 mt-5 max-w-[520px] text-center leading-relaxed">{TAGLINE}</p>
-          <div className="mt-6 inline-flex items-center gap-3 px-5 py-2.5 rounded-lg border border-white/10 bg-white/5">
-            <span className="text-[14px] font-mono text-white/70">npm i @designtools/cascade</span>
+          <h2 className="text-[96px] font-normal leading-[1.0] tracking-[-0.03em] text-white" style={jersey}>Cascade</h2>
+          <p className="text-[24px] text-white/50 mt-5 max-w-[560px] text-center leading-relaxed">{TAGLINE}</p>
+          <div className="mt-6 inline-flex items-center gap-3 px-6 py-3 rounded-lg border border-white/10 bg-white/5">
+            <span className="text-[15px] font-mono text-white/70">npm i @designtools/cascade</span>
           </div>
         </div>
       </div>
