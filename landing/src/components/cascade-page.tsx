@@ -317,17 +317,18 @@ function CanvasGrid({ entries }: {
 }) {
   return (
     <div
-      className="pt-[36px] sm:pt-[72px]"
+      className="max-sm:[--grid-pt:36px] sm:[--grid-pt:72px]"
       style={{
         width: "100vw",
         marginLeft: "calc(-50vw + 50%)",
+        paddingTop: "var(--grid-pt)",
         paddingBottom: CELL,
         backgroundImage: `
           repeating-linear-gradient(to right, ${LINE_COLOR} 0 1px, transparent 1px ${CELL}px),
           repeating-linear-gradient(to bottom, ${LINE_COLOR} 0 1px, transparent 1px ${CELL}px)
         `,
-        backgroundPosition: `calc(mod(100vw, ${CELL}px) / 2) 0`,
-      }}
+        backgroundPosition: `calc(mod(100vw, ${CELL}px) / 2) var(--grid-pt)`,
+      } as React.CSSProperties}
     >
       <div
         style={{
