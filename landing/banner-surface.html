@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Surface Banner</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Jersey+25&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #18181b; color: #fff; font-family: 'Inter', system-ui, sans-serif; padding: 48px 32px 96px; }
+  .page-header { max-width: 1200px; margin: 0 auto 32px; }
+  .page-header .label { font: 500 10px/1 'JetBrains Mono', monospace; color: rgba(255,255,255,0.3); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; }
+  .page-header h1 { font: normal clamp(1.5rem,3vw,2.5rem)/1.1 'Jersey 25', sans-serif; color: #fff; letter-spacing: -0.02em; }
+  .page-header .sub { font: 400 13px/1 'JetBrains Mono', monospace; color: rgba(255,255,255,0.4); margin-top: 6px; }
+
+  .banner-outer { max-width: 1200px; margin: 0 auto; }
+  .banner { position: relative; overflow: hidden; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); width: 1200px; height: 630px; background: #09090b; transform-origin: top left; }
+
+  .banner-content { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 2; }
+  .banner-content h2 { font: normal 88px/1 'Jersey 25', sans-serif; color: #fff; text-align: center; }
+  .banner-content .tagline { font: 400 22px/1.45 'Inter', sans-serif; color: rgba(255,255,255,0.8); max-width: 600px; text-align: center; margin-top: 16px; }
+  .banner-content .install { margin-top: 32px; display: inline-flex; align-items: center; padding: 14px 28px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: #09090b; font: 400 20px/1 'JetBrains Mono', monospace; color: rgba(255,255,255,0.7); }
+
+  .vignette { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+  .dither-bg { position: absolute; inset: 0; z-index: 0; image-rendering: pixelated; background-repeat: repeat; }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <p class="label">Internal</p>
+  <h1>LinkedIn Banner — Surface</h1>
+  <p class="sub">Dither scatter — dark mode</p>
+</div>
+
+<div class="banner-outer">
+  <div class="banner">
+    <div class="dither-bg" id="dither-bg"></div>
+    <div class="vignette" style="background: radial-gradient(ellipse 70% 80% at center, transparent 30%, #09090b 70%)"></div>
+    <div class="banner-content">
+      <h2>Visual editing for<br>production frontends</h2>
+      <p class="tagline">A multi-framework design tool that understands your design system, sits on top of your production code, and writes changes back to source.</p>
+      <div class="install"><span>npm i @designtools/surface</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function buildDither() {
+  const el = document.getElementById('dither-bg');
+  const W = 1200, H = 630, PX = 3;
+  const cols = Math.ceil(W / PX), rows = Math.ceil(H / PX);
+  const cx = cols / 2, cy = rows / 2, rx = cols / 2, ry = rows / 2;
+
+  const BAYER = [
+    [0,48,12,60,3,51,15,63],[32,16,44,28,35,19,47,31],
+    [8,56,4,52,11,59,7,55],[40,24,36,20,43,27,39,23],
+    [2,50,14,62,1,49,13,61],[34,18,46,30,33,17,45,29],
+    [10,58,6,54,9,57,5,53],[42,26,38,22,41,25,37,21],
+  ].map(r => r.map(v => v / 64));
+
+  function hash(x, y) {
+    let h = (x * 374761393 + y * 668265263) >>> 0;
+    h = ((h ^ (h >> 13)) * 1274126177) >>> 0;
+    return (h & 0xffff) / 0xffff;
+  }
+
+  const rects = [];
+  for (let y = 0; y < rows; y++)
+    for (let x = 0; x < cols; x++) {
+      const dx = (x - cx) / rx, dy = (y - cy) / ry;
+      const gv = Math.max(0, 0.45 * (1 - Math.sqrt(dx * dx + dy * dy) * 0.85));
+      if (gv > BAYER[y % 8][x % 8] * 0.5 + hash(x, y) * 0.5)
+        rects.push(`<rect x="${x}" y="${y}" width="1" height="1" fill="rgba(255,255,255,0.18)"/>`);
+    }
+
+  const uri = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${cols}" height="${rows}" viewBox="0 0 ${cols} ${rows}" shape-rendering="crispEdges">${rects.join('')}</svg>`)}`;
+  el.style.backgroundImage = `url("${uri}")`;
+  el.style.backgroundSize = `${W}px ${H}px`;
+})();
+
+// Responsive scaling
+function scale() {
+  const outer = document.querySelector('.banner-outer');
+  const banner = outer.querySelector('.banner');
+  const s = Math.min(1, outer.clientWidth / 1200);
+  banner.style.transform = `scale(${s})`;
+  banner.style.marginBottom = `${630 * (s - 1)}px`;
+}
+scale();
+window.addEventListener('resize', scale);
+</script>
+</body>
+</html>
