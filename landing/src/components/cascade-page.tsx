@@ -1250,8 +1250,8 @@ function MobilePreviewModal({ open, onClose }: { open: boolean; onClose: () => v
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-edge shrink-0">
           <div>
-            <span className="text-[11px] font-semibold text-ink/80">Editor Preview</span>
-            <p className="text-[10px] text-ink3 mt-0.5">See how icons appear in the editor panel</p>
+            <span className="text-[11px] font-semibold text-ink/80">Example Usage</span>
+            <p className="text-[11px] text-ink3 mt-0.5">How these icons could look in a properties panel</p>
           </div>
           <button
             type="button"
