@@ -2,6 +2,7 @@ import "./cascade.css";
 import { useState, useEffect, useCallback, useRef, createContext, useContext } from "react";
 import clsx from "clsx";
 import { Sun, Moon, Copy, Check } from "lucide-react";
+import * as Dialog from "@radix-ui/react-dialog";
 import * as Popover from "@radix-ui/react-popover";
 import { useTheme, toggleTheme } from "../theme.js";
 import { DitherGlow } from "./dither-glow.js";
@@ -60,10 +61,10 @@ function ThemeToggle() {
 
 function CascadeNav() {
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 py-3 bg-[#09090b]/90 backdrop-blur-xl border-b border-white/8">
+    <nav className="py-3 bg-[#09090b] border-b border-white/8">
       <div className="max-w-[1100px] mx-auto px-6 flex items-center justify-between">
         <span className="text-[13px] font-mono flex items-center gap-0">
-          <span className="text-white/40">@designtools/</span>
+          <span className="text-white/40 hidden sm:inline">@designtools/</span>
           <span className="text-white">cascade</span>
           <span className="text-white/20 mx-1.5">/</span>
           <a href="/" className="text-white/40 hover:text-white/60 transition-colors">surface</a>
@@ -199,7 +200,6 @@ function CopyActions({ texts }: { texts: Record<CopyKey, string> }) {
 /* ── Icon popover (rendered inside a bordered grid cell) ── */
 
 const CELL = 72; // px — grid cell size
-const ICON_COLS = 12; // fixed icon columns per row
 
 function IconCellContent({ entry }: { entry: IconEntry }) {
   const [open, setOpen] = useState(false);
@@ -305,102 +305,44 @@ function IconCellContent({ entry }: { entry: IconEntry }) {
 }
 
 /* ── Canvas grid ──
-   A real bordered grid that fills the content area. Icons sit in cells;
-   empty cells extend the canvas beyond. Three tiers of border weight
-   (fine / medium / bold) create the graph-paper effect.
+   Full-viewport graph-paper via CSS background gradients. Icons sit in
+   an auto-fill grid centered with justify-content; the background aligns
+   via mod() and extends beyond the icons in all directions.
    ─────────────────────────────────────────────────────────────────── */
 
-// 3-tier line colors via color-mix — auto dark mode, kept subtle
-const LINE_FINE = "color-mix(in srgb, var(--color-ink) 3%, transparent)";
-const LINE_MED  = "color-mix(in srgb, var(--color-ink) 3%, transparent)";
-const LINE_BOLD = "color-mix(in srgb, var(--color-ink) 3%, transparent)";
+// Graph-paper line color — subtle, auto dark mode via color-mix
+const LINE_COLOR = "color-mix(in srgb, var(--color-ink) 3%, transparent)";
 
-/** Line color based on distance from icon grid origin — bold every 4, medium every 2 */
-function lineColor(relIndex: number): string {
-  if (relIndex % 4 === 0) return LINE_BOLD;
-  if (relIndex % 2 === 0) return LINE_MED;
-  return LINE_FINE;
-}
-
-function CanvasGrid({ entries, padTop = 1, panelWidth = 0 }: {
+function CanvasGrid({ entries }: {
   entries: IconEntry[];
-  padTop?: number;
-  panelWidth?: number;
 }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [layout, setLayout] = useState({ cols: 20, iconStartCol: 2, totalRows: 20 });
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const measure = () => {
-      const vw = window.innerWidth;
-      const totalCols = Math.max(1, Math.ceil(vw / CELL));
-      const rect = el.getBoundingClientRect();
-      const startCol = Math.max(0, Math.round(rect.left / CELL));
-      const iconRows = Math.ceil(entries.length / ICON_COLS);
-      const rows = padTop + iconRows + 1;
-      setLayout({ cols: totalCols, iconStartCol: startCol, totalRows: rows });
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    window.addEventListener("resize", measure);
-    return () => { ro.disconnect(); window.removeEventListener("resize", measure); };
-  }, [panelWidth, entries.length, padTop]);
-
-  const { cols, iconStartCol, totalRows } = layout;
-  const iconRows = Math.ceil(entries.length / ICON_COLS);
-  const totalCells = cols * totalRows;
-
   return (
-    <div ref={containerRef} className="relative">
-      {/* Break out to full viewport width */}
+    <div
+      className="max-sm:[--grid-pt:36px] sm:[--grid-pt:72px]"
+      style={{
+        width: "100vw",
+        marginLeft: "calc(-50vw + 50%)",
+        paddingTop: "var(--grid-pt)",
+        paddingBottom: CELL,
+        backgroundImage: `
+          repeating-linear-gradient(to right, ${LINE_COLOR} 0 1px, transparent 1px ${CELL}px),
+          repeating-linear-gradient(to bottom, ${LINE_COLOR} 0 1px, transparent 1px ${CELL}px)
+        `,
+        backgroundPosition: `calc(mod(100vw, ${CELL}px) / 2) var(--grid-pt)`,
+      } as React.CSSProperties}
+    >
       <div
         style={{
-          width: "100vw",
-          marginLeft: "calc(-50vw + 50%)",
-          overflow: "hidden",
           display: "grid",
-          gridTemplateColumns: `repeat(${cols}, ${CELL}px)`,
-          borderTop: "none",
-          borderLeft: "none",
+          gridTemplateColumns: `repeat(auto-fill, ${CELL}px)`,
+          justifyContent: "center",
         }}
       >
-        {Array.from({ length: totalCells }, (_, i) => {
-          const col = i % cols;
-          const row = Math.floor(i / cols);
-
-          // Map cell to icon: icons start at (padTop, iconStartCol)
-          let entry: IconEntry | null = null;
-          if (
-            row >= padTop && row < padTop + iconRows &&
-            col >= iconStartCol && col < iconStartCol + ICON_COLS
-          ) {
-            const iconIdx = (row - padTop) * ICON_COLS + (col - iconStartCol);
-            if (iconIdx < entries.length) entry = entries[iconIdx];
-          }
-
-          // Line weights relative to icon grid origin
-          const relCol = col - iconStartCol + 1;
-          const relRow = row - padTop + 1;
-          const rightColor = lineColor(relCol);
-          const bottomColor = lineColor(relRow);
-
-          return (
-            <div
-              key={i}
-              style={{
-                width: CELL,
-                height: CELL,
-                borderRight: `1px solid ${rightColor}`,
-                borderBottom: `1px solid ${bottomColor}`,
-              }}
-            >
-              {entry && <IconCellContent entry={entry} />}
-            </div>
-          );
-        })}
+        {entries.map((entry, i) => (
+          <div key={entry.icon + entry.property} style={{ width: CELL, height: CELL }}>
+            <IconCellContent entry={entry} />
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -459,19 +401,19 @@ type LayoutContext = { display: Display; direction: Direction; wrap: Wrap };
 const DEFAULT_CTX: LayoutContext = { display: "flex", direction: "row", wrap: "nowrap" };
 
 /** Tiny live CSS layout preview showing the effect of a value. */
-function LayoutPreview({ property, value, width: w = 108, ctx = DEFAULT_CTX }: { property: string; value: string; width?: number; ctx?: LayoutContext }) {
+function LayoutPreview({ property, value, width: w = 108, stretch, ctx = DEFAULT_CTX }: { property: string; value: string; width?: number; stretch?: boolean; ctx?: LayoutContext }) {
   const isCol = ctx.direction.startsWith("column");
   const isGrid = ctx.display === "grid" || ctx.display === "inline-grid";
   const isAC = property === "align-content";
 
-  const baseW = isCol && !isAC ? Math.round(w * 0.5) : w;
-  const baseH = isCol && !isAC ? Math.round(w * 0.9) : (isAC ? 72 : 48);
+  const baseW = stretch ? undefined : (isCol && !isAC ? Math.round(w * 0.5) : w);
+  const baseH = isCol && !isAC ? (stretch ? 72 : Math.round(w * 0.9)) : (isAC ? 72 : 48);
 
   const base: React.CSSProperties = {
     display: isGrid ? "grid" : "flex",
     ...(!isGrid && { flexDirection: isCol ? "column" : "row" }),
     ...(isGrid && { gridTemplateColumns: "repeat(3, auto)", justifyContent: "start" }),
-    width: baseW, height: baseH,
+    width: baseW ?? "100%", height: baseH,
     borderRadius: 6, border: "1px dashed", borderColor: "var(--color-edge)",
     background: "color-mix(in oklab, var(--color-ink) 4%, transparent)",
     padding: 3, gap: 2, overflow: "hidden",
@@ -498,8 +440,11 @@ function LayoutPreview({ property, value, width: w = 108, ctx = DEFAULT_CTX }: {
   let items: React.CSSProperties[];
 
   const s1 = 18, s2 = 12, s3 = 22;
-  const ch = isCol ? baseW - 6 : baseH - 6;
-  const c1 = Math.round(ch * 0.7), c2 = Math.round(ch * 0.45), c3 = Math.round(ch * 0.55);
+  const usePct = isCol && stretch;
+  const ch = isCol ? (baseW ?? 100) - 6 : baseH - 6;
+  const c1 = usePct ? "70%" : Math.round(ch * 0.7);
+  const c2 = usePct ? "45%" : Math.round(ch * 0.45);
+  const c3 = usePct ? "55%" : Math.round(ch * 0.55);
 
   switch (property) {
     case "justify-content":
@@ -535,7 +480,7 @@ function LayoutPreview({ property, value, width: w = 108, ctx = DEFAULT_CTX }: {
         style.flexWrap = "wrap";
         style.alignContent = value;
       }
-      const cw = Math.round(baseW * 0.25);
+      const cw = Math.round((baseW ?? 200) * 0.25);
       items = value === "stretch"
         ? [box(cw, "auto"), box(cw - 4, "auto"), box(cw + 4, "auto"), box(cw - 2, "auto"), box(cw + 2, "auto")]
         : [box(cw, 14), box(cw - 4, 14), box(cw + 4, 14), box(cw - 2, 14), box(cw + 2, 14)];
@@ -582,9 +527,7 @@ function PropertyExplainerContent({ property, ctx, onClose }: { property: string
           <svg viewBox="0 0 15 15" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 4l7 7M11 4l-7 7" /></svg>
         </Popover.Close>
       </div>
-      <div className="flex justify-center">
-        <LayoutPreview property={property} value={value} width={200} ctx={ctx} />
-      </div>
+      <LayoutPreview property={property} value={value} stretch ctx={ctx} />
       <div className="flex flex-wrap gap-1">
         {values.map((v, i) => (
           <button
@@ -687,7 +630,7 @@ function segRounding(index: number, total: number): string {
   if (index === total - 1) return "rounded-r-md";
   return "";
 }
-const SEG_DROPDOWN = "absolute right-0 top-full mt-1 z-50 bg-[color:var(--color-page)] border border-[color:var(--color-edge)] rounded-lg shadow-lg p-1 min-w-[160px] animate-in fade-in-0 zoom-in-95";
+const SEG_DROPDOWN = "absolute right-0 top-full mt-1 bg-[color:var(--color-page)] border border-[color:var(--color-edge)] rounded-lg shadow-lg p-1 min-w-[160px] animate-in fade-in-0 zoom-in-95";
 const SEG_DROP_ITEM = "w-full flex items-center gap-2.5 px-2.5 py-1.5 text-[11px] rounded-md transition-colors cursor-pointer text-[color:var(--color-ink)]/70 hover:bg-black/[0.06] dark:hover:bg-white/[0.08]";
 
 /** Dots icon for overflow trigger. */
@@ -699,58 +642,65 @@ const OverflowDots = () => (
   </svg>
 );
 
-/** Overflow dropdown menu shared between segmented variants. */
-function SegmentedOverflowMenu({ items, selected, property, onSelect, onClose, resolveIcon }: {
+/** Overflow dropdown — uses Radix Popover so it portals above siblings. */
+function SegmentedOverflowPopover({ items, selected, property, open, onOpenChange, onSelect, active, disabled, resolveIcon, className }: {
   items: readonly string[];
   selected: string;
   property: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onSelect: (v: string) => void;
-  onClose: () => void;
+  active: boolean;
+  disabled?: boolean;
   resolveIcon?: (property: string, value: string) => CascadeIcon | undefined;
+  className?: string;
 }) {
   const getIcon = resolveIcon ?? resolve;
   return (
-    <>
-      <div className="fixed inset-0 z-40" onClick={onClose} />
-      <div className={SEG_DROPDOWN}>
-        {items.map((v) => {
-          const icon = getIcon(property, v);
-          return (
+    <Popover.Root open={open} onOpenChange={onOpenChange}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Popover.Trigger asChild>
             <button
-              key={v}
               type="button"
-              onClick={() => { onSelect(v); onClose(); }}
-              className={clsx(SEG_DROP_ITEM, selected === v && "bg-black/[0.06] dark:bg-white/[0.08]")}
+              disabled={disabled}
+              className={clsx(SEG_OVERFLOW_BTN, disabled ? "cursor-default" : "cursor-pointer", SEG_IDLE, active && SEG_ACTIVE, className)}
             >
-              {icon && <IconSvg icon={icon} className="w-[15px] h-[15px] shrink-0" />}
-              <span className="flex-1 text-left">{v}</span>
+              <OverflowDots />
             </button>
-          );
-        })}
-      </div>
-    </>
-  );
-}
-
-/** Overflow trigger button. */
-function SegmentedOverflowTrigger({ active, disabled, onClick, className }: { active: boolean; disabled?: boolean; onClick: () => void; className?: string }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          onClick={onClick}
-          disabled={disabled}
-          className={clsx(SEG_OVERFLOW_BTN, disabled ? "cursor-default" : "cursor-pointer", SEG_IDLE, active && SEG_ACTIVE, className)}
+          </Popover.Trigger>
+        </TooltipTrigger>
+        {!open && (
+          <TooltipContent side="bottom" className="text-xs px-2 py-1 rounded-md">
+            More options
+            <TooltipArrow />
+          </TooltipContent>
+        )}
+      </Tooltip>
+      <Popover.Portal>
+        <Popover.Content
+          side="bottom"
+          align="end"
+          sideOffset={4}
+          className={SEG_DROPDOWN}
         >
-          <OverflowDots />
-        </button>
-      </TooltipTrigger>
-      <TooltipContent side="bottom" className="text-xs px-2 py-1 rounded-md">
-        More options
-        <TooltipArrow />
-      </TooltipContent>
-    </Tooltip>
+          {items.map((v) => {
+            const icon = getIcon(property, v);
+            return (
+              <button
+                key={v}
+                type="button"
+                onClick={() => { onSelect(v); onOpenChange(false); }}
+                className={clsx(SEG_DROP_ITEM, selected === v && "bg-black/[0.06] dark:bg-white/[0.08]")}
+              >
+                {icon && <IconSvg icon={icon} className="w-[15px] h-[15px] shrink-0" />}
+                <span className="flex-1 text-left">{v}</span>
+              </button>
+            );
+          })}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 
@@ -817,20 +767,16 @@ function SegmentedControl({ property, values, value: controlledValue, onChange, 
           );
         })}
         {hasOverflow && (
-          <SegmentedOverflowTrigger
-            active={overflow.includes(selected)}
-            disabled={disabled}
-            onClick={() => !disabled && setOverflowOpen(!overflowOpen)}
-            className="rounded-r-md"
-          />
-        )}
-        {overflowOpen && (
-          <SegmentedOverflowMenu
+          <SegmentedOverflowPopover
             items={overflow}
             selected={selected}
             property={property}
+            open={overflowOpen}
+            onOpenChange={(v) => !disabled && setOverflowOpen(v)}
             onSelect={onSelect}
-            onClose={() => setOverflowOpen(false)}
+            active={overflow.includes(selected)}
+            disabled={disabled}
+            className="rounded-r-md"
           />
         )}
       </div>
@@ -975,9 +921,9 @@ function PropertySection({ label, property, values, rotate = 0, layoutProperty, 
             <Popover.Trigger asChild>
               <button
                 type="button"
-                className="w-4 h-4 flex items-center justify-center rounded text-[color:var(--color-ink3)]/40 hover:text-[color:var(--color-ink3)] transition-colors cursor-pointer"
+                className={clsx("w-4 h-4 flex items-center justify-center rounded hover:text-[color:var(--color-ink3)] transition-colors cursor-pointer text-[9px] font-semibold", PV_LABEL_COLOR)}
               >
-                <svg viewBox="0 0 12 12" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="1.2"><circle cx="6" cy="6" r="5" /><path d="M6 5.5V8.5M6 3.5V4" /></svg>
+                ?
               </button>
             </Popover.Trigger>
             <Popover.Portal>
@@ -986,7 +932,7 @@ function PropertySection({ label, property, values, rotate = 0, layoutProperty, 
                 align="start"
                 sideOffset={8}
                 collisionPadding={{ top: 12, bottom: 80, left: 12, right: 12 }}
-                className="bg-[color:var(--color-page)] border border-[color:var(--color-edge)] rounded-xl shadow-xl overflow-hidden w-[240px] animate-in fade-in-0 zoom-in-95 z-50"
+                className="bg-[color:var(--color-page)] border border-[color:var(--color-edge)] rounded-xl shadow-xl overflow-hidden w-[240px] animate-in fade-in-0 zoom-in-95"
               >
                 <PropertyExplainerContent property={layoutProperty} ctx={layoutCtx ?? DEFAULT_CTX} onClose={() => setExplainerOpen(false)} />
               </Popover.Content>
@@ -1289,9 +1235,51 @@ function IconStyleToggle({ value, onChange }: { value: IconStyle; onChange: (v: 
   );
 }
 
+/** Mobile example dialog — Radix Dialog for proper portal layering. */
+function MobileExampleDialog() {
+  return (
+    <Dialog.Root>
+      <Dialog.Trigger asChild>
+        <button
+          type="button"
+          className="lg:hidden fixed bottom-5 right-5 h-10 px-4 rounded-full bg-ink text-page shadow-lg flex items-center gap-2 cursor-pointer hover:scale-105 active:scale-95 transition-transform"
+          aria-label="Open example usage"
+        >
+          {/* Eye icon */}
+          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+          <span className="text-xs font-semibold">Example</span>
+        </button>
+      </Dialog.Trigger>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm lg:hidden animate-in fade-in-0" />
+        <Dialog.Content className="fixed inset-3 top-6 bottom-6 bg-page dark:bg-raised rounded-2xl border border-edge shadow-2xl flex flex-col overflow-hidden lg:hidden animate-in fade-in-0 zoom-in-95">
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-3 border-b border-edge shrink-0">
+            <div>
+              <Dialog.Title className="text-[11px] font-semibold text-ink/80">Example Usage</Dialog.Title>
+              <Dialog.Description className="text-[11px] text-ink3 mt-0.5">How cascade icons could look in a properties panel</Dialog.Description>
+            </div>
+            <Dialog.Close className="w-7 h-7 flex items-center justify-center rounded-lg text-ink3 hover:text-ink hover:bg-ink/5 dark:hover:bg-white/8 transition-colors cursor-pointer">
+              <svg viewBox="0 0 15 15" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M4 4l7 7M11 4l-7 7" />
+              </svg>
+            </Dialog.Close>
+          </div>
+          {/* Scrollable content */}
+          <div className="flex-1 overflow-y-auto overscroll-contain">
+            <ContextPanel />
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+
 export function CascadePage() {
   const entries = orderedEntries();
-  const uniqueIcons = new Set(metadata.map((e) => e.icon)).size;
   const uniqueProperties = new Set(metadata.map((e) => e.property)).size;
   const [iconStyle, setIconStyle] = useState<IconStyle>("duo");
 
@@ -1313,7 +1301,7 @@ export function CascadePage() {
               />
               <span className="inline-flex items-center gap-2.5 px-4 py-1.5 text-xs font-medium text-white/70 font-mono relative rounded-full">
                 <span className="animate-pulse w-1.5 h-1.5 bg-green-400 rounded-full" />
-                v0.1 — @designtools/cascade
+                v0.1 - react / svg
               </span>
             </div>
             <h1
@@ -1325,11 +1313,22 @@ export function CascadePage() {
               </span>{" "}
               Icons
             </h1>
-            <p className="text-sm md:text-base text-white/60 max-w-[480px] mx-auto leading-relaxed mb-6">
-              {uniqueIcons} hand-crafted icons across {uniqueProperties} CSS
-              property groups. Designed for visual editors that speak code.
+            <p className="text-sm md:text-base text-white/70 max-w-[480px] mx-auto leading-relaxed mb-6">
+              Hand-crafted icons for {uniqueProperties} CSS properties and their
+              values. Made for design tools that speak code.
             </p>
-            <InstallCommand />
+            <div className="flex items-center gap-3">
+              <InstallCommand />
+              <a
+                href="https://github.com/andflett/cascade"
+                target="_blank"
+                rel="noopener"
+                className="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-white/10 bg-white/5 hover:bg-white/8 text-white/50 hover:text-white transition-all"
+                title="GitHub"
+              >
+                <GitHubIcon />
+              </a>
+            </div>
             <div className="mt-7">
 {/* Duo/Solid toggle removed — available per-icon in popovers */}
             </div>
@@ -1341,17 +1340,13 @@ export function CascadePage() {
           {/* Canvas grid — full viewport width, icons centred */}
           <div className="max-w-[1200px] mx-auto px-6">
             <TooltipProvider delayDuration={200}>
-              <CanvasGrid
-                entries={entries}
-                padTop={1}
-                panelWidth={310 + CELL}
-              />
+              <CanvasGrid entries={entries} />
             </TooltipProvider>
           </div>
 
-          {/* Panel — absolute to right edge, full height of section */}
+          {/* Panel — absolute to right edge, full height of section (desktop only) */}
           <div
-            className="max-lg:hidden absolute top-0 right-0 bottom-0 z-30"
+            className="max-lg:hidden absolute top-0 right-0 bottom-0"
             style={{ width: 330 }}
           >
             <div className="sticky top-0 h-screen overflow-y-auto">
@@ -1360,10 +1355,8 @@ export function CascadePage() {
           </div>
         </section>
 
-        {/* Mobile-only editor panel */}
-        <section className="lg:hidden py-12 px-6">
-          <ContextPanel />
-        </section>
+        {/* Mobile floating preview button + modal */}
+        <MobileExampleDialog />
 
         <div className="dither-band" />
 
