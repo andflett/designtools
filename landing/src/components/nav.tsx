@@ -28,7 +28,7 @@ function ThemeToggle() {
 
 export function Nav() {
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 py-3 bg-[#09090b]/90 backdrop-blur-xl border-b border-white/8">
+    <nav className="py-3 bg-[#09090b] border-b border-white/8">
       <div className="max-w-[1100px] mx-auto px-6 flex items-center justify-between">
         <span className="text-[13px] font-mono flex items-center gap-0">
           <span className="text-white/40 hidden sm:inline">@designtools/</span>

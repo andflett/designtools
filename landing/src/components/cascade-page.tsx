@@ -61,7 +61,7 @@ function ThemeToggle() {
 
 function CascadeNav() {
   return (
-    <nav className="fixed top-0 left-0 right-0 py-3 bg-[#09090b]/90 backdrop-blur-xl border-b border-white/8">
+    <nav className="py-3 bg-[#09090b] border-b border-white/8">
       <div className="max-w-[1100px] mx-auto px-6 flex items-center justify-between">
         <span className="text-[13px] font-mono flex items-center gap-0">
           <span className="text-white/40 hidden sm:inline">@designtools/</span>
@@ -401,19 +401,19 @@ type LayoutContext = { display: Display; direction: Direction; wrap: Wrap };
 const DEFAULT_CTX: LayoutContext = { display: "flex", direction: "row", wrap: "nowrap" };
 
 /** Tiny live CSS layout preview showing the effect of a value. */
-function LayoutPreview({ property, value, width: w = 108, ctx = DEFAULT_CTX }: { property: string; value: string; width?: number; ctx?: LayoutContext }) {
+function LayoutPreview({ property, value, width: w = 108, stretch, ctx = DEFAULT_CTX }: { property: string; value: string; width?: number; stretch?: boolean; ctx?: LayoutContext }) {
   const isCol = ctx.direction.startsWith("column");
   const isGrid = ctx.display === "grid" || ctx.display === "inline-grid";
   const isAC = property === "align-content";
 
-  const baseW = isCol && !isAC ? Math.round(w * 0.5) : w;
-  const baseH = isCol && !isAC ? Math.round(w * 0.9) : (isAC ? 72 : 48);
+  const baseW = stretch ? undefined : (isCol && !isAC ? Math.round(w * 0.5) : w);
+  const baseH = isCol && !isAC ? (stretch ? 72 : Math.round(w * 0.9)) : (isAC ? 72 : 48);
 
   const base: React.CSSProperties = {
     display: isGrid ? "grid" : "flex",
     ...(!isGrid && { flexDirection: isCol ? "column" : "row" }),
     ...(isGrid && { gridTemplateColumns: "repeat(3, auto)", justifyContent: "start" }),
-    width: baseW, height: baseH,
+    width: baseW ?? "100%", height: baseH,
     borderRadius: 6, border: "1px dashed", borderColor: "var(--color-edge)",
     background: "color-mix(in oklab, var(--color-ink) 4%, transparent)",
     padding: 3, gap: 2, overflow: "hidden",
@@ -440,8 +440,11 @@ function LayoutPreview({ property, value, width: w = 108, ctx = DEFAULT_CTX }: {
   let items: React.CSSProperties[];
 
   const s1 = 18, s2 = 12, s3 = 22;
-  const ch = isCol ? baseW - 6 : baseH - 6;
-  const c1 = Math.round(ch * 0.7), c2 = Math.round(ch * 0.45), c3 = Math.round(ch * 0.55);
+  const usePct = isCol && stretch;
+  const ch = isCol ? (baseW ?? 100) - 6 : baseH - 6;
+  const c1 = usePct ? "70%" : Math.round(ch * 0.7);
+  const c2 = usePct ? "45%" : Math.round(ch * 0.45);
+  const c3 = usePct ? "55%" : Math.round(ch * 0.55);
 
   switch (property) {
     case "justify-content":
@@ -477,7 +480,7 @@ function LayoutPreview({ property, value, width: w = 108, ctx = DEFAULT_CTX }: {
         style.flexWrap = "wrap";
         style.alignContent = value;
       }
-      const cw = Math.round(baseW * 0.25);
+      const cw = Math.round((baseW ?? 200) * 0.25);
       items = value === "stretch"
         ? [box(cw, "auto"), box(cw - 4, "auto"), box(cw + 4, "auto"), box(cw - 2, "auto"), box(cw + 2, "auto")]
         : [box(cw, 14), box(cw - 4, 14), box(cw + 4, 14), box(cw - 2, 14), box(cw + 2, 14)];
@@ -524,9 +527,7 @@ function PropertyExplainerContent({ property, ctx, onClose }: { property: string
           <svg viewBox="0 0 15 15" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 4l7 7M11 4l-7 7" /></svg>
         </Popover.Close>
       </div>
-      <div className="flex justify-center">
-        <LayoutPreview property={property} value={value} width={200} ctx={ctx} />
-      </div>
+      <LayoutPreview property={property} value={value} stretch ctx={ctx} />
       <div className="flex flex-wrap gap-1">
         {values.map((v, i) => (
           <button
