@@ -1284,6 +1284,7 @@ function MobileExampleDialog() {
 export function CascadePage() {
   const entries = orderedEntries();
   const uniqueProperties = new Set(metadata.map((e) => e.property)).size;
+  const uniqueIcons = new Set(metadata.map((e) => e.icon)).size;
   const [iconStyle, setIconStyle] = useState<IconStyle>("duo");
 
   return (
@@ -1317,8 +1318,8 @@ export function CascadePage() {
               Icons
             </h1>
             <p className="text-sm md:text-base text-white/70 max-w-[480px] mx-auto leading-relaxed mb-6">
-              Hand-crafted icons for {uniqueProperties} CSS properties and their
-              values. Made for design tools that speak code.
+              {uniqueIcons} meticulously crafted, small-batch, artisanal icons
+              for CSS properties. Made for design tools that speak code.
             </p>
             <div className="flex items-center justify-center gap-3">
               <InstallCommand />
@@ -1332,7 +1333,6 @@ export function CascadePage() {
                 <GitHubIcon />
               </a>
             </div>
-           
           </div>
         </section>
 
