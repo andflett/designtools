@@ -260,8 +260,8 @@ function BannerD() {
         <div className="absolute inset-0" style={{ background: "radial-gradient(circle at center, transparent 20%, #09090b 70%)" }} />
         {/* Title centred */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <h2 className="text-[120px] font-normal leading-[1.0] tracking-[-0.03em] text-white" style={jersey}>Cascade</h2>
-          <p className="text-[26px] text-white/50 mt-6 max-w-[580px] text-center leading-relaxed">{TAGLINE}</p>
+          <h2 className="text-[120px] font-normal leading-[1.0] tracking-[0.04em] text-white" style={jersey}>Cascade</h2>
+          <p className="text-[30px] text-white/70 mt-6 max-w-[520px] text-center leading-snug">{TAGLINE}</p>
           <div className="mt-8 inline-flex items-center gap-3 px-6 py-3 rounded-lg border border-white/10 bg-white/5">
             <span className="text-[16px] font-mono text-white/70">npm i @designtools/cascade</span>
           </div>
@@ -302,8 +302,8 @@ function BannerDOg() {
         <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 80% 90% at center, transparent 20%, #09090b 70%)" }} />
         {/* Title centred */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <h2 className="text-[96px] font-normal leading-[1.0] tracking-[-0.03em] text-white" style={jersey}>Cascade</h2>
-          <p className="text-[24px] text-white/50 mt-5 max-w-[560px] text-center leading-relaxed">{TAGLINE}</p>
+          <h2 className="text-[96px] font-normal leading-[1.0] tracking-[0.04em] text-white" style={jersey}>Cascade</h2>
+          <p className="text-[26px] text-white/70 mt-5 max-w-[480px] text-center leading-snug">{TAGLINE}</p>
           <div className="mt-6 inline-flex items-center gap-3 px-6 py-3 rounded-lg border border-white/10 bg-white/5">
             <span className="text-[15px] font-mono text-white/70">npm i @designtools/cascade</span>
           </div>
