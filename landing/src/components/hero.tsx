@@ -25,7 +25,7 @@ export function Hero() {
               className="inline-flex items-center gap-2.5 px-4 py-1.5 text-xs font-medium text-white/70  font-mono relative rounded-full"
             >
               <span className="animate-pulse w-1.5 h-1.5 bg-green-400 rounded-full" />
-              v0.1 — <span className="hidden sm:inline">@designtools/</span>surface
+              v0.1 — @designtools/surface
             </motion.span>
           </div>
 
