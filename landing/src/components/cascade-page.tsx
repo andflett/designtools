@@ -675,7 +675,7 @@ function resolve(property: string, value: string): CascadeIcon | undefined {
 }
 
 /* ── Segmented control styles ── */
-const SEG_ITEM = "flex-1 flex items-center justify-center py-[8px] transition-all focus-visible:outline-none";
+const SEG_ITEM = "flex-1 flex items-center justify-center py-[7px] transition-all focus-visible:outline-none";
 const SEG_IDLE = "text-[color:var(--color-ink)]/50 hover:text-[color:var(--color-ink)]/60 hover:bg-black/[0.03] dark:hover:bg-white/[0.04]";
 const SEG_ACTIVE = "!text-[color:var(--color-ink)] bg-black/[0.06] dark:bg-white/[0.08] dark:shadow-sm";
 const SEG_OVERFLOW_BTN = "flex items-center justify-center py-1 pl-1.5 pr-2 transition-all focus-visible:outline-none";
