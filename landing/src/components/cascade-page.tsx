@@ -61,7 +61,7 @@ function ThemeToggle() {
 
 function CascadeNav() {
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 py-3 bg-[#09090b]/90 backdrop-blur-xl border-b border-white/8">
+    <nav className="fixed top-0 left-0 right-0 py-3 bg-[#09090b]/90 backdrop-blur-xl border-b border-white/8">
       <div className="max-w-[1100px] mx-auto px-6 flex items-center justify-between">
         <span className="text-[13px] font-mono flex items-center gap-0">
           <span className="text-white/40 hidden sm:inline">@designtools/</span>
@@ -629,7 +629,7 @@ function segRounding(index: number, total: number): string {
   if (index === total - 1) return "rounded-r-md";
   return "";
 }
-const SEG_DROPDOWN = "absolute right-0 top-full mt-1 z-50 bg-[color:var(--color-page)] border border-[color:var(--color-edge)] rounded-lg shadow-lg p-1 min-w-[160px] animate-in fade-in-0 zoom-in-95";
+const SEG_DROPDOWN = "absolute right-0 top-full mt-1 bg-[color:var(--color-page)] border border-[color:var(--color-edge)] rounded-lg shadow-lg p-1 min-w-[160px] animate-in fade-in-0 zoom-in-95";
 const SEG_DROP_ITEM = "w-full flex items-center gap-2.5 px-2.5 py-1.5 text-[11px] rounded-md transition-colors cursor-pointer text-[color:var(--color-ink)]/70 hover:bg-black/[0.06] dark:hover:bg-white/[0.08]";
 
 /** Dots icon for overflow trigger. */
@@ -653,7 +653,7 @@ function SegmentedOverflowMenu({ items, selected, property, onSelect, onClose, r
   const getIcon = resolveIcon ?? resolve;
   return (
     <>
-      <div className="fixed inset-0 z-40" onClick={onClose} />
+      <div className="fixed inset-0" onClick={onClose} />
       <div className={SEG_DROPDOWN}>
         {items.map((v) => {
           const icon = getIcon(property, v);
@@ -1331,7 +1331,7 @@ export function CascadePage() {
 
           {/* Panel — absolute to right edge, full height of section (desktop only) */}
           <div
-            className="max-lg:hidden absolute top-0 right-0 bottom-0 z-30"
+            className="max-lg:hidden absolute top-0 right-0 bottom-0"
             style={{ width: 330 }}
           >
             <div className="sticky top-0 h-screen overflow-y-auto">
