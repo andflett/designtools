@@ -25,6 +25,9 @@ export function toggleTheme() {
   setTheme(getTheme() === "dark" ? "light" : "dark");
 }
 
+// Apply on module load so DOM matches system/stored preference immediately
+if (typeof window !== "undefined") applyTheme(getTheme());
+
 // Minimal external store for React
 const listeners = new Set<() => void>();
 
