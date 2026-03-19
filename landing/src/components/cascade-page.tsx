@@ -318,24 +318,27 @@ function CanvasGrid({ entries }: {
 }) {
   return (
     <div
-      className="max-sm:[--grid-pt:36px] sm:[--grid-pt:72px]"
+      className="max-sm:[--grid-pt:36px] sm:[--grid-pt:36px] lg:[--panel-clear:330px]"
       style={{
         width: "100vw",
         marginLeft: "calc(-50vw + 50%)",
         paddingTop: "var(--grid-pt)",
-        paddingBottom: CELL,
+        paddingBottom: CELL / 2,
+        "--ci": `max(24px, calc((100vw - 1152px) / 2))`,
+        paddingLeft: "var(--ci)",
+        paddingRight: "max(var(--panel-clear, 0px), var(--ci))",
         backgroundImage: `
           repeating-linear-gradient(to right, ${LINE_COLOR} 0 1px, transparent 1px ${CELL}px),
           repeating-linear-gradient(to bottom, ${LINE_COLOR} 0 1px, transparent 1px ${CELL}px)
         `,
-        backgroundPosition: `calc(mod(100vw, ${CELL}px) / 2) var(--grid-pt)`,
+        backgroundPosition: `calc(mod(var(--ci), ${CELL}px)) var(--grid-pt)`,
       } as React.CSSProperties}
     >
       <div
+        className="grid"
         style={{
-          display: "grid",
           gridTemplateColumns: `repeat(auto-fill, ${CELL}px)`,
-          justifyContent: "center",
+          maxWidth: 12 * CELL,
         }}
       >
         {entries.map((entry, i) => (
@@ -1289,9 +1292,9 @@ export function CascadePage() {
         <CascadeNav />
 
         {/* Hero */}
-        <section className="relative pt-20 pb-8 text-center bg-[#09090b] overflow-hidden dark:border-b dark:border-edge">
+        <section className="relative pt-14 pb-16 text-center bg-[#09090b] overflow-hidden dark:border-b dark:border-edge">
           <div className="max-w-[1200px] mx-auto px-6 relative">
-            <div className="relative inline-flex justify-center mb-7">
+            <div className="relative inline-flex justify-center mb-6">
               <DitherGlow
                 width={450}
                 height={100}
@@ -1301,7 +1304,7 @@ export function CascadePage() {
               />
               <span className="inline-flex items-center gap-2.5 px-4 py-1.5 text-xs font-medium text-white/70 font-mono relative rounded-full">
                 <span className="animate-pulse w-1.5 h-1.5 bg-green-400 rounded-full" />
-                v0.1 - react / svg
+                v0.1 - React / SVG
               </span>
             </div>
             <h1
@@ -1323,15 +1326,13 @@ export function CascadePage() {
                 href="https://github.com/andflett/cascade"
                 target="_blank"
                 rel="noopener"
-                className="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-white/10 bg-white/5 hover:bg-white/8 text-white/50 hover:text-white transition-all"
+                className="inline-flex items-center justify-center w-11 h-11 rounded-lg border border-white/10 bg-white/5 hover:bg-white/8 text-white/50 hover:text-white transition-all"
                 title="GitHub"
               >
                 <GitHubIcon />
               </a>
             </div>
-            <div className="mt-7">
-{/* Duo/Solid toggle removed — available per-icon in popovers */}
-            </div>
+           
           </div>
         </section>
 
