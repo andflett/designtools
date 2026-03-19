@@ -45,10 +45,12 @@ export function IconSvg({
   icon,
   className,
   rotate = 0,
+  solid = false,
 }: {
   icon: CascadeIcon | undefined;
   className?: string;
   rotate?: number;
+  solid?: boolean;
 }) {
   if (!icon) {
     return React.createElement("div", {
@@ -58,13 +60,14 @@ export function IconSvg({
   const { Component } = icon;
   return React.createElement(Component, {
     className,
+    solid,
     style: rotate ? { transform: `rotate(${rotate}deg)` } : undefined,
   });
 }
 
-export function iconToSvgString(icon: CascadeIcon): string {
+export function iconToSvgString(icon: CascadeIcon, solid = false): string {
   const { Component } = icon;
-  return renderToStaticMarkup(React.createElement(Component));
+  return renderToStaticMarkup(React.createElement(Component, { solid }));
 }
 
 /** Generate a React JSX usage string for copying. */
