@@ -199,7 +199,33 @@ function CopyActions({ texts }: { texts: Record<CopyKey, string> }) {
 /* ── Icon popover (rendered inside a bordered grid cell) ── */
 
 const CELL = 72; // px — grid cell size
-const ICON_COLS = 12; // fixed icon columns per row
+const ICON_COLS = 12; // fixed icon columns per row (desktop)
+
+/** Responsive icon columns based on viewport width. */
+function useIconCols(): number {
+  const [cols, setCols] = useState(() => {
+    if (typeof window === "undefined") return ICON_COLS;
+    const vw = window.innerWidth;
+    if (vw < 480) return 4;
+    if (vw < 768) return 6;
+    if (vw < 1024) return 8;
+    return ICON_COLS;
+  });
+
+  useEffect(() => {
+    const update = () => {
+      const vw = window.innerWidth;
+      if (vw < 480) setCols(4);
+      else if (vw < 768) setCols(6);
+      else if (vw < 1024) setCols(8);
+      else setCols(ICON_COLS);
+    };
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
+  return cols;
+}
 
 function IconCellContent({ entry }: { entry: IconEntry }) {
   const [open, setOpen] = useState(false);
@@ -322,10 +348,11 @@ function lineColor(relIndex: number): string {
   return LINE_FINE;
 }
 
-function CanvasGrid({ entries, padTop = 1, panelWidth = 0 }: {
+function CanvasGrid({ entries, padTop = 1, panelWidth = 0, iconCols = ICON_COLS }: {
   entries: IconEntry[];
   padTop?: number;
   panelWidth?: number;
+  iconCols?: number;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [layout, setLayout] = useState({ cols: 20, iconStartCol: 2, totalRows: 20 });
@@ -338,7 +365,7 @@ function CanvasGrid({ entries, padTop = 1, panelWidth = 0 }: {
       const totalCols = Math.max(1, Math.ceil(vw / CELL));
       const rect = el.getBoundingClientRect();
       const startCol = Math.max(0, Math.round(rect.left / CELL));
-      const iconRows = Math.ceil(entries.length / ICON_COLS);
+      const iconRows = Math.ceil(entries.length / iconCols);
       const rows = padTop + iconRows + 1;
       setLayout({ cols: totalCols, iconStartCol: startCol, totalRows: rows });
     };
@@ -347,10 +374,10 @@ function CanvasGrid({ entries, padTop = 1, panelWidth = 0 }: {
     ro.observe(el);
     window.addEventListener("resize", measure);
     return () => { ro.disconnect(); window.removeEventListener("resize", measure); };
-  }, [panelWidth, entries.length, padTop]);
+  }, [panelWidth, entries.length, padTop, iconCols]);
 
   const { cols, iconStartCol, totalRows } = layout;
-  const iconRows = Math.ceil(entries.length / ICON_COLS);
+  const iconRows = Math.ceil(entries.length / iconCols);
   const totalCells = cols * totalRows;
 
   return (
@@ -375,9 +402,9 @@ function CanvasGrid({ entries, padTop = 1, panelWidth = 0 }: {
           let entry: IconEntry | null = null;
           if (
             row >= padTop && row < padTop + iconRows &&
-            col >= iconStartCol && col < iconStartCol + ICON_COLS
+            col >= iconStartCol && col < iconStartCol + iconCols
           ) {
-            const iconIdx = (row - padTop) * ICON_COLS + (col - iconStartCol);
+            const iconIdx = (row - padTop) * iconCols + (col - iconStartCol);
             if (iconIdx < entries.length) entry = entries[iconIdx];
           }
 
@@ -1289,11 +1316,78 @@ function IconStyleToggle({ value, onChange }: { value: IconStyle; onChange: (v: 
   );
 }
 
+/** Mobile preview modal — almost full width/height, scrollable, closable. */
+function MobilePreviewModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  // Lock body scroll when open
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [open]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[60] lg:hidden">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      {/* Panel */}
+      <div className="absolute inset-3 top-6 bottom-6 bg-page dark:bg-raised rounded-2xl border border-edge shadow-2xl flex flex-col overflow-hidden animate-in fade-in-0 zoom-in-95">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-edge shrink-0">
+          <span className="text-[11px] font-semibold text-ink/80">Editor Preview</span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-7 h-7 flex items-center justify-center rounded-lg text-ink3 hover:text-ink hover:bg-ink/5 dark:hover:bg-white/8 transition-colors cursor-pointer"
+          >
+            <svg viewBox="0 0 15 15" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M4 4l7 7M11 4l-7 7" />
+            </svg>
+          </button>
+        </div>
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto overscroll-contain">
+          <ContextPanel />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Floating action button — fixed bottom right on mobile. */
+function MobilePreviewFab({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="lg:hidden fixed bottom-5 right-5 z-50 w-12 h-12 rounded-full bg-ink text-page shadow-lg flex items-center justify-center cursor-pointer hover:scale-105 active:scale-95 transition-transform"
+      aria-label="Open editor preview"
+    >
+      {/* Sliders/panel icon */}
+      <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="4" y1="21" x2="4" y2="14" />
+        <line x1="4" y1="10" x2="4" y2="3" />
+        <line x1="12" y1="21" x2="12" y2="12" />
+        <line x1="12" y1="8" x2="12" y2="3" />
+        <line x1="20" y1="21" x2="20" y2="16" />
+        <line x1="20" y1="12" x2="20" y2="3" />
+        <line x1="1" y1="14" x2="7" y2="14" />
+        <line x1="9" y1="8" x2="15" y2="8" />
+        <line x1="17" y1="16" x2="23" y2="16" />
+      </svg>
+    </button>
+  );
+}
+
 export function CascadePage() {
   const entries = orderedEntries();
   const uniqueIcons = new Set(metadata.map((e) => e.icon)).size;
   const uniqueProperties = new Set(metadata.map((e) => e.property)).size;
   const [iconStyle, setIconStyle] = useState<IconStyle>("duo");
+  const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
+  const iconCols = useIconCols();
 
   return (
     <IconStyleContext.Provider value={iconStyle}>
@@ -1344,12 +1438,13 @@ export function CascadePage() {
               <CanvasGrid
                 entries={entries}
                 padTop={1}
-                panelWidth={310 + CELL}
+                panelWidth={iconCols === ICON_COLS ? 310 + CELL : 0}
+                iconCols={iconCols}
               />
             </TooltipProvider>
           </div>
 
-          {/* Panel — absolute to right edge, full height of section */}
+          {/* Panel — absolute to right edge, full height of section (desktop only) */}
           <div
             className="max-lg:hidden absolute top-0 right-0 bottom-0 z-30"
             style={{ width: 330 }}
@@ -1360,10 +1455,9 @@ export function CascadePage() {
           </div>
         </section>
 
-        {/* Mobile-only editor panel */}
-        <section className="lg:hidden py-12 px-6">
-          <ContextPanel />
-        </section>
+        {/* Mobile floating preview button + modal */}
+        <MobilePreviewFab onClick={() => setMobilePreviewOpen(true)} />
+        <MobilePreviewModal open={mobilePreviewOpen} onClose={() => setMobilePreviewOpen(false)} />
 
         <div className="dither-band" />
 
