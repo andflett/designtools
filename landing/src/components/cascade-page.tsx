@@ -324,7 +324,7 @@ function CanvasGrid({ entries }: {
         marginLeft: "calc(-50vw + 50%)",
         paddingTop: "var(--grid-pt)",
         paddingBottom: CELL / 2,
-        "--ci": `max(24px, calc((100vw - 1152px) / 2))`,
+        "--ci": `max(min(24px, calc((100vw - ${5 * CELL}px) / 2)), calc((100vw - 1152px) / 2))`,
         paddingLeft: "var(--ci)",
         paddingRight: "max(var(--panel-clear, 0px), var(--ci))",
         backgroundImage: `
