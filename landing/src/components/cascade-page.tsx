@@ -1249,7 +1249,10 @@ function MobilePreviewModal({ open, onClose }: { open: boolean; onClose: () => v
       <div className="absolute inset-3 top-6 bottom-6 bg-page dark:bg-raised rounded-2xl border border-edge shadow-2xl flex flex-col overflow-hidden animate-in fade-in-0 zoom-in-95">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-edge shrink-0">
-          <span className="text-[11px] font-semibold text-ink/80">Editor Preview</span>
+          <div>
+            <span className="text-[11px] font-semibold text-ink/80">Editor Preview</span>
+            <p className="text-[10px] text-ink3 mt-0.5">See how icons appear in the editor panel</p>
+          </div>
           <button
             type="button"
             onClick={onClose}
@@ -1275,21 +1278,15 @@ function MobilePreviewFab({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="lg:hidden fixed bottom-5 right-5 z-50 w-12 h-12 rounded-full bg-ink text-page shadow-lg flex items-center justify-center cursor-pointer hover:scale-105 active:scale-95 transition-transform"
+      className="lg:hidden fixed bottom-5 right-5 z-50 h-10 px-4 rounded-full bg-ink text-page shadow-lg flex items-center gap-2 cursor-pointer hover:scale-105 active:scale-95 transition-transform"
       aria-label="Open editor preview"
     >
-      {/* Sliders/panel icon */}
-      <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <line x1="4" y1="21" x2="4" y2="14" />
-        <line x1="4" y1="10" x2="4" y2="3" />
-        <line x1="12" y1="21" x2="12" y2="12" />
-        <line x1="12" y1="8" x2="12" y2="3" />
-        <line x1="20" y1="21" x2="20" y2="16" />
-        <line x1="20" y1="12" x2="20" y2="3" />
-        <line x1="1" y1="14" x2="7" y2="14" />
-        <line x1="9" y1="8" x2="15" y2="8" />
-        <line x1="17" y1="16" x2="23" y2="16" />
+      {/* Eye icon */}
+      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+        <circle cx="12" cy="12" r="3" />
       </svg>
+      <span className="text-xs font-semibold">Preview</span>
     </button>
   );
 }
