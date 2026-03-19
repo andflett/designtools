@@ -1317,7 +1317,18 @@ export function CascadePage() {
               Hand-crafted icons for {uniqueProperties} CSS properties and their
               values. Made for design tools that speak code.
             </p>
-            <InstallCommand />
+            <div className="flex items-center gap-3">
+              <InstallCommand />
+              <a
+                href="https://github.com/andflett/cascade"
+                target="_blank"
+                rel="noopener"
+                className="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-white/10 bg-white/5 hover:bg-white/8 text-white/50 hover:text-white transition-all"
+                title="GitHub"
+              >
+                <GitHubIcon />
+              </a>
+            </div>
             <div className="mt-7">
 {/* Duo/Solid toggle removed — available per-icon in popovers */}
             </div>
