@@ -1296,7 +1296,6 @@ function MobilePreviewFab({ onClick }: { onClick: () => void }) {
 
 export function CascadePage() {
   const entries = orderedEntries();
-  const uniqueIcons = new Set(metadata.map((e) => e.icon)).size;
   const uniqueProperties = new Set(metadata.map((e) => e.property)).size;
   const [iconStyle, setIconStyle] = useState<IconStyle>("duo");
   const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
@@ -1332,8 +1331,8 @@ export function CascadePage() {
               Icons
             </h1>
             <p className="text-sm md:text-base text-white/60 max-w-[480px] mx-auto leading-relaxed mb-6">
-              {uniqueIcons} hand-crafted icons across {uniqueProperties} CSS
-              property groups. Designed for visual editors that speak code.
+              Hand-crafted icons for {uniqueProperties} CSS properties and their
+              values. Made for design tools that speak code.
             </p>
             <InstallCommand />
             <div className="mt-7">
