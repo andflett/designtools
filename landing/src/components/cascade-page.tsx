@@ -317,10 +317,10 @@ function CanvasGrid({ entries }: {
 }) {
   return (
     <div
+      className="pt-[36px] sm:pt-[72px]"
       style={{
         width: "100vw",
         marginLeft: "calc(-50vw + 50%)",
-        paddingTop: CELL,
         paddingBottom: CELL,
         backgroundImage: `
           repeating-linear-gradient(to right, ${LINE_COLOR} 0 1px, transparent 1px ${CELL}px),
