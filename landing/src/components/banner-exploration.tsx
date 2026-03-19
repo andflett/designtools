@@ -11,6 +11,8 @@ import {
 /* ------------------------------------------------------------------ */
 
 const SIZE = 1024;
+const OG_W = 1200;
+const OG_H = 630;
 const UNIQUE_PROPS = new Set(metadata.map((e) => e.property)).size;
 const TITLE = "Cascade Icons";
 const TAGLINE = `Hand-crafted icons for ${UNIQUE_PROPS} CSS properties and their values. Made for design tools that speak code.`;
@@ -89,6 +91,28 @@ function BannerFrame({ label, children }: { label: string; children: React.React
       <h3 className="text-sm font-mono text-white/50 uppercase tracking-widest">{label}</h3>
       <div ref={ref} className="w-full max-w-[1024px]">
         <div className="relative overflow-hidden rounded-lg border border-white/10 origin-top-left" style={{ width: SIZE, height: SIZE, transform: `scale(${scale})`, marginBottom: SIZE * (scale - 1) }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OgFrame({ label, children }: { label: string; children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => setScale(Math.min(1, e.contentRect.width / OG_W)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return (
+    <div className="flex flex-col items-center gap-4">
+      <h3 className="text-sm font-mono text-white/50 uppercase tracking-widest">{label}</h3>
+      <div ref={ref} className="w-full max-w-[1200px]">
+        <div className="relative overflow-hidden rounded-lg border border-white/10 origin-top-left" style={{ width: OG_W, height: OG_H, transform: `scale(${scale})`, marginBottom: OG_H * (scale - 1) }}>
           {children}
         </div>
       </div>
@@ -248,6 +272,48 @@ function BannerD() {
 }
 
 /* ------------------------------------------------------------------ */
+/*  D-OG — OG image version of D (1200×630)                            */
+/* ------------------------------------------------------------------ */
+
+function BannerDOg() {
+  const CELL = 72;
+  const cols = Math.floor(OG_W / CELL);
+  const rows = Math.ceil(OG_H / CELL);
+  const total = cols * rows;
+  const fill: IconEntry[] = [];
+  while (fill.length < total) fill.push(...allEntries);
+
+  return (
+    <OgFrame label="D — Icon wall (OG 1200×630)">
+      <div className="w-full h-full bg-[#09090b] relative">
+        {/* Full grid of icons at low opacity */}
+        <div className="absolute inset-0" style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, ${CELL}px)`, justifyContent: "center" }}>
+          {fill.slice(0, total).map((entry, i) => {
+            const icon = lookupIcon(entry.property, entry.value);
+            if (!icon) return <div key={i} />;
+            return (
+              <div key={i} className="flex items-center justify-center text-white/15 border-r border-b border-white/[0.03]" style={{ width: CELL, height: CELL }}>
+                <IconSvg icon={icon} className="w-[15px] h-[15px]" />
+              </div>
+            );
+          })}
+        </div>
+        {/* Radial vignette — wider ellipse for landscape */}
+        <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 80% 90% at center, transparent 20%, #09090b 70%)" }} />
+        {/* Title centred */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <h2 className="text-[80px] font-normal leading-[1.0] tracking-[-0.03em] text-white" style={jersey}>Cascade</h2>
+          <p className="text-[20px] text-white/50 mt-5 max-w-[520px] text-center leading-relaxed">{TAGLINE}</p>
+          <div className="mt-6 inline-flex items-center gap-3 px-5 py-2.5 rounded-lg border border-white/10 bg-white/5">
+            <span className="text-[14px] font-mono text-white/70">npm i @designtools/cascade</span>
+          </div>
+        </div>
+      </div>
+    </OgFrame>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  E — Three large icons in a row, title below                        */
 /* ------------------------------------------------------------------ */
 
@@ -289,8 +355,8 @@ function BannerE() {
 
 export function BannerExploration() {
   const [selected, setSelected] = useState<number | null>(null);
-  const banners = [<BannerA key="a" />, <BannerB key="b" />, <BannerC key="c" />, <BannerD key="d" />, <BannerE key="e" />];
-  const chips = ["A — Row", "B — Hero", "C — Panel", "D — Wall", "E — Trio"];
+  const banners = [<BannerA key="a" />, <BannerB key="b" />, <BannerC key="c" />, <BannerD key="d" />, <BannerDOg key="d-og" />, <BannerE key="e" />];
+  const chips = ["A — Row", "B — Hero", "C — Panel", "D — Wall", "D — OG", "E — Trio"];
 
   return (
     <div className="min-h-screen bg-[#09090b] text-white">
