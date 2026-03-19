@@ -13,9 +13,8 @@ import {
 const SIZE = 1024;
 const OG_W = 1200;
 const OG_H = 630;
-const UNIQUE_PROPS = new Set(metadata.map((e) => e.property)).size;
 const TITLE = "Cascade Icons";
-const TAGLINE = `Hand-crafted icons for ${UNIQUE_PROPS} CSS properties and their values. Made for design tools that speak code.`;
+const TAGLINE = `Hand-crafted icons for CSS properties, made for design tools that speak code.`;
 
 const CATEGORIES: { label: string; properties: string[] }[] = [
   { label: "Layout", properties: ["position", "display", "flex-direction", "flex-wrap", "flex-grow", "flex-shrink"] },
@@ -136,99 +135,6 @@ function CascadeIcon({ prop, value, size = 15, className = "text-white/70" }: { 
 }
 
 /* ------------------------------------------------------------------ */
-/*  A — Centered title + single row of icons below                     */
-/* ------------------------------------------------------------------ */
-
-function BannerA() {
-  const picks = [
-    ["display", "flex"], ["display", "grid"], ["flex-direction", "column"],
-    ["justify-content", "center"], ["align-items", "center"], ["padding", "all"],
-    ["border-radius", "all"], ["text-align", "center"],
-  ] as const;
-
-  return (
-    <BannerFrame label="A — Centered + icon row">
-      <div className="w-full h-full bg-[#09090b] flex flex-col items-center justify-center">
-        <div className="relative mb-6">
-          <DitherGlow width={500} height={120} pixelSize={3} color="rgba(255,255,255,0.08)" />
-          <h2 className="text-[88px] font-normal leading-[1.0] tracking-[-0.03em] text-white relative" style={jersey}>{TITLE}</h2>
-        </div>
-        <p className="text-[18px] text-white/40 max-w-[520px] text-center leading-relaxed mb-20">{TAGLINE}</p>
-        <div className="flex items-center gap-6">
-          {picks.map(([p, v]) => (
-            <div key={`${p}-${v}`} className="w-12 h-12 flex items-center justify-center rounded-lg border border-white/6">
-              <CascadeIcon prop={p} value={v} size={20} className="text-white/40" />
-            </div>
-          ))}
-        </div>
-        <Badge className="mt-auto mb-10" />
-      </div>
-    </BannerFrame>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  B — Big single icon hero                                           */
-/* ------------------------------------------------------------------ */
-
-function BannerB() {
-  return (
-    <BannerFrame label="B — Big single icon">
-      <div className="w-full h-full bg-[#09090b] flex flex-col items-center justify-center">
-        <Badge className="mb-auto mt-10" />
-        <div className="relative mb-10">
-          <DitherGlow width={300} height={300} pixelSize={3} color="rgba(255,255,255,0.06)" />
-          <div className="w-40 h-40 flex items-center justify-center rounded-2xl border border-white/8 bg-white/[0.02] relative">
-            <CascadeIcon prop="display" value="flex" size={72} className="text-white/60" />
-          </div>
-        </div>
-        <h2 className="text-[88px] font-normal leading-[1.0] tracking-[-0.03em] text-white mb-5" style={jersey}>{TITLE}</h2>
-        <p className="text-[18px] text-white/40 max-w-[480px] text-center leading-relaxed mb-auto">{TAGLINE}</p>
-      </div>
-    </BannerFrame>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  C — Editor panel fragment                                          */
-/* ------------------------------------------------------------------ */
-
-function SegRow({ label, prop, values, active }: { label: string; prop: string; values: string[]; active: string }) {
-  return (
-    <div>
-      <span className="text-[11px] text-white/25 mb-1.5 block">{label}</span>
-      <div className="flex rounded-md border border-white/8 overflow-hidden">
-        {values.map((v, i) => (
-          <div key={v} className={`flex-1 flex items-center justify-center py-2.5 ${v === active ? "bg-white/8 text-white" : "text-white/30"} ${i > 0 ? "border-l border-white/8" : ""}`}>
-            <CascadeIcon prop={prop} value={v} size={15} className="text-current" />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function BannerC() {
-  return (
-    <BannerFrame label="C — Editor panel">
-      <div className="w-full h-full bg-[#09090b] flex flex-col items-center justify-center gap-16">
-        <div className="text-center">
-          <h2 className="text-[88px] font-normal leading-[1.0] tracking-[-0.03em] text-white mb-5" style={jersey}>{TITLE}</h2>
-          <p className="text-[18px] text-white/40 max-w-[480px] mx-auto leading-relaxed">{TAGLINE}</p>
-        </div>
-
-        {/* Compact panel fragment — just 3 segmented controls */}
-        <div className="w-[440px] rounded-xl border border-white/8 bg-white/[0.02] p-6 space-y-4">
-          <SegRow label="Display" prop="display" values={["block", "flex", "grid", "none"]} active="flex" />
-          <SegRow label="Justify content" prop="justify-content" values={["flex-start", "center", "flex-end", "space-between"]} active="center" />
-          <SegRow label="Align items" prop="align-items" values={["flex-start", "center", "flex-end", "stretch", "baseline"]} active="center" />
-        </div>
-      </div>
-    </BannerFrame>
-  );
-}
-
-/* ------------------------------------------------------------------ */
 /*  D — Grid of icons, title overlaid                                  */
 /* ------------------------------------------------------------------ */
 
@@ -245,25 +151,51 @@ function BannerD() {
     <BannerFrame label="D — Icon wall">
       <div className="w-full h-full bg-[#09090b] relative">
         {/* Full grid of icons at low opacity */}
-        <div className="absolute inset-0" style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, ${CELL}px)`, justifyContent: "center" }}>
+        <div
+          className="absolute inset-0"
+          style={{
+            display: "grid",
+            gridTemplateColumns: `repeat(${cols}, ${CELL}px)`,
+            justifyContent: "center",
+          }}
+        >
           {fill.slice(0, total).map((entry, i) => {
             const icon = lookupIcon(entry.property, entry.value);
             if (!icon) return <div key={i} />;
             return (
-              <div key={i} className="flex items-center justify-center text-white/20 border-r border-b border-white/[0.04]" style={{ width: CELL, height: CELL }}>
+              <div
+                key={i}
+                className="flex items-center justify-center text-white/20 border-r border-b border-white/[0.04]"
+                style={{ width: CELL, height: CELL }}
+              >
                 <IconSvg icon={icon} className="w-[15px] h-[15px]" />
               </div>
             );
           })}
         </div>
         {/* Radial vignette */}
-        <div className="absolute inset-0" style={{ background: "radial-gradient(circle at center, transparent 20%, #09090b 70%)" }} />
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(circle at center, transparent 40%, #09090b 80%)",
+          }}
+        />
         {/* Title centred */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <h2 className="text-[96px] font-normal leading-[1.0] text-white" style={jersey}>cascade icons</h2>
-          <p className="text-[30px] text-white/70 mt-6 max-w-[520px] text-center leading-snug">{TAGLINE}</p>
-          <div className="mt-6 inline-flex items-center gap-3 px-6 py-3 rounded-lg border border-white/10 bg-white/5">
-            <span className="text-[16px] font-mono text-white/70">npm i @designtools/cascade</span>
+          <h2
+            className="text-[126px] font-normal leading-[1] text-white"
+            style={jersey}
+          >
+            {TITLE}
+          </h2>
+          <p className="text-[30px] text-white/90 font-medium mt-4 max-w-[550px] text-center leading-snug">
+            {TAGLINE}
+          </p>
+          <div className="mt-9 inline-flex items-center gap-3 px-8 py-4 rounded-lg border border-white/10 bg-[#09090b]">
+            <span className="text-[22px] font-mono text-white/70">
+              npm i @designtools/cascade
+            </span>
           </div>
         </div>
       </div>
@@ -287,25 +219,51 @@ function BannerDOg() {
     <OgFrame label="D — Icon wall (OG 1200×630)">
       <div className="w-full h-full bg-[#09090b] relative">
         {/* Full grid of icons at low opacity */}
-        <div className="absolute inset-0" style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, ${CELL}px)`, justifyContent: "center" }}>
+        <div
+          className="absolute inset-0"
+          style={{
+            display: "grid",
+            gridTemplateColumns: `repeat(${cols}, ${CELL}px)`,
+            justifyContent: "center",
+          }}
+        >
           {fill.slice(0, total).map((entry, i) => {
             const icon = lookupIcon(entry.property, entry.value);
             if (!icon) return <div key={i} />;
             return (
-              <div key={i} className="flex items-center justify-center text-white/20 border-r border-b border-white/[0.04]" style={{ width: CELL, height: CELL }}>
+              <div
+                key={i}
+                className="flex items-center justify-center text-white/20 border-r border-b border-white/[0.04]"
+                style={{ width: CELL, height: CELL }}
+              >
                 <IconSvg icon={icon} className="w-[15px] h-[15px]" />
               </div>
             );
           })}
         </div>
         {/* Radial vignette — wider ellipse for landscape */}
-        <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 80% 90% at center, transparent 20%, #09090b 70%)" }} />
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(ellipse 80% 90% at center, transparent 40%, #09090b 80%)",
+          }}
+        />
         {/* Title centred */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <h2 className="text-[72px] font-normal leading-[1.0] text-white" style={jersey}>cascade icons</h2>
-          <p className="text-[26px] text-white/70 mt-5 max-w-[480px] text-center leading-snug">{TAGLINE}</p>
-          <div className="mt-5 inline-flex items-center gap-3 px-6 py-3 rounded-lg border border-white/10 bg-white/5">
-            <span className="text-[15px] font-mono text-white/70">npm i @designtools/cascade</span>
+          <h2
+            className="text-[78px] font-normal leading-[1] text-white"
+            style={jersey}
+          >
+            {TITLE}
+          </h2>
+          <p className="text-[24px] text-white/90 font-medium mt-3 max-w-[480px] text-center leading-snug">
+            {TAGLINE}
+          </p>
+          <div className="mt-6 inline-flex items-center gap-3 px-6 py-3 rounded-lg border border-white/10 bg-[#09090b]">
+            <span className="text-[14px] font-mono text-white/70">
+              npm i @designtools/cascade
+            </span>
           </div>
         </div>
       </div>
@@ -313,41 +271,6 @@ function BannerDOg() {
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  E — Three large icons in a row, title below                        */
-/* ------------------------------------------------------------------ */
-
-function BannerE() {
-  const trio = [
-    { prop: "justify-content", value: "space-between", label: "justify-content" },
-    { prop: "display", value: "flex", label: "display" },
-    { prop: "align-items", value: "center", label: "align-items" },
-  ] as const;
-
-  return (
-    <BannerFrame label="E — Three icons">
-      <div className="w-full h-full bg-[#09090b] flex flex-col items-center justify-center">
-        {/* Three icons */}
-        <div className="flex items-center gap-16 mb-20">
-          {trio.map(({ prop, value, label }) => (
-            <div key={label} className="flex flex-col items-center gap-4">
-              <div className="w-28 h-28 flex items-center justify-center rounded-2xl border border-white/8 bg-white/[0.02]">
-                <CascadeIcon prop={prop} value={value} size={48} className="text-white/60" />
-              </div>
-              <span className="text-[12px] font-mono text-white/20">{label}</span>
-            </div>
-          ))}
-        </div>
-
-        <div className="relative">
-          <DitherGlow width={500} height={120} pixelSize={3} color="rgba(255,255,255,0.06)" />
-          <h2 className="text-[88px] font-normal leading-[1.0] tracking-[-0.03em] text-white relative" style={jersey}>{TITLE}</h2>
-        </div>
-        <p className="text-[18px] text-white/40 max-w-[480px] text-center leading-relaxed mt-5">{TAGLINE}</p>
-      </div>
-    </BannerFrame>
-  );
-}
 
 /* ------------------------------------------------------------------ */
 /*  Page                                                               */
@@ -355,27 +278,35 @@ function BannerE() {
 
 export function BannerExploration() {
   const [selected, setSelected] = useState<number | null>(null);
-  const banners = [<BannerA key="a" />, <BannerB key="b" />, <BannerC key="c" />, <BannerD key="d" />, <BannerDOg key="d-og" />, <BannerE key="e" />];
-  const chips = ["A — Row", "B — Hero", "C — Panel", "D — Wall", "D — OG", "E — Trio"];
+  const [cssScale, setCssScale] = useState(1);
+  const banners = [<BannerD key="d" />, <BannerDOg key="d-og" />];
+  const chips = ["D — Wall", "D — OG"];
 
   return (
-    <div className="min-h-screen bg-[#09090b] text-white">
+    <div className="min-h-screen bg-[#18181b] text-white">
       <div className="max-w-[1200px] mx-auto px-4 sm:px-8 pt-12 pb-8">
         <p className="text-[10px] font-mono text-white/30 uppercase tracking-widest mb-2">Internal</p>
         <h1 className="text-[clamp(1.5rem,3vw,2.5rem)] font-normal tracking-[-0.02em] text-white" style={jersey}>
           LinkedIn Banner — Cascade Icons
         </h1>
-        <p className="text-sm text-white/40 mt-1 font-mono">1024 × 1024 — 5 variations — dark mode</p>
+        <p className="text-sm text-white/40 mt-1 font-mono">D variants — dark mode</p>
       </div>
 
-      <div className="max-w-[1200px] mx-auto px-4 sm:px-8 pb-8 flex items-center gap-2 flex-wrap">
-        <button onClick={() => setSelected(null)} className={`px-3 py-1.5 text-[11px] font-mono rounded-md border transition-colors cursor-pointer ${selected === null ? "border-white/30 text-white bg-white/10" : "border-white/8 text-white/40 hover:text-white/60"}`}>All</button>
-        {chips.map((label, i) => (
-          <button key={label} onClick={() => setSelected(i)} className={`px-3 py-1.5 text-[11px] font-mono rounded-md border transition-colors cursor-pointer ${selected === i ? "border-white/30 text-white bg-white/10" : "border-white/8 text-white/40 hover:text-white/60"}`}>{label}</button>
-        ))}
+      <div className="max-w-[1200px] mx-auto px-4 sm:px-8 pb-8 flex items-center gap-4 flex-wrap">
+        <div className="flex items-center gap-2">
+          <button onClick={() => setSelected(null)} className={`px-3 py-1.5 text-[11px] font-mono rounded-md border transition-colors cursor-pointer ${selected === null ? "border-white/30 text-white bg-white/10" : "border-white/8 text-white/40 hover:text-white/60"}`}>All</button>
+          {chips.map((label, i) => (
+            <button key={label} onClick={() => setSelected(i)} className={`px-3 py-1.5 text-[11px] font-mono rounded-md border transition-colors cursor-pointer ${selected === i ? "border-white/30 text-white bg-white/10" : "border-white/8 text-white/40 hover:text-white/60"}`}>{label}</button>
+          ))}
+        </div>
+        <div className="flex items-center gap-3 ml-auto">
+          <span className="text-[11px] font-mono text-white/40">Scale</span>
+          <input type="range" min="0.1" max="1" step="0.01" value={cssScale} onChange={(e) => setCssScale(Number(e.target.value))} className="w-32 accent-white/60" />
+          <span className="text-[11px] font-mono text-white/50 w-10 text-right">{Math.round(cssScale * 100)}%</span>
+        </div>
       </div>
 
-      <div className="max-w-[1200px] mx-auto px-4 sm:px-8 pb-24 space-y-16">
+      <div className="max-w-[1200px] mx-auto px-4 sm:px-8 pb-24 space-y-16" style={{ transform: `scale(${cssScale})`, transformOrigin: "top center" }}>
         {selected !== null ? banners[selected] : banners}
       </div>
     </div>

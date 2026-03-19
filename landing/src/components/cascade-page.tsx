@@ -1317,7 +1317,7 @@ export function CascadePage() {
               Hand-crafted icons for {uniqueProperties} CSS properties and their
               values. Made for design tools that speak code.
             </p>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center gap-3">
               <InstallCommand />
               <a
                 href="https://github.com/andflett/cascade"
