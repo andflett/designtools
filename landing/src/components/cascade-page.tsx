@@ -641,58 +641,65 @@ const OverflowDots = () => (
   </svg>
 );
 
-/** Overflow dropdown menu shared between segmented variants. */
-function SegmentedOverflowMenu({ items, selected, property, onSelect, onClose, resolveIcon }: {
+/** Overflow dropdown — uses Radix Popover so it portals above siblings. */
+function SegmentedOverflowPopover({ items, selected, property, open, onOpenChange, onSelect, active, disabled, resolveIcon, className }: {
   items: readonly string[];
   selected: string;
   property: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onSelect: (v: string) => void;
-  onClose: () => void;
+  active: boolean;
+  disabled?: boolean;
   resolveIcon?: (property: string, value: string) => CascadeIcon | undefined;
+  className?: string;
 }) {
   const getIcon = resolveIcon ?? resolve;
   return (
-    <>
-      <div className="fixed inset-0" onClick={onClose} />
-      <div className={SEG_DROPDOWN}>
-        {items.map((v) => {
-          const icon = getIcon(property, v);
-          return (
+    <Popover.Root open={open} onOpenChange={onOpenChange}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Popover.Trigger asChild>
             <button
-              key={v}
               type="button"
-              onClick={() => { onSelect(v); onClose(); }}
-              className={clsx(SEG_DROP_ITEM, selected === v && "bg-black/[0.06] dark:bg-white/[0.08]")}
+              disabled={disabled}
+              className={clsx(SEG_OVERFLOW_BTN, disabled ? "cursor-default" : "cursor-pointer", SEG_IDLE, active && SEG_ACTIVE, className)}
             >
-              {icon && <IconSvg icon={icon} className="w-[15px] h-[15px] shrink-0" />}
-              <span className="flex-1 text-left">{v}</span>
+              <OverflowDots />
             </button>
-          );
-        })}
-      </div>
-    </>
-  );
-}
-
-/** Overflow trigger button. */
-function SegmentedOverflowTrigger({ active, disabled, onClick, className }: { active: boolean; disabled?: boolean; onClick: () => void; className?: string }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          onClick={onClick}
-          disabled={disabled}
-          className={clsx(SEG_OVERFLOW_BTN, disabled ? "cursor-default" : "cursor-pointer", SEG_IDLE, active && SEG_ACTIVE, className)}
+          </Popover.Trigger>
+        </TooltipTrigger>
+        {!open && (
+          <TooltipContent side="bottom" className="text-xs px-2 py-1 rounded-md">
+            More options
+            <TooltipArrow />
+          </TooltipContent>
+        )}
+      </Tooltip>
+      <Popover.Portal>
+        <Popover.Content
+          side="bottom"
+          align="end"
+          sideOffset={4}
+          className={SEG_DROPDOWN}
         >
-          <OverflowDots />
-        </button>
-      </TooltipTrigger>
-      <TooltipContent side="bottom" className="text-xs px-2 py-1 rounded-md">
-        More options
-        <TooltipArrow />
-      </TooltipContent>
-    </Tooltip>
+          {items.map((v) => {
+            const icon = getIcon(property, v);
+            return (
+              <button
+                key={v}
+                type="button"
+                onClick={() => { onSelect(v); onOpenChange(false); }}
+                className={clsx(SEG_DROP_ITEM, selected === v && "bg-black/[0.06] dark:bg-white/[0.08]")}
+              >
+                {icon && <IconSvg icon={icon} className="w-[15px] h-[15px] shrink-0" />}
+                <span className="flex-1 text-left">{v}</span>
+              </button>
+            );
+          })}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 
@@ -759,20 +766,16 @@ function SegmentedControl({ property, values, value: controlledValue, onChange, 
           );
         })}
         {hasOverflow && (
-          <SegmentedOverflowTrigger
-            active={overflow.includes(selected)}
-            disabled={disabled}
-            onClick={() => !disabled && setOverflowOpen(!overflowOpen)}
-            className="rounded-r-md"
-          />
-        )}
-        {overflowOpen && (
-          <SegmentedOverflowMenu
+          <SegmentedOverflowPopover
             items={overflow}
             selected={selected}
             property={property}
+            open={overflowOpen}
+            onOpenChange={(v) => !disabled && setOverflowOpen(v)}
             onSelect={onSelect}
-            onClose={() => setOverflowOpen(false)}
+            active={overflow.includes(selected)}
+            disabled={disabled}
+            className="rounded-r-md"
           />
         )}
       </div>
