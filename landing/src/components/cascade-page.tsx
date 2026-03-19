@@ -1330,7 +1330,7 @@ export function CascadePage() {
               </span>{" "}
               Icons
             </h1>
-            <p className="text-sm md:text-base text-white/60 max-w-[480px] mx-auto leading-relaxed mb-6">
+            <p className="text-sm md:text-base text-white/70 max-w-[480px] mx-auto leading-relaxed mb-6">
               Hand-crafted icons for {uniqueProperties} CSS properties and their
               values. Made for design tools that speak code.
             </p>
