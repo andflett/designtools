@@ -23,6 +23,7 @@ export default defineConfig(({ mode }) => ({
         main: "index.html",
         "ai-writes": "ai-writes.html",
         cascade: "cascade.html",
+        "banner-explore": "banner-explore.html",
       },
     },
   },
