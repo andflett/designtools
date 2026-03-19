@@ -199,33 +199,6 @@ function CopyActions({ texts }: { texts: Record<CopyKey, string> }) {
 /* ── Icon popover (rendered inside a bordered grid cell) ── */
 
 const CELL = 72; // px — grid cell size
-const ICON_COLS = 12; // fixed icon columns per row (desktop)
-
-/** Responsive icon columns based on viewport width. */
-function useIconCols(): number {
-  const [cols, setCols] = useState(() => {
-    if (typeof window === "undefined") return ICON_COLS;
-    const vw = window.innerWidth;
-    if (vw < 480) return 4;
-    if (vw < 768) return 6;
-    if (vw < 1024) return 8;
-    return ICON_COLS;
-  });
-
-  useEffect(() => {
-    const update = () => {
-      const vw = window.innerWidth;
-      if (vw < 480) setCols(4);
-      else if (vw < 768) setCols(6);
-      else if (vw < 1024) setCols(8);
-      else setCols(ICON_COLS);
-    };
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, []);
-
-  return cols;
-}
 
 function IconCellContent({ entry }: { entry: IconEntry }) {
   const [open, setOpen] = useState(false);
@@ -331,103 +304,43 @@ function IconCellContent({ entry }: { entry: IconEntry }) {
 }
 
 /* ── Canvas grid ──
-   A real bordered grid that fills the content area. Icons sit in cells;
-   empty cells extend the canvas beyond. Three tiers of border weight
-   (fine / medium / bold) create the graph-paper effect.
+   Full-viewport graph-paper via CSS background gradients. Icons sit in
+   an auto-fill grid centered with justify-content; the background aligns
+   via mod() and extends beyond the icons in all directions.
    ─────────────────────────────────────────────────────────────────── */
 
-// 3-tier line colors via color-mix — auto dark mode, kept subtle
-const LINE_FINE = "color-mix(in srgb, var(--color-ink) 3%, transparent)";
-const LINE_MED  = "color-mix(in srgb, var(--color-ink) 3%, transparent)";
-const LINE_BOLD = "color-mix(in srgb, var(--color-ink) 3%, transparent)";
+// Graph-paper line color — subtle, auto dark mode via color-mix
+const LINE_COLOR = "color-mix(in srgb, var(--color-ink) 3%, transparent)";
 
-/** Line color based on distance from icon grid origin — bold every 4, medium every 2 */
-function lineColor(relIndex: number): string {
-  if (relIndex % 4 === 0) return LINE_BOLD;
-  if (relIndex % 2 === 0) return LINE_MED;
-  return LINE_FINE;
-}
-
-function CanvasGrid({ entries, padTop = 1, panelWidth = 0, iconCols = ICON_COLS }: {
+function CanvasGrid({ entries }: {
   entries: IconEntry[];
-  padTop?: number;
-  panelWidth?: number;
-  iconCols?: number;
 }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [layout, setLayout] = useState({ cols: 20, iconStartCol: 2, totalRows: 20 });
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const measure = () => {
-      const vw = window.innerWidth;
-      const totalCols = Math.max(1, Math.ceil(vw / CELL));
-      const rect = el.getBoundingClientRect();
-      const startCol = Math.max(0, Math.round(rect.left / CELL));
-      const iconRows = Math.ceil(entries.length / iconCols);
-      const rows = padTop + iconRows + 1;
-      setLayout({ cols: totalCols, iconStartCol: startCol, totalRows: rows });
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    window.addEventListener("resize", measure);
-    return () => { ro.disconnect(); window.removeEventListener("resize", measure); };
-  }, [panelWidth, entries.length, padTop, iconCols]);
-
-  const { cols, iconStartCol, totalRows } = layout;
-  const iconRows = Math.ceil(entries.length / iconCols);
-  const totalCells = cols * totalRows;
-
   return (
-    <div ref={containerRef} className="relative">
-      {/* Break out to full viewport width */}
+    <div
+      style={{
+        width: "100vw",
+        marginLeft: "calc(-50vw + 50%)",
+        paddingTop: CELL,
+        paddingBottom: CELL,
+        backgroundImage: `
+          repeating-linear-gradient(to right, ${LINE_COLOR} 0 1px, transparent 1px ${CELL}px),
+          repeating-linear-gradient(to bottom, ${LINE_COLOR} 0 1px, transparent 1px ${CELL}px)
+        `,
+        backgroundPosition: `calc(mod(100vw, ${CELL}px) / 2) 0`,
+      }}
+    >
       <div
         style={{
-          width: "100vw",
-          marginLeft: "calc(-50vw + 50%)",
-          overflow: "hidden",
           display: "grid",
-          gridTemplateColumns: `repeat(${cols}, ${CELL}px)`,
-          borderTop: "none",
-          borderLeft: "none",
+          gridTemplateColumns: `repeat(auto-fill, ${CELL}px)`,
+          justifyContent: "center",
         }}
       >
-        {Array.from({ length: totalCells }, (_, i) => {
-          const col = i % cols;
-          const row = Math.floor(i / cols);
-
-          // Map cell to icon: icons start at (padTop, iconStartCol)
-          let entry: IconEntry | null = null;
-          if (
-            row >= padTop && row < padTop + iconRows &&
-            col >= iconStartCol && col < iconStartCol + iconCols
-          ) {
-            const iconIdx = (row - padTop) * iconCols + (col - iconStartCol);
-            if (iconIdx < entries.length) entry = entries[iconIdx];
-          }
-
-          // Line weights relative to icon grid origin
-          const relCol = col - iconStartCol + 1;
-          const relRow = row - padTop + 1;
-          const rightColor = lineColor(relCol);
-          const bottomColor = lineColor(relRow);
-
-          return (
-            <div
-              key={i}
-              style={{
-                width: CELL,
-                height: CELL,
-                borderRight: `1px solid ${rightColor}`,
-                borderBottom: `1px solid ${bottomColor}`,
-              }}
-            >
-              {entry && <IconCellContent entry={entry} />}
-            </div>
-          );
-        })}
+        {entries.map((entry, i) => (
+          <div key={entry.icon + entry.property} style={{ width: CELL, height: CELL }}>
+            <IconCellContent entry={entry} />
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -1387,7 +1300,6 @@ export function CascadePage() {
   const uniqueProperties = new Set(metadata.map((e) => e.property)).size;
   const [iconStyle, setIconStyle] = useState<IconStyle>("duo");
   const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
-  const iconCols = useIconCols();
 
   return (
     <IconStyleContext.Provider value={iconStyle}>
@@ -1435,12 +1347,7 @@ export function CascadePage() {
           {/* Canvas grid — full viewport width, icons centred */}
           <div className="max-w-[1200px] mx-auto px-6">
             <TooltipProvider delayDuration={200}>
-              <CanvasGrid
-                entries={entries}
-                padTop={1}
-                panelWidth={iconCols === ICON_COLS ? 310 + CELL : 0}
-                iconCols={iconCols}
-              />
+              <CanvasGrid entries={entries} />
             </TooltipProvider>
           </div>
 
