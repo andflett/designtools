@@ -1136,7 +1136,7 @@ function ContextPanel() {
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="border-l border-edge-subtle dark:border-edge bg-page dark:bg-raised w-full h-full">
+      <div className="w-full pb-16">
         <EditorPanelBody
           position={position} display={display} direction={direction} wrap={wrap} showSelf={false}
           onChangePosition={setPosition} onChangeDisplay={setDisplay} onChangeDirection={setDirection} onChangeWrap={setWrap}
@@ -1326,7 +1326,7 @@ export function CascadePage() {
                 href="https://github.com/andflett/cascade"
                 target="_blank"
                 rel="noopener"
-                className="inline-flex items-center justify-center w-11 h-11 rounded-lg border border-white/10 bg-white/5 hover:bg-white/8 text-white/50 hover:text-white transition-all"
+                className="inline-flex items-center justify-center w-10.5 h-10.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/8 text-white/50 hover:text-white transition-all"
                 title="GitHub"
               >
                 <GitHubIcon />
@@ -1347,10 +1347,10 @@ export function CascadePage() {
 
           {/* Panel — absolute to right edge, full height of section (desktop only) */}
           <div
-            className="max-lg:hidden absolute top-0 right-0 bottom-0"
+            className="max-lg:hidden absolute top-0 right-0 bottom-0 border-l border-edge-subtle dark:border-edge bg-page dark:bg-raised"
             style={{ width: 330 }}
           >
-            <div className="sticky top-0 h-screen overflow-y-auto">
+            <div className="absolute inset-0 overflow-y-auto">
               <ContextPanel />
             </div>
           </div>
