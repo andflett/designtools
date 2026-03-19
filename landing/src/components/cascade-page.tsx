@@ -63,7 +63,7 @@ function CascadeNav() {
     <nav className="fixed top-0 left-0 right-0 z-50 py-3 bg-[#09090b]/90 backdrop-blur-xl border-b border-white/8">
       <div className="max-w-[1100px] mx-auto px-6 flex items-center justify-between">
         <span className="text-[13px] font-mono flex items-center gap-0">
-          <span className="text-white/40">@designtools/</span>
+          <span className="text-white/40 hidden sm:inline">@designtools/</span>
           <span className="text-white">cascade</span>
           <span className="text-white/20 mx-1.5">/</span>
           <a href="/" className="text-white/40 hover:text-white/60 transition-colors">surface</a>
