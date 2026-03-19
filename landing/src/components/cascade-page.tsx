@@ -1294,7 +1294,7 @@ export function CascadePage() {
         {/* Hero */}
         <section className="relative pt-14 pb-16 text-center bg-[#09090b] overflow-hidden dark:border-b dark:border-edge">
           <div className="max-w-[1200px] mx-auto px-6 relative">
-            <div className="relative inline-flex justify-center mb-6">
+            <div className="relative inline-flex justify-center mb-4">
               <DitherGlow
                 width={450}
                 height={100}
@@ -1308,7 +1308,7 @@ export function CascadePage() {
               </span>
             </div>
             <h1
-              className="text-[clamp(2.25rem,5.5vw,3.75rem)] font-normal leading-[1.0] tracking-[-0.025em] text-white mb-3"
+              className="text-[clamp(3rem,5.5vw,3.75rem)] font-normal leading-[1.0] tracking-[-0.025em] text-white mb-3"
               style={{ fontFamily: "'Jersey 25', sans-serif" }}
             >
               <span className="glitch" data-text="Cascade">
