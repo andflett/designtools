@@ -2,6 +2,7 @@ import "./cascade.css";
 import { useState, useEffect, useCallback, useRef, createContext, useContext } from "react";
 import clsx from "clsx";
 import { Sun, Moon, Copy, Check } from "lucide-react";
+import * as Dialog from "@radix-ui/react-dialog";
 import * as Popover from "@radix-ui/react-popover";
 import { useTheme, toggleTheme } from "../theme.js";
 import { DitherGlow } from "./dither-glow.js";
@@ -916,9 +917,9 @@ function PropertySection({ label, property, values, rotate = 0, layoutProperty, 
             <Popover.Trigger asChild>
               <button
                 type="button"
-                className="w-4 h-4 flex items-center justify-center rounded text-[color:var(--color-ink3)]/40 hover:text-[color:var(--color-ink3)] transition-colors cursor-pointer"
+                className={clsx("w-4 h-4 flex items-center justify-center rounded hover:text-[color:var(--color-ink3)] transition-colors cursor-pointer text-[9px] font-semibold", PV_LABEL_COLOR)}
               >
-                <svg viewBox="0 0 12 12" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="1.2"><circle cx="6" cy="6" r="5" /><path d="M6 5.5V8.5M6 3.5V4" /></svg>
+                ?
               </button>
             </Popover.Trigger>
             <Popover.Portal>
@@ -927,7 +928,7 @@ function PropertySection({ label, property, values, rotate = 0, layoutProperty, 
                 align="start"
                 sideOffset={8}
                 collisionPadding={{ top: 12, bottom: 80, left: 12, right: 12 }}
-                className="bg-[color:var(--color-page)] border border-[color:var(--color-edge)] rounded-xl shadow-xl overflow-hidden w-[240px] animate-in fade-in-0 zoom-in-95 z-50"
+                className="bg-[color:var(--color-page)] border border-[color:var(--color-edge)] rounded-xl shadow-xl overflow-hidden w-[240px] animate-in fade-in-0 zoom-in-95"
               >
                 <PropertyExplainerContent property={layoutProperty} ctx={layoutCtx ?? DEFAULT_CTX} onClose={() => setExplainerOpen(false)} />
               </Popover.Content>
@@ -1230,65 +1231,46 @@ function IconStyleToggle({ value, onChange }: { value: IconStyle; onChange: (v: 
   );
 }
 
-/** Mobile preview modal — almost full width/height, scrollable, closable. */
-function MobilePreviewModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  // Lock body scroll when open
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
-  }, [open]);
-
-  if (!open) return null;
-
+/** Mobile example dialog — Radix Dialog for proper portal layering. */
+function MobileExampleDialog() {
   return (
-    <div className="fixed inset-0 z-[60] lg:hidden">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      {/* Panel */}
-      <div className="absolute inset-3 top-6 bottom-6 bg-page dark:bg-raised rounded-2xl border border-edge shadow-2xl flex flex-col overflow-hidden animate-in fade-in-0 zoom-in-95">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-edge shrink-0">
-          <div>
-            <span className="text-[11px] font-semibold text-ink/80">Example Usage</span>
-            <p className="text-[11px] text-ink3 mt-0.5">How these icons could look in a properties panel</p>
+    <Dialog.Root>
+      <Dialog.Trigger asChild>
+        <button
+          type="button"
+          className="lg:hidden fixed bottom-5 right-5 h-10 px-4 rounded-full bg-ink text-page shadow-lg flex items-center gap-2 cursor-pointer hover:scale-105 active:scale-95 transition-transform"
+          aria-label="Open example usage"
+        >
+          {/* Eye icon */}
+          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+          <span className="text-xs font-semibold">Example</span>
+        </button>
+      </Dialog.Trigger>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm lg:hidden animate-in fade-in-0" />
+        <Dialog.Content className="fixed inset-3 top-6 bottom-6 bg-page dark:bg-raised rounded-2xl border border-edge shadow-2xl flex flex-col overflow-hidden lg:hidden animate-in fade-in-0 zoom-in-95">
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-3 border-b border-edge shrink-0">
+            <div>
+              <Dialog.Title className="text-[11px] font-semibold text-ink/80">Example Usage</Dialog.Title>
+              <Dialog.Description className="text-[11px] text-ink3 mt-0.5">How cascade icons could look in a properties panel</Dialog.Description>
+            </div>
+            <Dialog.Close className="w-7 h-7 flex items-center justify-center rounded-lg text-ink3 hover:text-ink hover:bg-ink/5 dark:hover:bg-white/8 transition-colors cursor-pointer">
+              <svg viewBox="0 0 15 15" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M4 4l7 7M11 4l-7 7" />
+              </svg>
+            </Dialog.Close>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-7 h-7 flex items-center justify-center rounded-lg text-ink3 hover:text-ink hover:bg-ink/5 dark:hover:bg-white/8 transition-colors cursor-pointer"
-          >
-            <svg viewBox="0 0 15 15" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M4 4l7 7M11 4l-7 7" />
-            </svg>
-          </button>
-        </div>
-        {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto overscroll-contain">
-          <ContextPanel />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** Floating action button — fixed bottom right on mobile. */
-function MobilePreviewFab({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="lg:hidden fixed bottom-5 right-5 z-50 h-10 px-4 rounded-full bg-ink text-page shadow-lg flex items-center gap-2 cursor-pointer hover:scale-105 active:scale-95 transition-transform"
-      aria-label="Open editor preview"
-    >
-      {/* Eye icon */}
-      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-        <circle cx="12" cy="12" r="3" />
-      </svg>
-      <span className="text-xs font-semibold">Example</span>
-    </button>
+          {/* Scrollable content */}
+          <div className="flex-1 overflow-y-auto overscroll-contain">
+            <ContextPanel />
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
 
@@ -1296,7 +1278,6 @@ export function CascadePage() {
   const entries = orderedEntries();
   const uniqueProperties = new Set(metadata.map((e) => e.property)).size;
   const [iconStyle, setIconStyle] = useState<IconStyle>("duo");
-  const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
 
   return (
     <IconStyleContext.Provider value={iconStyle}>
@@ -1360,8 +1341,7 @@ export function CascadePage() {
         </section>
 
         {/* Mobile floating preview button + modal */}
-        <MobilePreviewFab onClick={() => setMobilePreviewOpen(true)} />
-        <MobilePreviewModal open={mobilePreviewOpen} onClose={() => setMobilePreviewOpen(false)} />
+        <MobileExampleDialog />
 
         <div className="dither-band" />
 
