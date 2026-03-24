@@ -4,7 +4,7 @@ const features = [
   {
     title: "Deterministic mode",
     description:
-      "Click a property, change a value, the exact edit is written to your file. Targeted AST edits to your existing source — fast, precise, no surprises.",
+      "Click a property, change a value, the exact edit is written to your file. Targeted AST edits to your existing source. Fast, precise, no surprises.",
   },
   {
     title: "AI mode",
@@ -14,7 +14,7 @@ const features = [
   {
     title: "Live preview, real app",
     description:
-      "You're editing your actual running application in both modes. The iframe loads your dev server directly — no canvas, no export cycle.",
+      "You're editing your actual running application in both modes. The iframe loads your dev server directly. No canvas, no export cycle.",
   },
 ];
 

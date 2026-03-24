@@ -25,7 +25,7 @@ export function Hero() {
               className="inline-flex items-center gap-2.5 px-4 py-1.5 text-xs font-medium text-white/70  font-mono relative rounded-full"
             >
               <span className="animate-pulse w-1.5 h-1.5 bg-green-400 rounded-full" />
-              v0.1 — @designtools/surface
+              v0.1 / @designtools/surface
             </motion.span>
           </div>
 
@@ -47,8 +47,8 @@ export function Hero() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.15 }}
           >
-            A multi-framework design tool that sits on top of your production code and writes changes back to source —
-            with fine-grained deterministic controls or AI-assisted exploration, depending on what the moment calls for.
+            A multi-framework CLI design tool that sits on top of your production code and writes changes back to source.
+            Fine-grained deterministic controls or AI-assisted exploration, as the moment demands.
           </motion.p>
 
           <LogoBar />

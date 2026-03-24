@@ -14,7 +14,7 @@ const cards = [
     icon: <Target width={20} height={20} />,
     title: "Two modes, one workflow",
     description:
-      "Precision controls for fine-grained edits when you know exactly what you want. AI mode when you want to explore — passing context about your codebase to your local model CLI. Both write directly to source.",
+      "Precision controls for fine-grained edits when you know exactly what you want. AI mode for open exploration, passing context about your codebase to your local model CLI. Both write directly to source.",
   },
   {
     icon: <Grid3x3 width={20} height={20} />,
