@@ -42,13 +42,13 @@ export function Hero() {
           </motion.h1>
 
           <motion.p
-            className="text-sm md:text-lg text-white/80 max-w-[500px] mx-auto leading-relaxed"
+            className="text-sm md:text-lg text-white/80 max-w-[560px] mx-auto leading-relaxed"
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.15 }}
           >
-            A multi-framework design tool that understands your design system, sits on top of your production code,
-            and writes changes back to source.
+            A multi-framework design tool that sits on top of your production code and writes changes back to source —
+            with fine-grained deterministic controls or AI-assisted exploration, depending on what the moment calls for.
           </motion.p>
 
           <LogoBar />

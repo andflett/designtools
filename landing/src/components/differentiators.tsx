@@ -2,19 +2,19 @@ import { Reveal } from "./reveal.js";
 
 const features = [
   {
-    title: "No code generation",
+    title: "Deterministic mode",
     description:
-      "Your codebase stays yours. Codesurface reads your component tree and writes targeted AST edits to existing files.",
+      "Click a property, change a value, the exact edit is written to your file. Targeted AST edits to your existing source — fast, precise, no surprises.",
+  },
+  {
+    title: "AI mode",
+    description:
+      "Pass edits and codebase context to your local model CLI for open-ended exploration. When you're not sure what you want yet, AI mode helps you get there.",
   },
   {
     title: "Live preview, real app",
     description:
-      "You're editing your actual running application. The iframe loads your dev server directly — no proxy, no simulation.",
-  },
-  {
-    title: "Source-mapped edits",
-    description:
-      "A Babel plugin adds data-source attributes at compile time, so every element maps to its exact file, line, and column.",
+      "You're editing your actual running application in both modes. The iframe loads your dev server directly — no canvas, no export cycle.",
   },
 ];
 
@@ -22,9 +22,9 @@ const rows = [
   { label: "Edits existing code", us: true, them: false },
   { label: "Uses your dev server", us: true, them: false },
   { label: "Design system aware", us: true, them: false },
-  { label: "Deterministic edits", us: true, them: false },
+  { label: "Deterministic mode", us: true, them: false },
+  { label: "AI mode", us: true, them: false },
   { label: "Framework lock-in", us: false, them: true },
-  { label: "AI-dependent output", us: false, them: true },
 ];
 
 export function Differentiators() {
