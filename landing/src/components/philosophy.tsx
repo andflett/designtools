@@ -12,9 +12,9 @@ const cards = [
   },
   {
     icon: <Target width={20} height={20} />,
-    title: "Deterministic, not generative",
+    title: "Two edit modes, one workflow",
     description:
-      "You click a property, you change a value, the exact edit is written to your file. No AI guessing what you meant. Precision by default.",
+      "Precision controls for fine-grained edits when you know exactly what you want. AI mode for open exploration, passing context about your codebase to your local model CLI. Both write directly to source.",
   },
   {
     icon: <Grid3x3 width={20} height={20} />,
