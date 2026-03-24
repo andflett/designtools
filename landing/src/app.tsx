@@ -7,6 +7,7 @@ import { ThreeTiers } from "./components/three-tiers.js";
 import { Compatibility } from "./components/compatibility.js";
 import { Stack } from "./components/stack.js";
 import { Waitlist } from "./components/waitlist.js";
+import { CascadeCta } from "./components/cascade-cta.js";
 import { Footer } from "./components/footer.js";
 import { Privacy } from "./components/privacy.js";
 import { Analytics } from '@vercel/analytics/react';
@@ -39,11 +40,12 @@ export function App() {
       <Nav />
       <Hero />
       <DemoWindow />
-      <Waitlist />
       <Philosophy />
+      <Waitlist />
       <ThreeTiers />
       <Compatibility />
       <Stack />
+      <CascadeCta />
       <Footer />
       <Analytics />
     </>
