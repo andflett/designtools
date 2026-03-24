@@ -35,7 +35,7 @@ export function Differentiators() {
 
       <section className="py-24 bg-raised checker-dither">
         <div className="max-w-[1100px] mx-auto px-6">
-          <div className="grid grid-cols-2 max-md:grid-cols-1 gap-16 items-start">
+          <div className="flex flex-col gap-16">
             <Reveal>
               <div>
                 <p className="text-xs font-medium text-ink3 uppercase tracking-widest mb-3 font-mono">
@@ -49,7 +49,7 @@ export function Differentiators() {
                   what you already have.
                 </p>
 
-                <ul className="flex flex-col gap-6 list-none">
+                <ul className="grid grid-cols-3 max-md:grid-cols-1 gap-6 list-none">
                   {features.map((f) => (
                     <li key={f.title} className="pl-4 border-l-2 border-edge">
                       <h4 className="text-sm font-semibold mb-1">{f.title}</h4>
