@@ -6,6 +6,10 @@
 
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
+
+/** Module-level cache: source content hash → transformed output. Survives hot-reloads. */
+const transformCache = new Map<string, string>();
 
 interface LoaderContext {
   resourcePath: string;
@@ -59,6 +63,15 @@ export default function designtoolsLoader(this: LoaderContext, source: string): 
   // Quick check: skip files with no JSX
   if (!source.includes("<")) {
     callback(null, source);
+    return;
+  }
+
+  // Cache by path + content hash — avoids re-running Babel on unchanged files during hot-reload.
+  // Path must be included because the transform embeds relativePath in every data-source value.
+  const hash = relativePath + ":" + crypto.createHash("md5").update(source).digest("hex");
+  const cached = transformCache.get(hash);
+  if (cached !== undefined) {
+    callback(null, cached);
     return;
   }
 
@@ -169,7 +182,9 @@ export default function designtoolsLoader(this: LoaderContext, source: string): 
       babelrc: false,
     });
 
-    callback(null, result?.code || source);
+    const output = result?.code || source;
+    transformCache.set(hash, output);
+    callback(null, output);
   } catch (err: any) {
     // If Babel fails, pass through the original source
     // This ensures the app still works even if our plugin has issues

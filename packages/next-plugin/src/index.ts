@@ -86,8 +86,14 @@ export function withDesigntools<T extends Record<string, any>>(nextConfig: T = {
   // Unlike @next/mdx (which converts .mdx → .tsx and needs `as: '*.tsx'`),
   // our loaders transform .tsx → .tsx (same extension), so we must NOT use `as`
   // — that would cause Turbopack to re-append the extension (.tsx.tsx).
-  // Instead, use glob patterns that match the file extensions directly.
-  if (process.env.TURBOPACK) {
+  // Always set turbopack.rules unconditionally — it's silently ignored when
+  // Webpack is used, which is safer than relying on TURBOPACK env var detection
+  // (Next.js 16 does not guarantee any specific env var at config-eval time).
+  //
+  // Turbopack rule format does NOT support webpack-style condition objects
+  // (not/all/path). Path filtering for the mount loader is done inside the
+  // loader itself (surface-mount-loader checks resourcePath for "layout.").
+  {
     const sourceLoader = {
       loader: path.resolve(__dirname, "loader.js"),
       options: {
@@ -101,27 +107,15 @@ export function withDesigntools<T extends Record<string, any>>(nextConfig: T = {
       loader: path.resolve(__dirname, "surface-mount-loader.js"),
     };
 
-    // Source annotation loader for all .tsx/.jsx files (excluding node_modules)
-    const sourceRule = {
-      loaders: [sourceLoader],
-      condition: {
-        not: "foreign",
-      },
-    };
+    // Source annotation loader for all .tsx/.jsx files.
+    // The loader itself skips node_modules via relativePath check.
+    const sourceRule = { loaders: [sourceLoader] };
 
-    // Mount loader for layout files (the loader itself checks for <html to skip nested layouts)
-    const mountRule = {
-      loaders: [mountLoader],
-      condition: {
-        all: [
-          { not: "foreign" },
-          { path: /layout\.(tsx|jsx)$/ },
-        ],
-      },
-    };
+    // Mount loader — the loader itself checks both filename ("layout.") and
+    // content (<html>) to skip non-root layouts. Only needed for .tsx since
+    // Next.js App Router layouts are TypeScript.
+    const mountRule = { loaders: [mountLoader] };
 
-    // Use glob patterns that match tsx/jsx files.
-    // The source loader uses separate globs for .tsx and .jsx.
     const existingRules = (nextConfig as any).turbopack?.rules ?? {};
 
     const tsxRule = existingRules["*.tsx"] ?? [];
@@ -139,7 +133,6 @@ export function withDesigntools<T extends Record<string, any>>(nextConfig: T = {
         "*.jsx": [
           ...(Array.isArray(jsxRule) ? jsxRule : [jsxRule]),
           sourceRule,
-          mountRule,
         ],
       },
     };

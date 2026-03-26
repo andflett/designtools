@@ -15,6 +15,13 @@ interface LoaderContext {
 export default function surfaceMountLoader(this: LoaderContext, source: string): void {
   const callback = this.async();
 
+  // Skip files that aren't named layout.* — fast path before any content scan
+  const basename = this.resourcePath.replace(/\\/g, "/").split("/").pop() ?? "";
+  if (!basename.startsWith("layout.")) {
+    callback(null, source);
+    return;
+  }
+
   // Only inject into root layout (not nested layouts)
   // Root layout is detected by the presence of <html> tag
   if (!source.includes("<html")) {
