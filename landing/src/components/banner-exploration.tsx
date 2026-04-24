@@ -261,13 +261,7 @@ function CascadeIcon({
 }) {
   const icon = lookupIcon(prop, value);
   if (!icon) return null;
-  return (
-    <IconSvg
-      icon={icon}
-      className={className}
-      style={{ width: size, height: size }}
-    />
-  );
+  return <IconSvg icon={icon} className={className} />;
 }
 
 /* ------------------------------------------------------------------ */
