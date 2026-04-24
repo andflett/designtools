@@ -142,6 +142,11 @@ export default function designtoolsLoader(this: LoaderContext, source: string): 
                       t.stringLiteral(value)
                     )
                   );
+                  // Propagate loop context through {...props} spread so the rendered
+                  // DOM element carries data-loop even though it's a component element
+                  if (isInMapCallback(nodePath, t)) {
+                    attrs.push(t.jsxAttribute(t.jsxIdentifier("data-loop"), null));
+                  }
                 } else {
                   // Native elements get data-source as before
                   if (attrs.some((a: any) =>

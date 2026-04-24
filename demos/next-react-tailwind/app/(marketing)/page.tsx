@@ -28,7 +28,7 @@ export default function HomePage() {
   return (
     <main className="mx-auto max-w-4xl px-36 py-8 space-y-5">
       <PageHeader title="Workspace" tag="Beta" description="Manage your team and deployments.">
-        <Button variant="ghost" size="sm" className="bg-primary h-52">Deploy</Button>
+        <Button variant="ghost" size="sm" className="bg-primary h-11 text-card">Deploy</Button>
       </PageHeader>
       <SearchBar placeholder="Search members, projects…" action="Go" />
       <Alert variant="warning" >

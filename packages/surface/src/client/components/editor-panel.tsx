@@ -491,6 +491,16 @@ export function EditorPanel({
                   </div>
                 )}
 
+                {/* Dynamic content notice */}
+                {hasDynamicContent && !inLoop && (
+                  <div className="px-3 py-2" style={{ borderBottom: "1px solid var(--studio-border-subtle)" }}>
+                    <div className="text-[10px] px-2 py-1.5 rounded" style={{ color: "#2dd4bf", background: "rgba(20,184,166,0.08)", border: "1px solid rgba(20,184,166,0.2)" }}>
+                      <span style={{ fontWeight: 600 }}>Dynamic content</span>
+                      {" — "}text or children contain runtime expressions.
+                    </div>
+                  </div>
+                )}
+
                 {/* npm component notice */}
                 {isNpmComponent && element.instanceSource && (
                   <div className="px-3 py-2" style={{ borderBottom: "1px solid var(--studio-border-subtle)" }}>

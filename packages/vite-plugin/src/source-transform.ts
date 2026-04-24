@@ -92,6 +92,11 @@ export function transformSource(code: string, id: string, relativePath: string):
                 attrs.push(
                   t.jsxAttribute(t.jsxIdentifier(attrName), t.stringLiteral(value))
                 );
+                // Propagate loop context through {...props} spread so the rendered
+                // DOM element carries data-loop even though it's a component element
+                if (isInMapCallback(nodePath, t)) {
+                  attrs.push(t.jsxAttribute(t.jsxIdentifier("data-loop"), null));
+                }
               } else {
                 if (
                   attrs.some(

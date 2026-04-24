@@ -22,6 +22,8 @@ export default defineConfig(({ mode }) => ({
       input: {
         main: "index.html",
         "ai-writes": "ai-writes.html",
+        "data-sources": "data-sources.html",
+        "data-sources-carousel": "data-sources-carousel.html",
         cascade: "cascade.html",
         "banner-explore": "banner-explore.html",
       },

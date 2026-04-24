@@ -58,6 +58,12 @@ export default function RootLayout({
             >
               Projects
             </a>
+            <a
+              href="/classification-test"
+              className="text-sm text-muted-foreground hover:text-foreground ml-auto font-mono"
+            >
+              classify-test
+            </a>
           </div>
         </nav>
         <main>{children}</main>

@@ -87,6 +87,7 @@ export function App() {
   const [inLoop, setInLoop] = useState(false);
   const inLoopRef = useRef(false);
   const [hasDynamicContent, setHasDynamicContent] = useState(false);
+  const hasDynamicContentRef = useRef(false);
   const [dataOrigin, setDataOrigin] = useState<"local" | "external" | undefined>(undefined);
   const [iteratorExpression, setIteratorExpression] = useState<string | undefined>(undefined);
   const scanReady = useScanReady();
@@ -224,12 +225,14 @@ export function App() {
           setInLoop(false);
           inLoopRef.current = false;
           setHasDynamicContent(false);
+          hasDynamicContentRef.current = false;
           setDataOrigin(undefined);
           setIteratorExpression(undefined);
           sendOverlayState(msg.data, "instance", false);
           // Fire classify-element async to detect data-driven / loop instances
           {
             const src = msg.data.source;
+            const instanceSrc = msg.data.instanceSource;
             if (src && !src.file.includes("node_modules")) {
               const params = new URLSearchParams({
                 file: src.file,
@@ -242,6 +245,7 @@ export function App() {
                   const dataDriven = c.inLoop || c.hasDynamicContent;
                   isDataDrivenRef.current = dataDriven;
                   inLoopRef.current = c.inLoop;
+                  hasDynamicContentRef.current = c.hasDynamicContent;
                   setIsDataDriven(dataDriven);
                   setInLoop(c.inLoop);
                   setHasDynamicContent(c.hasDynamicContent);
@@ -256,6 +260,33 @@ export function App() {
                     });
                     return prev;
                   });
+                  // If the definition file has no loop, check the usage site (instanceSrc) —
+                  // component elements rendered in a .map() are looped at the call site, not
+                  // inside the component's own source file.
+                  if (!c.inLoop && instanceSrc) {
+                    const p2 = new URLSearchParams({ file: instanceSrc.file, line: String(instanceSrc.line), col: String(instanceSrc.col) });
+                    fetch(`/api/classify-element?${p2}`)
+                      .then(r => r.json())
+                      .then((c2: { inLoop: boolean; dataOrigin?: "local" | "external"; iteratorExpression?: string }) => {
+                        if (!c2.inLoop) return;
+                        inLoopRef.current = true;
+                        isDataDrivenRef.current = true;
+                        setInLoop(true);
+                        setIsDataDriven(true);
+                        setDataOrigin(c2.dataOrigin);
+                        setIteratorExpression(c2.iteratorExpression);
+                        setSelectedElement(prev => {
+                          if (prev) sendOverlayState(prev, "instance", true, {
+                            inLoop: true,
+                            hasDynamicContent: hasDynamicContentRef.current,
+                            dataOrigin: c2.dataOrigin,
+                            iteratorExpression: c2.iteratorExpression,
+                          });
+                          return prev;
+                        });
+                      })
+                      .catch(() => {});
+                  }
                 })
                 .catch(() => {}); // classify failing silently is fine
             }
@@ -267,7 +298,7 @@ export function App() {
           setSelectedElement(prev => {
             if (prev) sendOverlayState(prev, newMode, isDataDrivenRef.current, {
               inLoop: inLoopRef.current,
-              hasDynamicContent: false,
+              hasDynamicContent: hasDynamicContentRef.current,
             });
             return prev;
           });

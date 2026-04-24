@@ -22,7 +22,8 @@
     "motion": "^12.0.0",
     "pixelarticons": "^2.0.2",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "shiki": "^4.0.2"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",
