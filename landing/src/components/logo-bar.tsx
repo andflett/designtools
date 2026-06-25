@@ -100,7 +100,7 @@ function LogoItem({ name, svg, index }: { name: string; svg: React.ReactNode; in
 
 export function LogoBar() {
   return (
-    <div className="flex items-center justify-center gap-x-6 gap-y-2 md:gap-10 flex-wrap pt-10 pb-2">
+    <div className="flex items-center justify-center gap-x-6 gap-y-2 md:gap-10 flex-wrap pt-5 pb-2">
       {logos.map((logo, i) => (
         <LogoItem key={logo.name} name={logo.name} svg={logo.svg} index={i} />
       ))}
