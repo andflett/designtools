@@ -41,16 +41,6 @@ export function Hero() {
             <span className="glitch" data-text="production">production</span> frontends
           </motion.h1>
 
-          <motion.p
-            className="text-sm md:text-lg text-white/80 max-w-[560px] mx-auto leading-relaxed"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.15 }}
-          >
-            A multi-framework CLI design tool that sits on top of your production code and writes changes back to source.
-            Fine-grained deterministic controls or AI-assisted exploration, as the moment demands.
-          </motion.p>
-
           <LogoBar />
         </div>
       </div>
