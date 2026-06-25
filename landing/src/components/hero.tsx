@@ -36,9 +36,9 @@ export function Hero() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.08 }}
           >
-            Your codebase,
+            Visual editing for
             <br />
-            edited <span className="glitch" data-text="visually">visually</span>
+            <span className="glitch" data-text="production">production</span> frontends
           </motion.h1>
 
           <LogoBar />
