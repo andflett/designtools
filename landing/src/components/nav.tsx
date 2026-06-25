@@ -59,6 +59,14 @@ export function Nav() {
           >
             <NpmIcon />
           </a>
+          <a
+            href="https://github.com/andflett/designtools/releases"
+            target="_blank"
+            rel="noopener"
+            className="hidden sm:inline-flex items-center px-3.5 h-[30px] text-[12px] font-medium text-black bg-white rounded-full hover:bg-white/90 transition-colors"
+          >
+            Download
+          </a>
         </div>
       </div>
     </nav>

@@ -6,7 +6,7 @@ import { Philosophy } from "./components/philosophy.js";
 import { ThreeTiers } from "./components/three-tiers.js";
 import { Compatibility } from "./components/compatibility.js";
 import { Stack } from "./components/stack.js";
-import { Waitlist } from "./components/waitlist.js";
+import { Download } from "./components/download.js";
 import { CascadeCta } from "./components/cascade-cta.js";
 import { Footer } from "./components/footer.js";
 import { Privacy } from "./components/privacy.js";
@@ -41,7 +41,7 @@ export function App() {
       <Hero />
       <DemoWindow />
       <Philosophy />
-      <Waitlist />
+      <Download />
       <ThreeTiers />
       <Compatibility />
       <Stack />
