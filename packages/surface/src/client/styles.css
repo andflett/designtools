@@ -2014,3 +2014,14 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .studio-grid-gap-row {
   margin-top: 2px;
 }
+
+/* Publish button spinner */
+@keyframes studio-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.studio-publish-btn:hover:not(:disabled) {
+  background: var(--studio-accent-hover);
+}

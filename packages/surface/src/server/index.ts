@@ -13,6 +13,7 @@ import { createInstructionsRouter } from "./api/instructions.js";
 import { createAgentChatRouter } from "./api/agent-chat.js";
 import { createClassifyElementRouter } from "./api/classify-element.js";
 import { createComponentStylesRouter } from "./api/component-styles.js";
+import { createPublishPreviewRouter } from "./api/publish-preview.js";
 import { ensureSurfaceInstructions } from "./lib/instruction-builder.js";
 import type { FrameworkInfo } from "./lib/detect-framework.js";
 import type { StylingSystem } from "./lib/detect-styling.js";
@@ -89,6 +90,9 @@ export async function createServer(config: ServerConfig) {
 
   // API: authored styles on element at source coordinates
   app.use("/api/component-styles", createComponentStylesRouter(config.projectRoot));
+
+  // API: commit + push edits to a preview branch, resolve Vercel preview URL
+  app.use("/api/publish-preview", createPublishPreviewRouter(config.projectRoot));
 
   // API: open file in the user's editor
   app.get("/api/open-file", (req, res) => {

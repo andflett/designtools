@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { execSync } from "child_process";
+import { execSync, type ChildProcess } from "child_process";
 import process from "process";
 import readline from "readline";
 import { createServer as createHttpsServer } from "https";
@@ -9,6 +9,7 @@ import { detectFramework, type FrameworkInfo } from "./server/lib/detect-framewo
 import { detectStylingSystem, type StylingSystem } from "./server/lib/detect-styling.js";
 import { createServer } from "./server/index.js";
 import { setupTerminalServer } from "./server/lib/terminal-server.js";
+import { launchProject } from "./server/lib/project-launcher.js";
 
 /**
  * Generate a trusted local certificate using mkcert, or fall back to a
@@ -286,7 +287,26 @@ async function main() {
   let noOpen = false;
   let useHttps = false;
 
-  for (let i = 0; i < args.length; i++) {
+  // Subcommand: `surface open <github-url>` clones a repo, installs deps, and
+  // starts its dev server before launching the editor. Positional args precede
+  // the flag loop, so parse them out first.
+  let openUrl: string | undefined;
+  let openRef: string | undefined;
+  let projectsDirOverride: string | undefined;
+  let flagStart = 0;
+  if (args[0] === "open") {
+    openUrl = args[1];
+    flagStart = 2;
+    if (!openUrl || openUrl.startsWith("-")) {
+      console.log("");
+      console.log(`  ${red("✗")} Missing repository URL`);
+      console.log(`    ${dim("Usage: surface open <github-url> [--ref <branch>]")}`);
+      console.log("");
+      process.exit(1);
+    }
+  }
+
+  for (let i = flagStart; i < args.length; i++) {
     if (args[i] === "--port" && args[i + 1]) {
       targetPort = parseInt(args[i + 1], 10);
       i++;
@@ -307,6 +327,14 @@ async function main() {
       cssOverride = args[i + 1];
       i++;
     }
+    if (args[i] === "--ref" && args[i + 1]) {
+      openRef = args[i + 1];
+      i++;
+    }
+    if (args[i] === "--projects-dir" && args[i + 1]) {
+      projectsDirOverride = args[i + 1];
+      i++;
+    }
     if (args[i] === "--no-open") {
       noOpen = true;
     }
@@ -315,7 +343,42 @@ async function main() {
     }
   }
 
-  const projectRoot = process.cwd();
+  // In `open` mode, clone + install + start the dev server first. This sets the
+  // project root and target port for the rest of the flow; the dev server is
+  // already confirmed reachable, so the later "wait for dev server" step is
+  // skipped. The spawned process is killed on shutdown.
+  let launchedDevProcess: ChildProcess | undefined;
+  let projectRoot: string;
+  if (openUrl) {
+    console.log("");
+    console.log(`  ${bold("@designtools/surface")} ${dim("open")}`);
+    console.log("");
+    try {
+      const result = await launchProject(openUrl, {
+        ref: openRef,
+        projectsDir: projectsDirOverride,
+        onProgress: ({ phase, message }) => {
+          const mark =
+            phase === "ready" ? green("✓") : phase === "clone" ? cyan("→") : dim("·");
+          console.log(`  ${mark} ${message}`);
+        },
+      });
+      projectRoot = result.projectRoot;
+      targetPort = result.port;
+      launchedDevProcess = result.devProcess;
+    } catch (err: any) {
+      console.log("");
+      console.log(`  ${red("✗")} Could not open repository`);
+      console.log(`    ${dim(err.message)}`);
+      console.log("");
+      console.log(`    ${dim("If this app needs a backend, start your staging environment")}`);
+      console.log(`    ${dim("and run: surface --url <staging-url>")}`);
+      console.log("");
+      process.exit(1);
+    }
+  } else {
+    projectRoot = process.cwd();
+  }
 
   console.log("");
   console.log(`  ${bold("@designtools/surface")}`);
@@ -417,7 +480,10 @@ async function main() {
   console.log("");
 
   // 4. Wait for target dev server (retry for up to 15 seconds)
-  if (targetUrl) {
+  if (openUrl) {
+    // `open` mode already started the dev server and confirmed it's reachable.
+    console.log(`  ${green("✓")} Target         http://localhost:${targetPort}`);
+  } else if (targetUrl) {
     // Remote URL mode — check reachability of the provided URL
     let targetReachable = false;
     let waited = false;
@@ -575,6 +641,13 @@ async function main() {
   // so ports are released even if the process is killed abruptly.
   const shutdown = () => {
     console.log(`\n  ${dim("Shutting down...")}`);
+    if (launchedDevProcess) {
+      try {
+        launchedDevProcess.kill();
+      } catch {
+        // already gone
+      }
+    }
     if (viteDevServer) {
       viteDevServer.close().catch(() => {});
     }

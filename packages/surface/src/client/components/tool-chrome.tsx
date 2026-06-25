@@ -11,6 +11,7 @@ import * as Popover from "@radix-ui/react-popover";
 import { Monitor, ChevronDown, ZoomIn, ZoomOut } from "lucide-react";
 import { Viewport } from "./viewport.js";
 import { Tooltip } from "./tooltip.js";
+import { PublishButton } from "./publish-button.js";
 import { rescanAll } from "../lib/scan-actions.js";
 
 export interface ToolChromeProps {
@@ -128,6 +129,7 @@ export function ToolChrome({
               />
             </form>
             <ZoomControl zoom={zoom} onChange={onZoomChange} />
+            <PublishButton />
           </div>
 
           {/* Floating bottom toolbar */}

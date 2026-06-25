@@ -332,24 +332,106 @@ The `instanceOverride` write type in `write-element.ts` already handles this cor
 
 ---
 
-## What We're NOT Building
+### Phase 4: Designer Lifecycle Workflow
 
-- Drag-and-drop element insertion/removal — too complex on real apps with data fetching, server components, conditional rendering. Easy on marketing sites but that's Webflow/Framer territory
-- AI coding agent — different product, Onlook/Cursor territory
-- Cloud sandboxes — local-first is our advantage, not a limitation
-- Figma-style drawing tools — we edit existing apps, not create from scratch
-- Deeper Next.js + Tailwind + shadcn features — that's the fight we lose against funded competitors with platform advantages
+**Goal:** Non-technical designers can open a GitHub repo, run it locally (or point at staging), edit it visually, and publish to a Vercel preview — without ever touching a terminal.
 
-## Competitive Landscape (March 2026)
+This is a new strategic axis: *workflow completeness* alongside the existing styling/framework breadth. The three moments below are independent slices; each ships and works on its own.
 
-| Tool | Framework | Styling | Runtime | Audience |
-|------|-----------|---------|---------|----------|
-| **Onlook** | Next.js only | Tailwind only | Cloud sandbox | AI app builders |
-| **v0** | Next.js only | Tailwind + shadcn | Cloud | Prototypers |
-| **Lovable** | React only | Tailwind | Cloud | Non-developers |
-| **Bolt.new** | Multi (React default) | Tailwind default | WebContainer | Prototypers |
-| **Webflow/Framer** | Own runtime | Own system | Cloud | Designers |
-| **Browser DevTools** | Any | Any | Local | Developers (no persistence) |
-| **Surface** | Next.js, Vite, Astro, SvelteKit (expanding) | Multi-system (expanding) | Local | Developers on real codebases |
+#### Scope constraints
 
-The gap we fill: DevTools-level flexibility (any framework, any styling) with source-file persistence. Nobody else occupies this space.
+- **Existing codebases only.** Target project is already in git, already linked to Vercel (or has a staging URL). Not a greenfield scaffolding tool.
+- **Frontend-only apps.** Apps requiring provisioned backends (databases, auth servers, microservices) won't run locally without significant setup. Fallback: use `--url` to point at a staging environment instead of running locally.
+- **Vercel-first deployment.** Preview push targets Vercel (the most common host for the React/Next/Vite/Astro apps we support). Other hosts can use the raw git push; the preview URL just won't auto-appear.
+
+#### Moment 0 — Launcher: Tauri desktop app
+
+**Status:** Planned (after Moments 1–3 headless pieces are proven)
+
+A thin native desktop app built with Tauri:
+- Designer downloads a signed `.dmg` / `.exe` / `.AppImage` — no App Store approval required, just sign + notarize like Cursor/VS Code/TablePlus. Updates via Tauri Updater.
+- First launch: GitHub OAuth → pick repo from list → app clones, installs deps, starts dev server, opens the editor in an embedded webview.
+- Subsequent launches: "Recent projects" list, one click.
+- The desktop shell does NOT reimplement the editor — it wraps the existing surface server + client (`packages/surface`) and points its webview at `localhost:4400`.
+
+Key new package: `packages/surface-app/` — Tauri app shell (Rust side spawns Node subprocess for surface server; webview points at localhost:4400).
+
+**Deferred:** Hosted cloud-VM tier (bolt.new-style ephemeral containers). Local desktop is the chosen path; cloud is a later paid tier. Validate local first.
+
+#### Moment 1 — Open a codebase from Git ✅
+
+**Status:** Done (`project-launcher.ts` + `surface open <url>` CLI command)
+
+Key file: `packages/surface/src/server/lib/project-launcher.ts`
+
+Full flow: parse GitHub URL → git clone to `~/DesignTools/projects/<repo>/` (or `--projects-dir`) → detect package manager (bun > pnpm > yarn > npm) → install deps → detect dev script → spawn dev server → watch stdout for port → poll until reachable → return `{ projectRoot, port, url, devProcess, stop }`.
+
+CLI usage: `surface open https://github.com/owner/repo [--ref branch] [--projects-dir ~/path]`
+
+Handles: https/SSH/shorthand GitHub URLs, `/tree/<branch>` branch selection, `.git` stripping, reuse of existing clone (no re-clone on subsequent launches), backend-app error path ("if this app needs a running server, use --url").
+
+**Tests:** 28 unit tests in `project-launcher.test.ts` (parseRepoUrl, parsePortFromOutput, detectPackageManager, detectDevScript, defaultProjectsDir).
+
+#### Moment 2 — Run it (local-first) ✅
+
+**Status:** Done (part of `project-launcher.ts`)
+
+`launchProject()` handles the full local run lifecycle: detect package manager, run install (skipped when `node_modules` already exists), detect dev script, spawn child process, parse port from stdout, poll `localhost:<port>` until 200. The CLI shows "starting…" until the port becomes reachable.
+
+**Backend apps / staging shortcut:** If local run fails (missing env vars, backend deps), the error path suggests: "This app needs a running server. Enter a staging URL with `--url https://your-staging.example.com`" — drops into the existing `--url` flow.
+
+#### Moment 3 — Push to Vercel preview ✅
+
+**Status:** Done
+
+| Component | File | What it does |
+|-----------|------|-------------|
+| Git commit+push | `server/lib/git-publish.ts` | `publishToBranch`: `git add -A`, commits if staged, pushes `HEAD:<branch>` to origin. Returns `{ branch, committed, sha }` |
+| Vercel URL resolution | `server/lib/vercel-client.ts` | Reads `.vercel/project.json`, polls `/v6/deployments` API, returns `{ url, state, inspectorUrl }` |
+| API route | `server/api/publish-preview.ts` | `POST /api/publish-preview` — git push + Vercel resolve, decoupled (push always succeeds; Vercel is best-effort) |
+| UI | `client/components/publish-button.tsx` | "Publish" button in top toolbar, Radix Popover, idle/publishing/done/error states, preview URL link |
+
+Token sourcing: `VERCEL_TOKEN` env var or request body `token` field. `.vercel/project.json` auto-detected in the project root.
+
+**Tests:** 4 integration tests in `tests/publish-preview.test.ts` (local bare git remote, `vi.stubGlobal("fetch", ...)` for Vercel API).
+
+#### Build order
+
+1. ✅ `project-launcher.ts` + `surface open <url>` — headless engine, independently testable
+2. ✅ `git-publish.ts` — commit+push on save
+3. ✅ `publish-preview.ts` route + `vercel-client.ts` + Publish button
+4. Staging URL fallback UX — if local run fails, prompt for a staging URL in the desktop app UI
+5. `packages/surface-app/` — Tauri desktop app shell (GitHub OAuth, repo picker, recent projects, embedded webview). Larger; depends on 1–4.
+6. Hosted cloud tier — deferred; validate the local desktop flow first.
+
+---
+
+## What We're NOT Building (Updated June 2026)
+
+- **Drag-and-drop element insertion/removal** — too complex on real apps with data fetching, server components, conditional rendering. Easy on marketing sites but that's Webflow/Framer territory.
+- **AI coding agent** — different product, Onlook/Cursor territory.
+- **Cloud sandboxes (deferred, not rejected)** — local-first desktop is the chosen path. A hosted cloud-VM tier (bolt.new-style ephemeral containers) is a future paid tier; validate local first. The infrastructure bet (container orchestration, networking, billing, cold starts) is startup-scale and the backend-app limitation still applies.
+- **Figma-style drawing tools** — we edit existing apps, not create from scratch.
+- **Deeper Next.js + Tailwind + shadcn features** — that's the fight we lose against funded competitors with platform advantages.
+- **App Store distribution** — distribution is via signed + notarized direct download (.dmg/.exe), same as Cursor/VS Code/TablePlus. No App Store review cycle.
+
+## Competitive Landscape (June 2026)
+
+| Tool | Codebase access | Runtime | Deployment | Designer-native? |
+|------|----------------|---------|-----------|-----------------|
+| **tryinspector.com** | Local only, manual setup | Local | None | Partial (React-biased) |
+| **Figma Make** | GitHub repos → one-way PR | Figma desktop (Mac beta) | GitHub PR | Yes, but Figma-locked |
+| **Onlook** | Local React projects only | Local desktop app | None | Yes, React-only |
+| **Cursor Visual Editor** | Any local codebase | Local browser | None | No (dev tool) |
+| **dessn.ai** | GitHub read access | Cloud (conversational) | None | Yes, no visual editing |
+| **Design in the Browser** | Live dev server (extension) | Local | None | No (needs AI agent) |
+| **bolt/lovable/v0** | None (greenfield only) | Cloud containers | Vercel/auto | Yes, but generate-only |
+| **Surface** | Any git repo (clone + run) | Local desktop app (Tauri) | Vercel preview push | Yes — multi-framework, multi-styling |
+
+**Our differentiation no one else has:**
+- Multi-framework (Next, Vite, Remix, Astro, SvelteKit) + multi-styling-system (Tailwind v3/v4, CSS modules, plain CSS) in one tool
+- Deterministic AST editing — not AI hallucination of what changed
+- Exact source mapping via `data-source="file:line:col"` — precision none of the above have
+- Full lifecycle: paste a GitHub URL → running → edit → ship to Vercel preview, in a browser-based flow with no terminal
+
+The gap we fill: DevTools-level flexibility (any framework, any styling) with source-file persistence AND a designer-native no-terminal workflow. Nobody else occupies this space.
