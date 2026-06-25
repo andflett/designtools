@@ -8,7 +8,7 @@ export function Hero() {
     <section className="relative pt-0 text-center overflow-hidden">
       {/* Dark header band that dissolves via Bayer dither */}
       <div className="bg-[#09090b]">
-        <div className="pt-28 pb-8 md:pb-11 max-w-[1100px] mx-auto px-6 relative">
+        <div className="pt-20 pb-8 md:pb-11 max-w-[1100px] mx-auto px-6 relative">
           {/* Dithered glow — static, not inside motion */}
           <div className="relative inline-flex justify-center mb-8">
             <DitherGlow
@@ -30,7 +30,7 @@ export function Hero() {
           </div>
 
           <motion.h1
-            className="text-[clamp(2.75rem,6.5vw,4.5rem)] font-normal leading-[1.0] tracking-[-0.025em] text-white mb-5"
+            className="text-[clamp(2.75rem,6.5vw,4.5rem)] font-normal leading-[1.0] tracking-[-0.025em] text-white mb-3"
             style={{ fontFamily: "'Jersey 25', sans-serif" }}
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
@@ -41,16 +41,6 @@ export function Hero() {
             <span className="glitch" data-text="production">production</span> frontends
           </motion.h1>
 
-          <motion.p
-            className="text-sm md:text-lg text-white/80 max-w-[560px] mx-auto leading-relaxed"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.15 }}
-          >
-            A multi-framework CLI design tool that sits on top of your production code and writes changes back to source.
-            Fine-grained deterministic controls or AI-assisted exploration, as the moment demands.
-          </motion.p>
-
           <LogoBar />
         </div>
       </div>
@@ -58,7 +48,7 @@ export function Hero() {
       {/* Bayer dither dissolve edge — dark hero into content */}
       <DitherGradient
         direction="down"
-        height={160}
+        height={100}
         pixelSize={4}
         color="#09090b"
       />

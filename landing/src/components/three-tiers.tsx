@@ -6,12 +6,6 @@ import tokensSrc from "../assets/tokens.png?format=webp&quality=80";
 import componentsSrc from "../assets/components.png?format=webp";
 // @ts-ignore
 import instanceSrc from "../assets/instance.png?format=webp";
-// @ts-ignore
-import isolateSrc from "../assets/isolate.png?format=webp";
-// @ts-ignore
-import usageSrc from "../assets/usage3.png?format=webp&quality=100";
-// @ts-ignore
-import explorerSrc from "../assets/explorer.png?format=webp";
 
 interface Tier {
   number: string;
@@ -43,28 +37,6 @@ const tiers: Tier[] = [
       "Override specific component instances. Swap variants, add class overrides, or adjust props in place.",
     screenshot: instanceSrc,
   },
-  {
-    number: "04",
-    title: "Isolate",
-    description:
-      "Preview every variant combination of a component in a single view. Pin dimensions to focus on exactly the states you care about, all updating live as you edit.",
-    screenshot: isolateSrc,
-    imgClass: "!object-left"
-  },
-  {
-    number: "05",
-    title: "Usage",
-    description:
-      "See every page that uses a component, organized as a route tree. Click any route to navigate there instantly and see how your changes look across the app.",
-    screenshot: usageSrc,
-  },
-  {
-    number: "06",
-    title: "Explorer",
-    description:
-      "A refined layers panel showing only the components you authored — or toggle to the full DOM. Next.js apps get Layout and Page sections separated automatically.",
-    screenshot: explorerSrc,
-  },
 ];
 
 export function ThreeTiers() {
@@ -81,8 +53,8 @@ export function ThreeTiers() {
           Every level of your design system
         </h2>
         <p className="text-base text-ink2 max-w-[480px] leading-relaxed mb-14">
-          Edit tokens, components, and instances — then isolate variants, trace
-          usage, and navigate your tree. All writing back to source.
+          Edit tokens, components, and instances — all writing back to your
+          actual source files.
         </p>
 
         <div className="grid grid-cols-3 max-md:grid-cols-1 gap-8">
