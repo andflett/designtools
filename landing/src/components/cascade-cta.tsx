@@ -30,7 +30,6 @@ export function CascadeCta() {
           </Reveal>
         </div>
       </section>
-      <DitherGradient direction="down" height={80} pixelSize={4} color="#09090b" />
     </>
   );
 }

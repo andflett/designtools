@@ -50,6 +50,17 @@ export function DemoWindow() {
             </div>
           </div>
         </Reveal>
+
+        <Reveal delay={0.1}>
+          <div className="max-w-[720px] mx-auto mt-12 grid sm:grid-cols-2 gap-8 text-[14px] leading-relaxed text-ink2">
+            <p>
+              Surface is a CLI tool that mounts a visual editor on top of your running dev server — no canvas, no separate design file. Click any element in your actual app, and a panel opens with Figma-style controls for spacing, colour, typography, and more.
+            </p>
+            <p>
+              Every edit writes back to the real source: swapping Tailwind classes, updating CSS custom properties, or patching CSS rules directly. Changes land in your files the way you'd write them by hand — then HMR picks them up instantly. Works with Next.js, Vite, Astro, SvelteKit, and Remix.
+            </p>
+          </div>
+        </Reveal>
       </div>
     </section>
   );
