@@ -400,8 +400,8 @@ Token sourcing: `VERCEL_TOKEN` env var or request body `token` field. `.vercel/p
 1. ✅ `project-launcher.ts` + `surface open <url>` — headless engine, independently testable
 2. ✅ `git-publish.ts` — commit+push on save
 3. ✅ `publish-preview.ts` route + `vercel-client.ts` + Publish button
-4. Staging URL fallback UX — if local run fails, prompt for a staging URL in the desktop app UI
-5. `packages/surface-app/` — Tauri desktop app shell (GitHub OAuth, repo picker, recent projects, embedded webview). Larger; depends on 1–4.
+4. ✅ Staging URL fallback UX — interactive prompt in CLI (`process.stdin.isTTY`); LaunchScreen in the desktop app shows an input field on failure.
+5. ✅ `packages/surface-app/` — Tauri desktop app shell (GitHub OAuth via device flow, repo picker, recent projects persisted to `~/.designtools/projects.json`, embedded webview navigates to localhost:4400 when surface is ready, tray icon with "Switch Project" / "Quit").
 6. Hosted cloud tier — deferred; validate the local desktop flow first.
 
 ---

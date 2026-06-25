@@ -371,10 +371,32 @@ async function main() {
       console.log(`  ${red("✗")} Could not open repository`);
       console.log(`    ${dim(err.message)}`);
       console.log("");
-      console.log(`    ${dim("If this app needs a backend, start your staging environment")}`);
-      console.log(`    ${dim("and run: surface --url <staging-url>")}`);
-      console.log("");
-      process.exit(1);
+
+      if (process.stdin.isTTY) {
+        const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+        const stagingAnswer = await new Promise<string>((resolve) => {
+          process.stdout.write(
+            `  ${yellow("?")} Enter a staging URL to connect to instead (or press Enter to exit): `
+          );
+          rl.question("", (a) => { rl.close(); resolve(a.trim()); });
+        });
+        if (stagingAnswer) {
+          targetUrl = stagingAnswer.replace(/\/+$/, "");
+          projectRoot = process.cwd();
+          console.log(`  ${green("✓")} Using staging URL: ${targetUrl}`);
+          console.log("");
+        } else {
+          console.log(`    ${dim("Tip: start your staging environment and run:")}`);
+          console.log(`    ${dim("     surface --url <staging-url>")}`);
+          console.log("");
+          process.exit(1);
+        }
+      } else {
+        console.log(`    ${dim("Tip: start your staging environment and run:")}`);
+        console.log(`    ${dim("     surface --url <staging-url>")}`);
+        console.log("");
+        process.exit(1);
+      }
     }
   } else {
     projectRoot = process.cwd();
