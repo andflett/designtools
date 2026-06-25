@@ -9,13 +9,6 @@ const AppleIcon = () => (
   </svg>
 );
 
-const steps = [
-  { n: "1", label: "Download & open the app" },
-  { n: "2", label: "Sign in with GitHub" },
-  { n: "3", label: "Pick a repo or paste a URL" },
-  { n: "4", label: "Edit visually — changes write to source" },
-];
-
 export function Download() {
   return (
     <section className="py-24 border-t border-edge-subtle">
@@ -61,25 +54,7 @@ export function Download() {
         </Reveal>
 
         <Reveal delay={0.1}>
-          <ol className="flex flex-col sm:flex-row items-start sm:items-center justify-center gap-0 max-w-[680px] mx-auto">
-            {steps.map((step, i) => (
-              <li key={step.n} className="flex items-center gap-3 sm:gap-0">
-                <span className="flex items-center gap-3">
-                  <span className="w-6 h-6 rounded-full border border-edge-subtle flex items-center justify-center text-[11px] font-mono text-ink3 shrink-0">
-                    {step.n}
-                  </span>
-                  <span className="text-[13px] text-ink2 whitespace-nowrap">{step.label}</span>
-                </span>
-                {i < steps.length - 1 && (
-                  <span className="hidden sm:block mx-4 text-ink3/30 text-xs">→</span>
-                )}
-              </li>
-            ))}
-          </ol>
-        </Reveal>
-
-        <Reveal delay={0.15}>
-          <p className="text-[11px] text-ink3/60 dark:text-ink3 mt-8 font-mono">
+          <p className="text-[11px] text-ink3/60 dark:text-ink3 font-mono">
             macOS 12+ required &middot; Windows &amp; Linux coming soon
           </p>
         </Reveal>
