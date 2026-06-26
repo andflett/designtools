@@ -269,7 +269,15 @@ body {
   31% { clip-path: inset(60% 0 61% 0); }
   37% { clip-path: inset(68% 0 12% 0); }
   43% { clip-path: inset(51% 0 27% 0); }
-  50% { clip-path: inset(100% 0 0% 0); }
+  50% { clip-path: inset(33% 0 49% 0); }
+  56% { clip-path: inset(78% 0 8% 0); }
+  62% { clip-path: inset(14% 0 67% 0); }
+  68% { clip-path: inset(46% 0 31% 0); }
+  74% { clip-path: inset(89% 0 4% 0); }
+  80% { clip-path: inset(20% 0 58% 0); }
+  85% { clip-path: inset(63% 0 18% 0); }
+  /* brief rest — glitch layer fully clipped */
+  86% { clip-path: inset(100% 0 0% 0); }
   100% { clip-path: inset(100% 0 0% 0); }
 }
 
