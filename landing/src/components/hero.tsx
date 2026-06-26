@@ -8,7 +8,7 @@ export function Hero() {
     <section className="relative pt-0 text-center overflow-hidden">
       {/* Dark header band that dissolves via Bayer dither */}
       <div className="bg-[#09090b]">
-        <div className="pt-20 md:pt-16 pb-8 md:pb-11 max-w-[1100px] mx-auto px-6 relative">
+        <div className="pt-20 md:pt-16 pb-8 md:pb-28 max-w-[1100px] mx-auto px-6 relative">
           {/* Dithered glow — static, not inside motion */}
           <div className="relative inline-flex justify-center mb-8 md:mb-4">
             <DitherGlow
