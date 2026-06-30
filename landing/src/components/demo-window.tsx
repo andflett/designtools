@@ -15,7 +15,7 @@ export function DemoWindow() {
   }
 
   return (
-    <section className="relative z-10 pb-16 pt-12 md:pt-0 md:-mt-[162px]">
+    <section className="relative pb-20 pt-8 md:pt-12">
       <div className="max-w-[1100px] mx-auto px-6">
         <Reveal>
           <div className="max-w-[960px] mx-auto rounded-md overflow-hidden bg-surface shadow-[0_1px_3px_rgba(0,0,0,0.04),0_8px_32px_-8px_rgba(0,0,0,0.08)]">
@@ -48,17 +48,6 @@ export function DemoWindow() {
                 </div>
               )}
             </div>
-          </div>
-        </Reveal>
-
-        <Reveal delay={0.1}>
-          <div className="max-w-[720px] mx-auto mt-12 grid sm:grid-cols-2 gap-8 text-[14px] leading-relaxed text-ink2">
-            <p>
-              Surface is a CLI tool that mounts a visual editor on top of your running dev server — no canvas, no separate design file. Click any element in your actual app and a panel opens with precise controls for tokens, spacing, colour, and typography. Every edit writes back to the real source: Tailwind classes, CSS custom properties, or CSS rules, exactly as you'd write them by hand.
-            </p>
-            <p>
-              There are two ways to work. Fine-grained controls let you scrub values, pick from your token scale, and commit changes one property at a time. AI-assisted mode lets you describe what you want and explores the space for you — swapping variants, trying combinations, iterating freely. Both modes write to the same source files. Switch between them as the moment demands.
-            </p>
           </div>
         </Reveal>
       </div>

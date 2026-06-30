@@ -1,44 +1,45 @@
 import { BracesContent } from "pixelarticons/react/BracesContent";
 import { Target } from "pixelarticons/react/Target";
 import { Grid3x3 } from "pixelarticons/react/Grid3x3";
+import { DitherGradient } from "./dither-gradient.js";
 import { Reveal } from "./reveal.js";
 
 const cards = [
   {
-    icon: <BracesContent width={20} height={20} />,
-    title: "Your code, not a canvas",
-    description:
-      "No import/export cycle. Surface loads your running app in an iframe and edits source files directly. The app you see is the app you ship.",
-  },
-  {
     icon: <Target width={20} height={20} />,
-    title: "Two edit modes, one workflow",
+    title: "Direct edits or AI — your call",
     description:
-      "Precision controls for fine-grained edits when you know exactly what you want. AI mode for open exploration, passing context about your codebase to your local model CLI. Both write directly to source.",
+      "Figma-grade controls for hands-on work: scrub spacing, pick colours, tune type. Or describe the change and let AI explore it for you. Both write to the same source files.",
   },
   {
     icon: <Grid3x3 width={20} height={20} />,
-    title: "Design system thinking",
+    title: "Fluent in your design system",
     description:
-      "Tokens, components, instances. Surface maps your codebase structure and encourages systematic changes over freeform pixel pushing.",
+      "Surface reads your tokens, components and variants, then offers choices in your system's own language — your scales, your names. Need an exception? Drop to arbitrary values anytime.",
+  },
+  {
+    icon: <BracesContent width={20} height={20} />,
+    title: "Live on production code",
+    description:
+      "Edit your real running app, writing straight back to source — across Next, Vite, Remix, Astro and SvelteKit, Tailwind or plain CSS. Not a React-only toy. Not a throwaway canvas.",
   },
 ];
 
 export function Philosophy() {
   return (
     <>
-      <div className="dither-band" />
-      <section className="py-24 bg-raised checker-dither">
-        <div className="max-w-[1100px] mx-auto px-6">
-          <div className="text-center mb-12">
-            <p className="text-xs font-medium text-ink3 uppercase tracking-widest mb-3 font-mono">
-              Philosophy
-            </p>
-            <h2 className="text-[clamp(1.9rem,4vw,3rem)] font-normal tracking-[-0.025em] leading-[1.1]" style={{ fontFamily: "'Jersey 25', sans-serif" }}>
-              Your code, your rules
-            </h2>
-          </div>
-
+      <section className="relative pt-24 md:pt-36 pb-24 md:pb-16 bg-raised checker-dither overflow-hidden">
+        {/* Bayer dither dissolves the dark hero straight into the
+            checkerboard — sits over the section bg, no separator line.
+            -mt-px overlaps the solid top row onto the hero above. */}
+        <DitherGradient
+          direction="down"
+          height={64}
+          pixelSize={4}
+          color="#09090b"
+          className="absolute inset-x-0 top-0 -mt-px pointer-events-none"
+        />
+        <div className="max-w-[1100px] mx-auto px-6 relative">
           <div className="grid grid-cols-3 max-md:grid-cols-1 gap-px bg-edge-subtle rounded-xl overflow-hidden border border-edge-subtle">
           {cards.map((card, i) => (
             <Reveal key={card.title} delay={i * 0.08}>

@@ -1,5 +1,4 @@
 import { motion } from "motion/react";
-import { DitherGradient } from "./dither-gradient.js";
 import { DitherGlow } from "./dither-glow.js";
 import { LogoBar } from "./logo-bar.js";
 
@@ -8,7 +7,7 @@ export function Hero() {
     <section className="relative pt-0 text-center overflow-hidden">
       {/* Dark header band that dissolves via Bayer dither */}
       <div className="bg-[#09090b]">
-        <div className="pt-14 md:pt-16 pb-8 md:pb-28 max-w-[1100px] mx-auto px-6 relative">
+        <div className="pt-14 md:pt-16 pb-10 md:pb-16 max-w-[1100px] mx-auto px-6 relative">
           {/* Dithered glow — static, not inside motion */}
           <div className="relative inline-flex justify-center mb-8 md:mb-4">
             <DitherGlow
@@ -44,14 +43,6 @@ export function Hero() {
           <LogoBar />
         </div>
       </div>
-
-      {/* Bayer dither dissolve edge — dark hero into content */}
-      <DitherGradient
-        direction="down"
-        height={100}
-        pixelSize={4}
-        color="#09090b"
-      />
     </section>
   );
 }

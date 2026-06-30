@@ -1,5 +1,6 @@
 import { Sun, Moon } from "lucide-react";
 import { useTheme, toggleTheme } from "../theme.js";
+import { ComingSoon } from "./coming-soon-tooltip.js";
 
 const GitHubIcon = () => (
   <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="currentColor">
@@ -59,14 +60,16 @@ export function Nav() {
           >
             <NpmIcon />
           </a>
-          <a
-            href="https://github.com/andflett/designtools/releases"
-            target="_blank"
-            rel="noopener"
-            className="hidden sm:inline-flex items-center px-3.5 h-[30px] text-[12px] font-medium text-black bg-white rounded-full hover:bg-white/90 transition-colors"
-          >
-            Download
-          </a>
+          <ComingSoon>
+            <button
+              type="button"
+              aria-disabled="true"
+              onClick={(e) => e.preventDefault()}
+              className="hidden sm:inline-flex items-center px-3.5 h-[30px] text-[12px] font-medium text-black bg-white rounded-full opacity-60 cursor-not-allowed select-none"
+            >
+              Download
+            </button>
+          </ComingSoon>
         </div>
       </div>
     </nav>

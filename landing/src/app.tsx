@@ -39,8 +39,8 @@ export function App() {
     <>
       <Nav />
       <Hero />
-      <DemoWindow />
       <Philosophy />
+      <DemoWindow />
       <Download />
       <ThreeTiers />
       <Compatibility />

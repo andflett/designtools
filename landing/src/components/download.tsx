@@ -1,7 +1,5 @@
-import { motion } from "motion/react";
 import { Reveal } from "./reveal.js";
-
-const RELEASES_URL = "https://github.com/andflett/designtools/releases";
+import { ComingSoon } from "./coming-soon-tooltip.js";
 
 const AppleIcon = () => (
   <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -11,8 +9,19 @@ const AppleIcon = () => (
 
 export function Download() {
   return (
-    <section className="py-24 border-t border-edge-subtle">
-      <div className="max-w-[1100px] mx-auto px-6 text-center">
+    <>
+      {/* Bayer dither bands separate the panel from its neighbours */}
+      <div className="dither-band" />
+      <section className="relative bg-raised checker-dither pt-24 pb-20 overflow-hidden">
+      {/* Corner crop marks — framing ticks, like an artboard */}
+      <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+        <span className="absolute top-6 left-6 w-3 h-3 border-l border-t border-ink3/40" />
+        <span className="absolute top-6 right-6 w-3 h-3 border-r border-t border-ink3/40" />
+        <span className="absolute bottom-6 left-6 w-3 h-3 border-l border-b border-ink3/40" />
+        <span className="absolute bottom-6 right-6 w-3 h-3 border-r border-b border-ink3/40" />
+      </div>
+
+      <div className="max-w-[1100px] mx-auto px-6 text-center relative">
         <Reveal>
           <p className="text-xs font-medium text-ink3 uppercase tracking-widest mb-3 font-mono">
             Free &amp; open source
@@ -31,25 +40,27 @@ export function Download() {
 
         <Reveal delay={0.05}>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-12">
-            <motion.a
-              href={RELEASES_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2.5 px-6 h-[46px] text-sm font-medium bg-ink text-page rounded-lg hover:bg-ink/90 transition-colors"
-              whileHover={{ y: -1 }}
-              whileTap={{ scale: 0.985 }}
-            >
-              <AppleIcon />
-              Download for macOS
-            </motion.a>
-            <a
-              href={RELEASES_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 h-[46px] px-5 text-sm text-ink2 hover:text-ink transition-colors font-mono"
-            >
-              All releases ↗
-            </a>
+            <ComingSoon>
+              <button
+                type="button"
+                aria-disabled="true"
+                onClick={(e) => e.preventDefault()}
+                className="inline-flex items-center gap-2.5 px-6 h-[46px] text-sm font-medium bg-ink text-page rounded-lg opacity-60 cursor-not-allowed select-none"
+              >
+                <AppleIcon />
+                Download for macOS
+              </button>
+            </ComingSoon>
+            <ComingSoon>
+              <button
+                type="button"
+                aria-disabled="true"
+                onClick={(e) => e.preventDefault()}
+                className="inline-flex items-center gap-2 h-[46px] px-5 text-sm text-ink3 cursor-not-allowed select-none font-mono"
+              >
+                All releases ↗
+              </button>
+            </ComingSoon>
           </div>
         </Reveal>
 
@@ -59,6 +70,8 @@ export function Download() {
           </p>
         </Reveal>
       </div>
-    </section>
+      </section>
+      <div className="dither-band" />
+    </>
   );
 }

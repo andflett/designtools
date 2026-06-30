@@ -50,7 +50,7 @@ export function ThreeTiers() {
           Systems, not screens
         </p>
         <h2 className="text-[clamp(1.9rem,4vw,3rem)] font-normal tracking-[-0.025em] leading-[1.1] mb-3" style={{ fontFamily: "'Jersey 25', sans-serif" }}>
-          Surface understands and adheres to your design system
+          Built around your design system
         </h2>
         <p className="text-base text-ink2 max-w-[480px] leading-relaxed mb-14">
           Edit tokens, components, and instances — all writing back to your
