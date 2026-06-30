@@ -29,8 +29,8 @@ export function Stack() {
               className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
             />
             <span className="inline-flex items-center uppercase gap-2.5 px-4 py-1.5 text-xs font-medium text-ink3 font-mono relative rounded-full">
-              <span className="animate-pulse w-1.5 h-1.5 bg-amber-400 rounded-full" />
-              Active development
+              <span className="animate-pulse w-1.5 h-1.5 bg-green-400 rounded-full" />
+              Open source
             </span>
           </div>
         </Reveal>
@@ -40,16 +40,13 @@ export function Stack() {
             className="text-[clamp(1.9rem,4vw,3rem)] font-normal leading-[1.1] tracking-[-0.025em] mb-5"
             style={{ fontFamily: "'Jersey 25', sans-serif" }}
           >
-            Feeling adventurous?
+            Or go CLI-first
           </h2>
         </Reveal>
 
         <Reveal delay={0.1}>
           <p className="text-base text-ink2 max-w-[480px] mx-auto leading-relaxed mb-10">
-            We're not ready yet. Things will break, APIs will change, and
-            your colleagues might
-            judge you. But if you like living on the edge, the source is
-            open and the package is published.
+            Already have a dev server running? Skip the app and use surface directly from the terminal — plug into any existing workflow.
           </p>
         </Reveal>
 
