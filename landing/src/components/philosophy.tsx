@@ -28,7 +28,7 @@ const cards = [
 export function Philosophy() {
   return (
     <>
-      <section className="relative pt-24 md:pt-36 pb-24 md:pb-16 bg-raised checker-dither overflow-hidden">
+      <section className="relative pt-24 md:pt-36 pb-12 md:pb-16 bg-raised checker-dither overflow-hidden">
         {/* Bayer dither dissolves the dark hero straight into the
             checkerboard — sits over the section bg, no separator line.
             -mt-px overlaps the solid top row onto the hero above. */}

@@ -13,14 +13,6 @@ export function Download() {
       {/* Bayer dither bands separate the panel from its neighbours */}
       <div className="dither-band" />
       <section className="relative bg-raised checker-dither pt-24 pb-20 overflow-hidden">
-      {/* Corner crop marks — framing ticks, like an artboard */}
-      <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-        <span className="absolute top-6 left-6 w-3 h-3 border-l border-t border-ink3/40" />
-        <span className="absolute top-6 right-6 w-3 h-3 border-r border-t border-ink3/40" />
-        <span className="absolute bottom-6 left-6 w-3 h-3 border-l border-b border-ink3/40" />
-        <span className="absolute bottom-6 right-6 w-3 h-3 border-r border-b border-ink3/40" />
-      </div>
-
       <div className="max-w-[1100px] mx-auto px-6 text-center relative">
         <Reveal>
           <p className="text-xs font-medium text-ink3 uppercase tracking-widest mb-3 font-mono">
@@ -39,7 +31,7 @@ export function Download() {
         </Reveal>
 
         <Reveal delay={0.05}>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-12">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-6">
             <ComingSoon>
               <button
                 type="button"

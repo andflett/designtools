@@ -15,7 +15,7 @@ export function DemoWindow() {
   }
 
   return (
-    <section className="relative pb-20 pt-8 md:pt-12">
+    <section className="relative pt-8 pb-8 md:pt-12 md:pb-20">
       <div className="max-w-[1100px] mx-auto px-6">
         <Reveal>
           <div className="max-w-[960px] mx-auto rounded-md overflow-hidden bg-surface shadow-[0_1px_3px_rgba(0,0,0,0.04),0_8px_32px_-8px_rgba(0,0,0,0.08)]">
